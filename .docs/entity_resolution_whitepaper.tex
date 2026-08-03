@@ -34,7 +34,7 @@ Entity resolution attempts to determine whether two records refer to the same re
 
 The implementation in the \href{https://github.com/denisrobert/entity-resolution}{entity-resolution repository} addresses this problem with a retrieval-and-linkage architecture. A dense vector index performs approximate or exact nearest-neighbor retrieval, reducing the candidate set to the closest $k$ records. Splink then evaluates those candidates with explicit field comparisons and returns a match only when its probability exceeds a configurable threshold.
 
-The representation choice is motivated by recent work on universal tabular representations. In particular, Vogel et al.~\cite{vogel2026} benchmark tabular embeddings at cell, row, column, and table levels and show that embedding quality depends on the downstream task and representation level, but that in the current environment, textual embeddings are superior to dedicate tabular embeddings for retrieval tasks. The present system treats a person record as a row-level textual representation and evaluates it in a retrieval task, while leaving room to replace the embedding engine as better row-oriented representations become available.
+The representation choice is informed by recent work comparing tabular representation approaches. Vogel et al.'s \emph{Towards Universal Tabular Embeddings: A Benchmark Across Data Tasks} (arXiv:2604.21696v1, \url{https://arxiv.org/abs/2604.21696v1})~\cite{vogel2026} benchmark embeddings at cell, row, column, and table levels and show that performance depends on the downstream task and representation level; in the relevant current evaluation, textual embeddings outperform the dedicated tabular alternatives for retrieval. Franz et al.'s \emph{Universal Embeddings of Tabular Data} (arXiv:2507.05904v1, \url{https://arxiv.org/abs/2507.05904v1})~\cite{franz2025} describes a different strategy that transforms tabular data into a graph, learns entity embeddings with graph auto-encoders, and aggregates them into row embeddings. This graph-based approach may bear fruit for entity resolution in future experiments because it is designed to capture relationships among tabular entities and to embed unseen samples composed of similar entities. The present system therefore uses a row-level textual representation as its current baseline while leaving room to replace the embedding engine as these alternatives become more capable.
 
 \section{System Objective and Data Model}
 The reference population contains 50,000 synthetic Canadian person records. Each record has:
@@ -324,7 +324,7 @@ The current MiniLM encoder is a useful baseline, but it is not specialized for e
   \item multilingual encoders for names and addresses across language communities;
   \item character n-gram or TF--IDF vectors for typo-sensitive retrieval;
   \item domain-adapted contrastive encoders trained on positive and hard-negative person pairs;
-  \item tabular representation models evaluated by Vogel et al.~\cite{vogel2026}; and
+  \item graph-based universal tabular embeddings such as those proposed by Franz et al.~\cite{franz2025}; and
   \item hybrid retrieval that combines dense similarity with lexical or field-specific indexes.
 \end{itemize}
 
@@ -337,6 +337,12 @@ Future work should estimate Splink parameters from labelled operational samples,
 The implemented architecture combines a fast vector retrieval layer with an interpretable probabilistic linkage layer. FAISS narrows a 50,000-record population to 20 candidates, while Splink compares identity, contact, and address fields under a configurable decision threshold. Persisting the index and metadata makes the workflow operationally reusable. The most important next steps are to train and calibrate Splink parameters on labelled pairs, investigate differentiable surrogates for its metaparameters, and benchmark alternative row and tabular embedding engines using blocking recall as a first-class metric.
 
 \begin{thebibliography}{9}
+\bibitem{franz2025}
+Astrid Franz, Frederik Hoppe, Marianne Michaelis, and Udo G\"obel.
+\newblock Universal Embeddings of Tabular Data.
+\newblock arXiv:2507.05904v1, 2025.
+\newblock \url{https://arxiv.org/abs/2507.05904v1}.
+
 \bibitem{vogel2026}
 Liane Vogel, Kavitha Srinivas, Niharika D'Souza, Sola Shirai, Oktie Hassanzadeh, and Horst Samulowitz.
 \newblock Towards Universal Tabular Embeddings: A Benchmark Across Data Tasks.
