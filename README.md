@@ -1,42 +1,41 @@
 # Entity Resolution with FAISS + Splink
 
-A complete entity resolution pipeline that combines FAISS vector similarity search for fast candidate blocking with Splink probabilistic record linkage for accurate matching.
+Repository: <https://github.com/denisrobert/entity-resolution>
+
+This project implements a two-stage entity resolution pipeline for synthetic
+Canadian person records. FAISS performs dense-vector candidate blocking and
+Splink performs interpretable probabilistic record linkage over the candidates.
 
 ## Architecture
 
-```
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│  Input Person   │────▶│  FAISS Blocking  │────▶│  Splink Match   │
-│  (with missing  │     │  (Top 20 by      │     │  (Probabilistic │
-│   address/email)│     │   cosine sim)    │     │   scoring)      │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
-                                                          │
-                                                          ▼
-                                                ┌─────────────────┐
-                                                │  Match/No Match │
-                                                │  (threshold)    │
-                                                └─────────────────┘
+```text
+Query person -> MiniLM embedding -> FAISS top-k blocking -> Splink matching
+                                                               |
+                                                               v
+                                                        Match or no match
 ```
 
 ## Features
 
-- **50,000 synthetic Canadian person records** with realistic data
-- **30% missing data** for address and email fields
-- **FAISS vector store** using `sentence-transformers/all-MiniLM-L6-v2` embeddings
-- **Splink probabilistic matching** with priority-weighted comparisons:
+- **Synthetic Canadian person records** with independently missing address and email fields
+- **Normalized `sentence-transformers/all-MiniLM-L6-v2` embeddings** in FAISS `IndexFlatIP`
+- **Persisted index and metadata** that can be reloaded without re-embedding the reference population
+- **Splink probabilistic matching** with field comparisons:
   1. First Name (Jaro-Winkler, high weight)
   2. Last Name (Jaro-Winkler, high weight)
   3. Date of Birth (Exact match, highest weight)
   4. Email (Jaro-Winkler, medium weight)
   5. Address (Jaro-Winkler, lower weight - handles variations)
-- **Configurable thresholds** for both FAISS blocking and Splink matching
+- **Configurable top-k blocking and match thresholds**
+- **Reproducible confusion-matrix and Section 7 benchmark evaluations**
 
 ## Installation
 
 ```bash
-cd work/entity
 pip install -r requirements.txt
 ```
+
+Run commands from the repository root. Python 3.10 or newer is required.
 
 ## Usage
 
@@ -62,13 +61,37 @@ python main.py --index-dir data --input-json query.json
 
 # Run the 5,000-row confusion-matrix experiment
 python test_confusion_matrix.py --count 5000 --output confusion_matrix_results.json
+
+# Run the full Section 7 evaluation plan
+python evaluate_section7.py --count 5000 --ablation-count 500 \
+  --output section7_results.json --csv-output section7_metrics.csv
 ```
+
+The Section 7 evaluator reports blocking recall at `k=10,20,50,100`, threshold
+metrics including precision, recall, F1, and false-match rate, calibration
+bins, per-query FAISS latency percentiles, index build time, and persisted
+index sizes. It also evaluates missing email, missing address, both fields
+missing, address changes, and name perturbations. The `default`,
+`identity_first`, and `compact` row serialization strategies can be selected
+with `--strategies`.
+
+The Section 7 run builds the default, `identity_first`, and `compact`
+serialization indexes. It evaluates 15,000 labelled queries, blocking recall
+at `k=10,20,50,100`, thresholds from `0.50` through `0.95`, calibration bins,
+latency, storage, build time, and controlled field/perturbation ablations.
+
+The latest paper-scale run reported, for the default serialization, 99.88%
+top-20 blocking recall, 99.71% precision, 99.93% recall, and 99.82% F1 at a
+0.85 threshold. The compact serialization reached 99.94% top-20 blocking
+recall and 99.84% F1. Results are stored in `section7_results.json` and
+`section7_metrics.csv`.
 
 ### Python API
 
 ```python
-from entity import generate_people, build_person_store, create_resolver
-from vector_store import FaissPersonStore
+from generate_data import Person, generate_people
+from entity_resolver import create_resolver
+from vector_store import FaissPersonStore, build_person_store
 
 # Generate data and build the persisted index once
 people = generate_people(50000, missing_rate=0.3)
@@ -99,14 +122,19 @@ if result:
 ## Project Structure
 
 ```
-work/entity/
+entity-resolution/
 ├── __init__.py           # Package exports
 ├── requirements.txt      # Dependencies
 ├── generate_data.py      # Synthetic Canadian person generation
 ├── vector_store.py       # FAISS vector store with LangChain interface
 ├── entity_resolver.py    # Splink-based probabilistic matching
 ├── main.py               # Load index and resolve one input person
-└── test_confusion_matrix.py # Generated quality evaluation
+├── test_confusion_matrix.py # Confusion-matrix evaluation
+├── evaluate_section7.py  # Whitepaper Section 7 benchmark suite
+├── data/                 # Persisted FAISS index and person metadata
+├── section7_results.json # Latest Section 7 JSON results
+├── section7_metrics.csv  # Latest Section 7 flat metric table
+└── .docs/                # Whitepaper LaTeX source and PDF
 ```
 
 ## Splink Comparison Priority
@@ -121,14 +149,21 @@ The Splink model is configured with the following priority order:
 | 2 (Medium) | Email | Jaro-Winkler (0.95/0.85/0.75) | Stable when present |
 | 3 (Lower) | Address | Jaro-Winkler (0.85/0.75/0.65) | Changes frequently |
 
-## Output
+## Artifacts and Caveats
 
-The pipeline produces:
-- Match probability scores (0-1)
-- FAISS cosine similarity scores
-- Matched person records
-- Detailed candidate rankings
-- JSON export for analysis
+The resolver produces match probabilities, FAISS cosine similarity scores,
+matched person records, and candidate rankings. `generate_data.py` persists
+`data/people.faiss` and `data/people.json`.
+
+The included data is synthetic and intended for evaluation. Splink currently
+uses untrained default `m/u` parameters; production use requires calibration
+on labelled pairs. The current `IndexFlatIP` query is a linear scan, so HNSW,
+IVF/PQ, sharding, or an external vector database should be benchmarked at
+larger scale. The confusion-matrix and Section 7 evaluators batch Splink
+inference for throughput; the production resolver remains per-query.
+
+The whitepaper is available at `.docs/entity_resolution_whitepaper.pdf`, with
+source in `.docs/entity_resolution_whitepaper.tex`.
 
 ## Requirements
 

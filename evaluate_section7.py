@@ -1,0 +1,352 @@
+"""Run the evaluation plan described in Section 7 of the whitepaper.
+
+The default run builds one synthetic reference index, evaluates blocking recall,
+Splink scores, latency, storage, controlled perturbation cases, and row
+serialization strategies. Results are written as JSON and flat CSV tables.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import statistics
+import tempfile
+import time
+from dataclasses import asdict
+from pathlib import Path
+from typing import Any, Callable
+
+import faiss
+import numpy as np
+import pandas as pd
+import splink
+from langchain_core.documents import Document
+from langchain_huggingface import HuggingFaceEmbeddings
+from splink import Linker, block_on
+from splink.comparison_library import ExactMatch, JaroWinklerAtThresholds
+
+from generate_data import Person, generate_people, introduce_variations
+
+
+DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_THRESHOLDS = (0.50, 0.65, 0.75, 0.85, 0.90, 0.95)
+DEFAULT_K_VALUES = (10, 20, 50, 100)
+
+
+def serialize(person: Person, strategy: str) -> str:
+    """Serialize a person using one of the compared row representations."""
+    if strategy == "default":
+        return person.to_text()
+    if strategy == "identity_first":
+        parts = [
+            f"First Name: {person.first_name}",
+            f"Last Name: {person.last_name}",
+            f"Date of Birth: {person.date_of_birth}",
+        ]
+        if person.email:
+            parts.append(f"Email: {person.email}")
+        if person.address:
+            parts.append(f"Address: {person.address}")
+        return "\n".join(parts)
+    if strategy == "compact":
+        return "|".join(
+            value or ""
+            for value in (
+                person.first_name,
+                person.last_name,
+                person.date_of_birth,
+                person.address,
+                person.email,
+            )
+        )
+    raise ValueError(f"Unknown serialization strategy: {strategy}")
+
+
+def build_index(
+    people: list[Person],
+    model_name: str,
+    strategy: str,
+) -> tuple[Any, Any, list[str], float]:
+    """Build a normalized FAISS index and return its embedding client."""
+    start = time.perf_counter()
+    embedding = HuggingFaceEmbeddings(model_name=model_name)
+    texts = [serialize(person, strategy) for person in people]
+    vectors = np.asarray(embedding.embed_documents(texts), dtype="float32")
+    faiss.normalize_L2(vectors)
+    index = faiss.IndexFlatIP(vectors.shape[1])
+    index.add(vectors)
+    return embedding, index, texts, time.perf_counter() - start
+
+
+def perturb_name(person: Person) -> Person:
+    """Make a deterministic name perturbation for the name ablation."""
+    name = person.first_name
+    if len(name) < 2:
+        return Person(name + "a", person.last_name, person.date_of_birth, person.address, person.email)
+    replacement = "a" if name[-1].lower() != "a" else "e"
+    return Person(name[:-1] + replacement, person.last_name, person.date_of_birth, person.address, person.email)
+
+
+def perturb_address(person: Person) -> Person:
+    """Make a deterministic address-format variation when an address exists."""
+    if not person.address:
+        return person
+    address = person.address.replace(" Street", " St").replace(" Avenue", " Ave")
+    if address == person.address:
+        address = person.address.replace(" ", "  ", 1)
+    return Person(person.first_name, person.last_name, person.date_of_birth, address, person.email)
+
+
+def make_cases(people: list[Person], seed: int) -> list[dict[str, Any]]:
+    """Create labelled positive and negative cases with their true row index."""
+    unrelated = generate_people(len(people), missing_rate=0.3, seed=seed + 1)
+    cases: list[dict[str, Any]] = []
+    for index, (person, negative) in enumerate(zip(people, unrelated)):
+        close = introduce_variations(person, variation_rate=0.15)
+        cases.extend([
+            {"id": f"identical_{index}", "category": "identical", "person": person, "true_index": index, "label": 1},
+            {"id": f"close_{index}", "category": "close", "person": close, "true_index": index, "label": 1},
+            {"id": f"unrelated_{index}", "category": "unrelated", "person": negative, "true_index": None, "label": 0},
+        ])
+    return cases
+
+
+def search_candidates(
+    cases: list[dict[str, Any]],
+    embedding: Any,
+    index: Any,
+    strategy: str,
+    k: int,
+) -> tuple[np.ndarray, np.ndarray, list[float]]:
+    """Return candidate indices and per-query FAISS latency samples."""
+    indices: list[np.ndarray] = []
+    scores: list[np.ndarray] = []
+    latencies: list[float] = []
+    for case in cases:
+        start = time.perf_counter()
+        vector = np.asarray([embedding.embed_query(serialize(case["person"], strategy))], dtype="float32")
+        faiss.normalize_L2(vector)
+        query_scores, query_indices = index.search(vector, min(k, index.ntotal))
+        latencies.append((time.perf_counter() - start) * 1000)
+        scores.append(query_scores[0])
+        indices.append(query_indices[0])
+    return np.asarray(scores), np.asarray(indices), latencies
+
+
+def splink_scores(cases: list[dict[str, Any]], candidate_indices: np.ndarray, people: list[Person]) -> dict[str, float]:
+    """Score all blocked query/candidate pairs and return each query's max probability."""
+    query_records: list[dict[str, Any]] = []
+    candidate_records: list[dict[str, Any]] = []
+    for query_number, case in enumerate(cases):
+        query = case["person"].to_dict()
+        query.update({"unique_id": case["id"], "block_id": query_number})
+        query_records.append(query)
+        for candidate_number in candidate_indices[query_number]:
+            if candidate_number < 0:
+                continue
+            candidate = people[int(candidate_number)].to_dict()
+            candidate.update({
+                "unique_id": f"candidate_{query_number}_{candidate_number}",
+                "block_id": query_number,
+            })
+            candidate_records.append(candidate)
+
+    settings = {
+        "link_type": "link_only",
+        "unique_id_column_name": "unique_id",
+        "source_dataset_column_name": "source_dataset",
+        "comparisons": [
+            JaroWinklerAtThresholds("first_name", [0.9, 0.8, 0.7]),
+            JaroWinklerAtThresholds("last_name", [0.9, 0.8, 0.7]),
+            ExactMatch("date_of_birth"),
+            JaroWinklerAtThresholds("email", [0.95, 0.85, 0.75]),
+            JaroWinklerAtThresholds("address", [0.85, 0.75, 0.65]),
+        ],
+        "blocking_rules_to_generate_predictions": [block_on("block_id")],
+        "probability_two_random_records_match": 0.0001,
+    }
+    linker = Linker(
+        [pd.DataFrame(query_records), pd.DataFrame(candidate_records)],
+        settings,
+        db_api=splink.DuckDBAPI(),
+        set_up_basic_logging=False,
+        input_table_aliases=["query", "candidate"],
+    )
+    predictions = linker.inference.predict(threshold_match_probability=0.0).as_pandas_dataframe()
+    result = {case["id"]: 0.0 for case in cases}
+    if predictions.empty:
+        return result
+    for _, row in predictions.iterrows():
+        query_id = row["unique_id_l"] if row["unique_id_l"] in result else row["unique_id_r"]
+        result[query_id] = max(result[query_id], float(row["match_probability"]))
+    return result
+
+
+def percentile(values: list[float], fraction: float) -> float:
+    return float(np.percentile(values, fraction * 100)) if values else 0.0
+
+
+def classification_metrics(cases: list[dict[str, Any]], probabilities: dict[str, float], threshold: float) -> dict[str, float | int]:
+    counts = {"tp": 0, "tn": 0, "fp": 0, "fn": 0}
+    for case in cases:
+        predicted = probabilities[case["id"]] >= threshold
+        if case["label"] and predicted:
+            counts["tp"] += 1
+        elif case["label"] and not predicted:
+            counts["fn"] += 1
+        elif not case["label"] and predicted:
+            counts["fp"] += 1
+        else:
+            counts["tn"] += 1
+    tp, tn, fp, fn = (counts[key] for key in ("tp", "tn", "fp", "fn"))
+    precision = tp / (tp + fp) if tp + fp else 0.0
+    recall = tp / (tp + fn) if tp + fn else 0.0
+    specificity = tn / (tn + fp) if tn + fp else 0.0
+    return {
+        **counts,
+        "accuracy": (tp + tn) / len(cases),
+        "precision": precision,
+        "recall": recall,
+        "specificity": specificity,
+        "false_match_rate": fp / (fp + tn) if fp + tn else 0.0,
+        "f1": 2 * precision * recall / (precision + recall) if precision + recall else 0.0,
+    }
+
+
+def calibration_bins(cases: list[dict[str, Any]], probabilities: dict[str, float], bins: int = 10) -> list[dict[str, float | int]]:
+    """Return reliability-bin counts, mean probability, and empirical rate."""
+    output = []
+    for bin_number in range(bins):
+        lower = bin_number / bins
+        upper = (bin_number + 1) / bins
+        selected = [case for case in cases if lower <= probabilities[case["id"]] < upper or (bin_number == bins - 1 and probabilities[case["id"]] == 1.0)]
+        output.append({
+            "lower": lower,
+            "upper": upper,
+            "count": len(selected),
+            "mean_probability": statistics.mean([probabilities[c["id"]] for c in selected]) if selected else 0.0,
+            "empirical_match_rate": statistics.mean([c["label"] for c in selected]) if selected else 0.0,
+        })
+    return output
+
+
+def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
+    people = generate_people(args.count, missing_rate=args.missing_rate, seed=args.seed)
+    cases = make_cases(people, args.seed)
+    parameters = {
+        key: str(value) if isinstance(value, Path) else value
+        for key, value in vars(args).items()
+    }
+    all_results: dict[str, Any] = {"parameters": parameters, "strategies": {}}
+
+    for strategy in args.strategies:
+        print(f"Building {strategy} index for {len(people):,} records...")
+        embedding, index, _, build_seconds = build_index(people, args.model, strategy)
+        max_k = max(args.k_values)
+        _, candidate_indices, latencies = search_candidates(cases, embedding, index, strategy, max_k)
+        splink_start = time.perf_counter()
+        probabilities = splink_scores(cases, candidate_indices, people)
+        splink_batch_seconds = time.perf_counter() - splink_start
+        blocking = {}
+        for k in args.k_values:
+            hits = [case for case, row in zip(cases, candidate_indices) if case["true_index"] is not None and case["true_index"] in row[:k]]
+            positives = [case for case in cases if case["true_index"] is not None]
+            blocking[str(k)] = {"hits": len(hits), "positives": len(positives), "recall": len(hits) / len(positives)}
+        thresholds = {str(threshold): classification_metrics(cases, probabilities, threshold) for threshold in args.thresholds}
+        with tempfile.TemporaryDirectory(prefix="entity_eval_") as temp_dir:
+            index_dir = Path(temp_dir)
+            faiss.write_index(index, str(index_dir / "people.faiss"))
+            metadata = {"model_name": args.model, "normalize": True, "people": [asdict(person) for person in people]}
+            (index_dir / "people.json").write_text(json.dumps(metadata), encoding="utf-8")
+            storage = {
+                "faiss_bytes": (index_dir / "people.faiss").stat().st_size,
+                "metadata_bytes": (index_dir / "people.json").stat().st_size,
+            }
+        all_results["strategies"][strategy] = {
+            "build_seconds": build_seconds,
+            "storage": {**storage, "total_bytes": sum(storage.values())},
+            "blocking_recall": blocking,
+            "threshold_metrics": thresholds,
+            "calibration": calibration_bins(cases, probabilities),
+            "latency_ms": {
+                "mean": statistics.mean(latencies),
+                "p50": percentile(latencies, 0.50),
+                "p95": percentile(latencies, 0.95),
+                "p99": percentile(latencies, 0.99),
+                "samples": len(latencies),
+                "scope": "embedding plus FAISS blocking per query",
+            },
+            "splink_batch_seconds": splink_batch_seconds,
+            "estimated_end_to_end_mean_milliseconds": (
+                sum(latencies) / 1000 + splink_batch_seconds
+            ) / len(cases) * 1000,
+        }
+        if strategy == args.strategies[0]:
+            all_results["ablations"] = run_ablations(people, embedding, index, strategy, args)
+    return all_results
+
+
+def run_ablations(people: list[Person], embedding: Any, index: Any, strategy: str, args: argparse.Namespace) -> dict[str, Any]:
+    """Evaluate the controlled field-missingness and perturbation cases."""
+    base = people[: args.ablation_count]
+    variants: dict[str, list[Person]] = {
+        "baseline": base,
+        "missing_email": [Person(p.first_name, p.last_name, p.date_of_birth, p.address, None) for p in base],
+        "missing_address": [Person(p.first_name, p.last_name, p.date_of_birth, None, p.email) for p in base],
+        "missing_both": [Person(p.first_name, p.last_name, p.date_of_birth, None, None) for p in base],
+        "address_change": [perturb_address(p) for p in base],
+        "name_perturbation": [perturb_name(p) for p in base],
+    }
+    output = {}
+    for name, variant_people in variants.items():
+        variant_cases = [{"id": f"{name}_{i}", "category": name, "person": person, "true_index": i, "label": 1} for i, person in enumerate(variant_people)]
+        _, candidate_indices, _ = search_candidates(variant_cases, embedding, index, strategy, max(args.k_values))
+        probabilities = splink_scores(variant_cases, candidate_indices, people)
+        output[name] = {
+            "count": len(variant_cases),
+            "blocking_recall": {str(k): sum(case["true_index"] in row[:k] for case, row in zip(variant_cases, candidate_indices)) / len(variant_cases) for k in args.k_values},
+            "threshold_metrics": {str(t): classification_metrics(variant_cases, probabilities, t) for t in args.thresholds},
+        }
+    return output
+
+
+def write_csv(results: dict[str, Any], output: Path) -> None:
+    """Write the main metric tables as a single flat CSV."""
+    rows = []
+    for strategy, values in results["strategies"].items():
+        for k, metric in values["blocking_recall"].items():
+            rows.append({"table": "blocking_recall", "strategy": strategy, "parameter": k, **metric})
+        for threshold, metric in values["threshold_metrics"].items():
+            rows.append({"table": "threshold_metrics", "strategy": strategy, "parameter": threshold, **metric})
+    fieldnames = sorted({key for row in rows for key in row})
+    with output.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Run Section 7 entity-resolution evaluations")
+    parser.add_argument("--count", type=int, default=1000, help="Reference rows; use 5000 for the paper-scale run")
+    parser.add_argument("--ablation-count", type=int, default=250)
+    parser.add_argument("--missing-rate", type=float, default=0.3)
+    parser.add_argument("--model", default=DEFAULT_MODEL)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--k-values", type=int, nargs="+", default=list(DEFAULT_K_VALUES))
+    parser.add_argument("--thresholds", type=float, nargs="+", default=list(DEFAULT_THRESHOLDS))
+    parser.add_argument("--strategies", nargs="+", default=["default", "identity_first", "compact"], choices=["default", "identity_first", "compact"])
+    parser.add_argument("--output", type=Path, default=Path("section7_results.json"))
+    parser.add_argument("--csv-output", type=Path, default=Path("section7_metrics.csv"))
+    args = parser.parse_args()
+    if args.ablation_count > args.count:
+        parser.error("--ablation-count cannot exceed --count")
+    results = run_evaluation(args)
+    args.output.write_text(json.dumps(results, indent=2), encoding="utf-8")
+    write_csv(results, args.csv_output)
+    print(f"Saved JSON results to {args.output}")
+    print(f"Saved CSV metrics to {args.csv_output}")
+
+
+if __name__ == "__main__":
+    main()
