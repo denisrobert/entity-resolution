@@ -58,6 +58,55 @@ Email: ...
 \end{verbatim}
 Missing fields are omitted from the embedding text and retained as null metadata. The same person object is used for the query and for the persisted metadata, avoiding a second source of truth.
 
+\subsection{Row serialization strategies}
+The embedding ablation compares three textual representations of the same structured record. These representations affect only dense retrieval; Splink receives the original structured fields and uses the same comparisons in every experiment. For example, consider the record
+
+\begin{verbatim}
+first_name    = Alice
+last_name     = Wong
+date_of_birth = 1985-06-15
+address       = 123 Main Street, Toronto, ON M5V 1A1
+email         = alice.wong@example.com
+\end{verbatim}
+
+The \textbf{default} strategy is the production representation implemented by \texttt{Person.to\_text}. It uses labelled lines in identity, address, and email order:
+
+\begin{verbatim}
+First Name: Alice
+Last Name: Wong
+Date of Birth: 1985-06-15
+Address: 123 Main Street, Toronto, ON M5V 1A1
+Email: alice.wong@example.com
+\end{verbatim}
+
+The \textbf{identity-first} strategy retains the same labels and values but places the optional contact fields in email-then-address order after the identity fields:
+
+\begin{verbatim}
+First Name: Alice
+Last Name: Wong
+Date of Birth: 1985-06-15
+Email: alice.wong@example.com
+Address: 123 Main Street, Toronto, ON M5V 1A1
+\end{verbatim}
+
+This tests whether giving the embedding model an explicit identity prefix changes retrieval, without changing the vocabulary or the underlying data. The \textbf{compact} strategy removes labels and joins the fixed field sequence with pipe delimiters:
+
+\begin{verbatim}
+Alice|Wong|1985-06-15|123 Main Street, Toronto, ON M5V 1A1|alice.wong@example.com
+\end{verbatim}
+
+For a record with missing address and email, the labelled strategies omit those lines, whereas compact serialization preserves field positions with empty values:
+
+\begin{verbatim}
+First Name: Alice
+Last Name: Wong
+Date of Birth: 1985-06-15
+
+Alice|Wong|1985-06-15||
+\end{verbatim}
+
+The default strategy is the baseline used by the resolver and confusion-matrix experiment. Identity-first and compact are evaluation alternatives, not separate linkage models. Comparing them under the same FAISS index type, blocking sizes, Splink configuration, queries, and thresholds isolates the effect of row representation on candidate recall and downstream matching.
+
 \section{Two-Stage Algorithm}
 \subsection{Offline generation and indexing}
 The offline process in \texttt{generate\_data.py} performs the following steps:
