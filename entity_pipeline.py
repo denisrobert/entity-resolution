@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from typing import Any, Generic, List, Optional, Sequence, Tuple, TypeVar
 
 import numpy as np
+from splink import block_on
 
 DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 DEFAULT_K = 20
@@ -351,6 +352,14 @@ class Linker:
         self.tau = float(tau)
         self.blocking_k = int(blocking_k)
         self.extra_settings = dict(extra_settings or {})
+        # Trained Splink model (settings dict with fitted m/u and prior). When
+        # set, link() uses these parameters instead of the untrained defaults.
+        self._trained_settings: Optional[dict] = None
+
+    @property
+    def is_trained(self) -> bool:
+        """Whether m/u parameters have been trained with :meth:`train`."""
+        return self._trained_settings is not None
 
     def _settings(self) -> dict:
         settings: dict = {
@@ -363,6 +372,132 @@ class Linker:
         }
         settings.update(self.extra_settings)
         return settings
+
+    def _link_settings(self) -> dict:
+        """Resolve the settings for a per-query linkage job.
+
+        Uses the trained model when available (preserving fitted m/u values and
+        the run-behaviour probability), otherwise the untrained comparisons.
+        The linkage-specific fields are always overridden to scope Splink to
+        comparing the input against its candidates via the block key.
+        """
+        if self._trained_settings is not None:
+            settings = dict(self._trained_settings)
+        else:
+            settings = self._settings()
+        settings["link_type"] = "link_only"
+        settings["unique_id_column_name"] = "unique_id"
+        settings["source_dataset_column_name"] = "source_dataset"
+        settings["blocking_rules_to_generate_predictions"] = [block_on("block_id")]
+        return settings
+
+    def train(
+        self,
+        vector_database: VectorDatabase,
+        training_block_on: Optional[Sequence[Sequence[str]]] = None,
+        recall: float = 0.7,
+        max_pairs: float = 1e6,
+        max_iterations: int = 20,
+        em_convergence: float = 0.001,
+        seed: Optional[int] = None,
+    ) -> dict:
+        """Train the m/u parameters (and match prior) on a reference population.
+
+        The vector database is used as the training data source: every stored
+        record is treated as a row of a deduplication problem over which Splink
+        estimates u via random sampling, the Bayesian prior on a random match,
+        and m via expectation maximisation.
+
+        Parameters
+        ----------
+        vector_database:
+            The vector store whose records provide the training population.
+        training_block_on:
+            Blocking rules used to generate the training pairs, as lists of
+            column names, e.g. ``[("first_name",), ("date_of_birth",)]``.
+            Defaults to per-field rules on first name and date of birth, which
+            reliably produce comparison pairs even for a de-duplicated
+            population. Rules that generate no pairs are skipped.
+        recall:
+            Passed to Splink's prior estimation.
+        max_pairs:
+            Cap on pairs sampled for the u estimate.
+        max_iterations, em_convergence:
+            Passed through to the expectation-maximisation step.
+        seed:
+            Optional seed for Splink's random sampling.
+
+        Returns
+        -------
+        dict
+            The trained Splink settings (with fitted m/u values and prior),
+            which is stored on the linker and used by :meth:`link`.
+        """
+        import logging
+
+        import pandas as pd
+        import splink
+
+        rules = list(training_block_on) if training_block_on else [
+            ("first_name",),
+            ("date_of_birth",),
+        ]
+        blocking_rules = [block_on(*columns) for columns in rules]
+
+        rows = []
+        for position in range(len(vector_database)):
+            row = _record_dict(vector_database.record_at(position))
+            row["unique_id"] = str(position)
+            rows.append(row)
+        df = pd.DataFrame(rows)
+
+        settings = {
+            "link_type": "dedupe_only",
+            "unique_id_column_name": "unique_id",
+            "comparisons": self.comparisons,
+            "blocking_rules_to_generate_predictions": blocking_rules,
+            "em_convergence": em_convergence,
+            "max_iterations": max_iterations,
+        }
+        settings.update(self.extra_settings)
+
+        linker = splink.Linker(
+            df,
+            settings,
+            db_api=splink.DuckDBAPI(),
+            set_up_basic_logging=False,
+        )
+
+        linker.training.estimate_u_using_random_sampling(
+            max_pairs=max_pairs, seed=seed
+        )
+        linker.training.estimate_probability_two_random_records_match(
+            blocking_rules, recall=recall
+        )
+
+        from splink.internals.exceptions import EMTrainingException
+
+        trained_any = False
+        for rule in blocking_rules:
+            try:
+                linker.training.estimate_parameters_using_expectation_maximisation(
+                    rule
+                )
+                trained_any = True
+            except EMTrainingException as exc:
+                logging.getLogger(__name__).warning(
+                    "Skipped EM training on blocking rule %s: %s", rule, exc
+                )
+
+        if not trained_any:
+            raise RuntimeError(
+                "None of the training blocking rules produced any record pairs; "
+                "supply a data source with overlapping records or adjust "
+                "training_block_on."
+            )
+
+        self._trained_settings = linker.misc.save_model_to_json()
+        return self._trained_settings
 
     def link(
         self,
@@ -398,10 +533,7 @@ class Linker:
             row["block_id"] = 0
             row["source_dataset"] = "query" if row["unique_id"] == "INPUT_QUERY" else "candidate"
 
-        settings = self._settings()
-        settings["blocking_rules_to_generate_predictions"] = [
-            splink.block_on("block_id")
-        ]
+        settings = self._link_settings()
         linker = splink.Linker(
             [pd.DataFrame(query_records), pd.DataFrame(candidate_records)],
             settings,

@@ -119,6 +119,25 @@ if result:
     print(f"Matched: {result['matched_person'].first_name} {result['matched_person'].last_name}")
 ```
 
+The abstract `Blocker`/`Linker` classes in `entity_pipeline.py` expose the two
+stages separately and support training the Splink `m/u` parameters on the
+vector store:
+
+```python
+from entity_pipeline import Blocker, Linker, default_comparisons
+
+blocker = Blocker.build(people, k=20)          # index the reference population
+linker = Linker(default_comparisons(), tau=0.85)
+
+linker.train(blocker.vector_database, seed=1)  # fit m/u on the vector store
+print("trained:", linker.is_trained)
+
+candidates = blocker.block(query, k=20)        # FAISS k-ANN blocking
+matches = linker.link(query, candidates)       # Splink linkage above tau
+for m in matches:
+    print(m.match_probability, m.record.first_name, m.record.last_name)
+```
+
 ## Project Structure
 
 ```
