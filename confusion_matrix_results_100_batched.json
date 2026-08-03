@@ -1,0 +1,49 @@
+{
+  "parameters": {
+    "reference_records": 100,
+    "test_rows": 100,
+    "queries_per_test_row": 3,
+    "total_queries": 300,
+    "missing_rate": 0.3,
+    "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+    "blocking_k": 20,
+    "match_threshold": 0.85,
+    "close_variation_rate": 0.15,
+    "seed": 42
+  },
+  "timing": {
+    "index_build_seconds": 5.163442499993835,
+    "query_seconds": 1.9182798999827355,
+    "mean_query_milliseconds": 6.394266333275786
+  },
+  "confusion_matrix": {
+    "TP": 199,
+    "FN": 1,
+    "FP": 0,
+    "TN": 100
+  },
+  "by_category": {
+    "identical": {
+      "expected_match": true,
+      "TP": 100,
+      "FN": 0
+    },
+    "close_same_entity": {
+      "expected_match": true,
+      "TP": 99,
+      "FN": 1
+    },
+    "unrelated": {
+      "expected_match": false,
+      "FP": 0,
+      "TN": 100
+    }
+  },
+  "metrics": {
+    "accuracy": 0.9966666666666667,
+    "precision": 1.0,
+    "recall": 0.995,
+    "specificity": 1.0,
+    "f1": 0.9974937343358395
+  }
+}
