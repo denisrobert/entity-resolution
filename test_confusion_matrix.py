@@ -12,7 +12,11 @@ import numpy as np
 import pandas as pd
 import splink
 from splink import Linker, block_on
-from splink.comparison_library import ExactMatch, JaroWinklerAtThresholds
+from splink.comparison_library import (
+    DateOfBirthComparison,
+    EmailComparison,
+    JaroWinklerAtThresholds,
+)
 
 from generate_data import Person, generate_people, introduce_variations
 from vector_store import build_person_store
@@ -103,8 +107,8 @@ def predict_batch(
         "comparisons": [
             JaroWinklerAtThresholds("first_name", [0.9, 0.8, 0.7]),
             JaroWinklerAtThresholds("last_name", [0.9, 0.8, 0.7]),
-            ExactMatch("date_of_birth"),
-            JaroWinklerAtThresholds("email", [0.95, 0.85, 0.75]),
+            DateOfBirthComparison("date_of_birth", input_is_string=True),
+            EmailComparison("email"),
             JaroWinklerAtThresholds("address", [0.85, 0.75, 0.65]),
         ],
         "blocking_rules_to_generate_predictions": [block_on("block_id")],

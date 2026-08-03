@@ -26,7 +26,7 @@
 \maketitle
 
 \begin{abstract}
-This paper presents and evaluates a two-stage entity resolution pipeline for incomplete Canadian person records. A synthetic reference population is represented with normalized \texttt{all-MiniLM-L6-v2} embeddings and persisted in a FAISS \texttt{IndexFlatIP} store. Each query is first blocked to its top 20 vector neighbors, after which Splink performs interpretable probabilistic linkage using Jaro--Winkler comparisons for names, email, and address, together with exact date-of-birth comparison. The approach is similar in overall architecture to the FAISS-plus-linkage workflow described by Strojny and Ber\k{e}sewicz~\cite{strojny2026}, although the present pipeline was independently derived and uses a different implementation and evaluation design. The implementation supports persisted-index reload without re-embedding the reference population and independently models 30\% missingness for address and email. In a 15,000-query experiment comprising identical, close-variation, and unrelated records, the pipeline achieved 99.41\% accuracy, 99.57\% precision, 99.55\% recall, 99.14\% specificity, and a 99.56\% F1 score, with a mean query time of 7.26\,ms in the validation environment. The paper also discusses memory scaling, operational limits, calibration of Splink parameters, and alternatives to linear-scan FAISS indexing.
+This paper presents and evaluates a two-stage entity resolution pipeline for incomplete Canadian person records. A synthetic reference population is represented with normalized \texttt{all-MiniLM-L6-v2} embeddings and persisted in a FAISS \texttt{IndexFlatIP} store. Each query is first blocked to its top 20 vector neighbors, after which Splink performs interpretable probabilistic linkage using Jaro--Winkler comparisons for names and address, a dedicated email comparison, and a date-of-birth comparison that accounts for date structure. The approach is similar in overall architecture to the FAISS-plus-linkage workflow described by Strojny and Ber\k{e}sewicz~\cite{strojny2026}, although the present pipeline was independently derived and uses a different implementation and evaluation design. The implementation supports persisted-index reload without re-embedding the reference population and independently models 30\% missingness for address and email. In a 15,000-query experiment comprising identical, close-variation, and unrelated records, the updated pipeline achieved 99.27\% accuracy, 99.48\% precision, 99.43\% recall, 98.96\% specificity, and a 99.45\% F1 score, with a mean query time of 7.25\,ms in the validation environment. The paper also discusses memory scaling, operational limits, calibration of Splink parameters, and alternatives to linear-scan FAISS indexing.
 \end{abstract}
 
 \section{Introduction}
@@ -138,8 +138,8 @@ Field & Comparison & Intended role \\
 \midrule
 First name & Jaro--Winkler thresholds & High-priority identity evidence \\
 Last name & Jaro--Winkler thresholds & High-priority identity evidence \\
-Date of birth & Exact match & Strong, stable evidence \\
-Email & Jaro--Winkler thresholds & Medium-priority evidence when present \\
+Date of birth & Date-of-birth comparison & Strong, stable evidence \\
+Email & Email comparison & Medium-priority evidence when present \\
 Address & Jaro--Winkler thresholds & Lower-priority, changeable evidence \\
 \bottomrule
 \end{tabular}
@@ -220,7 +220,7 @@ The benchmark should include ablations for missing email, missing address, both 
 \subsection{Measured Section 7 benchmark}
 These requirements were implemented in \texttt{evaluate\_section7.py} and run with 5,000 reference records, 15,000 labelled queries, a 30\% independent missingness rate, and 500 records per ablation. The labelled queries consisted of identical positives, close same-entity variants, and unrelated negatives. Splink used its current untrained default $m/u$ parameters, so the measurements are an engineering baseline rather than calibrated production probabilities. The evaluator wrote the complete results to \texttt{section7\_results.json} and \texttt{section7\_metrics.csv}.
 
-Table~\ref{tab:section7-strategies} compares the three row serialization strategies. Blocking recall is measured over the 10,000 positive queries. Latency percentiles cover embedding plus FAISS blocking per query; the reported end-to-end mean adds the batched Splink inference time divided by the number of queries.
+Table~\ref{tab:section7-strategies} compares the three row serialization strategies. Blocking recall is measured over the 10,000 positive queries. Final linkage metrics use the production top-20 candidate set, while recall is also reported at $k=10,50,100$. Latency percentiles cover embedding plus FAISS blocking per query; the reported end-to-end mean adds the batched Splink inference time divided by the number of queries.
 
 \begin{table}[h]
 \centering
@@ -231,14 +231,14 @@ Table~\ref{tab:section7-strategies} compares the three row serialization strateg
 \toprule
 Strategy & R@10 & R@20 & R@50 & R@100 & P$_{.85}$ & R$_{.85}$ & F1$_{.85}$ \\
 \midrule
-Default & 99.86\% & 99.88\% & 99.92\% & 99.94\% & 99.71\% & 99.93\% & 99.82\% \\
-Identity first & 99.87\% & 99.88\% & 99.92\% & 99.93\% & 99.71\% & 99.92\% & 99.82\% \\
-Compact & 99.94\% & 99.94\% & 99.97\% & 99.98\% & 99.73\% & 99.95\% & 99.84\% \\
+Default & 99.81\% & 99.84\% & 99.93\% & 99.96\% & 99.58\% & 99.80\% & 99.69\% \\
+Identity first & 99.81\% & 99.86\% & 99.94\% & 99.96\% & 99.59\% & 99.82\% & 99.71\% \\
+Compact & 99.95\% & 99.95\% & 99.97\% & 99.99\% & 99.64\% & 99.89\% & 99.77\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The compact serialization was the strongest of the three in this run, improving top-20 blocking recall from 99.88\% to 99.94\% and reducing the false-match rate at threshold 0.85 from 0.58\% to 0.54\%. The difference is descriptive rather than statistically conclusive and should be retested on labelled operational data. For the default strategy, index build time was 34.39 seconds, p95 blocking latency was 23.26\,ms, and estimated mean end-to-end latency was 21.08\,ms. The corresponding values for identity-first were 39.30 seconds, 26.88\,ms, and 24.39\,ms; compact was 34.93 seconds, 22.50\,ms, and 21.46\,ms.
+The compact serialization was the strongest of the three in this run, improving top-20 blocking recall from 99.84\% to 99.95\% and reducing the false-match rate at threshold 0.85 from 0.84\% to 0.72\%. The difference is descriptive rather than statistically conclusive and should be retested on labelled operational data. For the default strategy, index build time was 37.13 seconds, p95 blocking latency was 24.13\,ms, and estimated mean end-to-end latency was 24.44\,ms. The corresponding values for identity-first were 36.22 seconds, 25.32\,ms, and 34.85\,ms; compact was 28.53 seconds, 19.95\,ms, and 21.22\,ms.
 
 \begin{table}[h]
 \centering
@@ -251,15 +251,15 @@ Condition & R@10 & R@20 & R@50 & R@100 \\
 \midrule
 Baseline & 100.0\% & 100.0\% & 100.0\% & 100.0\% \\
 Missing email & 100.0\% & 100.0\% & 100.0\% & 100.0\% \\
-Missing address & 99.0\% & 99.4\% & 99.8\% & 100.0\% \\
-Missing both & 98.0\% & 99.2\% & 99.8\% & 100.0\% \\
+Missing address & 99.6\% & 100.0\% & 100.0\% & 100.0\% \\
+Missing both & 98.2\% & 100.0\% & 100.0\% & 100.0\% \\
 Address change & 100.0\% & 100.0\% & 100.0\% & 100.0\% \\
-Name perturbation & 100.0\% & 100.0\% & 100.0\% & 100.0\% \\
+Name perturbation & 99.8\% & 100.0\% & 100.0\% & 100.0\% \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-At the default 0.85 threshold, every ablation query was accepted in this synthetic positive-only slice once it reached Splink, so the main observed degradation was retrieval: removing both optional fields reduced top-10 recall to 98.0\% and top-20 recall to 99.2\%. The evaluator also produces ten-bin reliability data and threshold curves; those outputs should be recalculated after Splink is trained on labelled pairs.
+At the default 0.85 threshold, every ablation query was accepted in this synthetic positive-only slice once it reached Splink, so the main observed degradation was retrieval: removing both optional fields reduced top-10 recall to 98.2\%, although all tested ablations reached 100.0\% by top 20. The evaluator also produces ten-bin reliability data and threshold curves; those outputs should be recalculated after Splink is trained on labelled pairs.
 
 \section{Confusion-Matrix Experiment}
 The implementation includes \texttt{test\_confusion\_matrix.py}, which evaluates the current algorithm on $n=5{,}000$ generated reference rows. For every reference person, the test creates three queries: an identical row labelled as the same entity, a close but non-identical row generated with controlled perturbations and labelled as the same entity, and an independently generated unrelated row labelled as a different entity. The latter is not present in the reference index. FAISS retrieves the top 20 candidates for every query, after which Splink applies the same field comparisons and decision threshold used by the resolver. The experiment batches the queries into one Splink link-only inference call for execution efficiency; this changes execution strategy but not the candidate pairs or scoring configuration.
@@ -291,31 +291,76 @@ Random seed & 42 \\
 \toprule
  & Predicted match & Predicted no match \\
 \midrule
-Actual same entity & 9,955 (TP) & 45 (FN) \\
-Actual different entity & 43 (FP) & 4,957 (TN) \\
+Actual same entity & 9,943 (TP) & 57 (FN) \\
+Actual different entity & 52 (FP) & 4,948 (TN) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-All 5,000 identical queries were correctly matched. Among the 5,000 close same-entity queries, 4,955 were matched and 45 were missed. Among the 5,000 unrelated queries, 43 were incorrectly accepted and 4,957 were rejected. The resulting accuracy was 99.41\%, precision 99.57\%, recall 99.55\%, specificity 99.14\%, and F1 99.56\%. Index construction took 31.5 seconds and batched query processing took 108.9 seconds, or 7.3 milliseconds per query on the test environment. These measurements are a baseline rather than a general performance guarantee; hardware, model caching, and Splink configuration affect both quality and latency.
+All 5,000 identical queries were correctly matched. Among the 5,000 close same-entity queries, 4,943 were matched and 57 were missed. Among the 5,000 unrelated queries, 52 were incorrectly accepted and 4,948 were rejected. The resulting accuracy was 99.27\%, precision 99.48\%, recall 99.43\%, specificity 98.96\%, and F1 99.45\%. Index construction took 37.97 seconds and batched query processing took 108.7 seconds, or 7.25 milliseconds per query on the test environment. These measurements are a baseline rather than a general performance guarantee; hardware, model caching, and Splink configuration affect both quality and latency.
 
 \section{Further Research}
-\subsection{Back-propagation through the linkage pipeline}
-Splink is primarily a probabilistic SQL-based linkage engine, while FAISS retrieval and discrete comparison levels are not directly differentiable. Nevertheless, its metaparameters can be optimized with a differentiable surrogate. Let $\theta$ represent learnable parameters such as comparison thresholds, field weights, missing-value handling, and the final decision threshold. For a labelled pair $y \in \{0,1\}$, define a soft comparison vector $c_\theta(q,r)$ and a differentiable match score $p_\theta(q,r)$. A supervised objective is
-\[
- \mathcal{L}(\theta) = -y\log p_\theta(q,r) - (1-y)\log(1-p_\theta(q,r)) + \lambda\Omega(\theta).
-\]
+\subsection{Differentiable tuning of linkage parameters}
+The useful back-propagation target is the linkage model after blocking, not the entire retrieval-and-linkage pipeline. FAISS top-$k$ selection is a discrete operation: a record omitted from the candidate set has no comparison feature through which a gradient can flow. The proposed method therefore holds the candidate pairs fixed and uses labelled pairs to tune the comparison model's $m/u$ parameters, field weights, thresholds, missing-value treatment, and, where possible, the comparison functions themselves. Blocking recall must be measured separately and remains an upper bound on end-to-end recall.
 
-A practical research path is:
+For a candidate pair $(q,r)$ and field $f$, first define a differentiable similarity $s_f(q,r) \in [0,1]$. Examples include a character $n$-gram cosine similarity, a soft edit similarity, or a differentiable approximation to Jaro--Winkler. Let $o_f(q,r) \in \{0,1\}$ indicate that both values are observed. For comparison level $j$ with threshold $t_{fj}$ and temperature $T_f>0$, define the soft agreement feature
+\[
+ c_{f j,\theta}(q,r) = o_f(q,r)\,
+ \sigma\!\left(\frac{s_f(q,r)-t_{fj}}{T_f}\right),
+ \qquad
+ \sigma(x)=\frac{1}{1+\exp(-x)}.
+\]
+The complete soft comparison vector is
+\[
+ c_\theta(q,r)=\bigl(c_{fj,\theta}(q,r),\ o_f(q,r),\ 1-o_f(q,r)\bigr)_{f,j}.
+\]
+The observation indicators permit missingness to have its own learned evidence instead of silently treating a missing value as disagreement. Exact date-of-birth agreement can be included as a fixed binary feature; if a graded date comparison is desired, it can instead use a differentiable distance-based similarity.
+
+To make the connection to Splink explicit, parameterize each soft comparison's match and non-match probabilities as
+\[
+ m_{fj}=\sigma(a^m_{fj}),\qquad u_{fj}=\sigma(a^u_{fj}),
+ \qquad
+ w_{fj}=\log\frac{m_{fj}(1-u_{fj})}{u_{fj}(1-m_{fj})}.
+\]
+Here $m_{fj}$ is the probability of observing agreement level $j$ for a true match, $u_{fj}$ is the corresponding probability for a non-match, and $w_{fj}$ is its log-likelihood-ratio weight. A differentiable linkage score can then be written as
+\[
+ z_\theta(q,r)=b_\theta+
+ \sum_{f,j}w_{fj}c_{fj,\theta}(q,r)+
+ \sum_f\left(v_f^\mathrm{obs}o_f(q,r)+v_f^\mathrm{miss}(1-o_f(q,r))\right),
+ \qquad
+ p_\theta(q,r)=\sigma\!\left(z_\theta(q,r)\right).
+\]
+The intercept $b_\theta$ represents the prior log-odds of a match. The $v$ terms allow observed and missing fields to contribute separately, while the $w$ terms are soft analogues of Splink's agreement-level log-likelihood ratios. A production decision threshold is applied to $p_\theta$ after training; it is not required to be differentiated during pairwise training.
+
+For labelled pairs $(q_i,r_i,y_i)$, $y_i\in\{0,1\}$, the concrete training objective is regularized binary cross-entropy:
+\[
+ \mathcal{L}(\theta)=
+ -\frac{1}{n}\sum_{i=1}^{n}
+ \left[y_i\log p_\theta(q_i,r_i)+
+ (1-y_i)\log\left(1-p_\theta(q_i,r_i)\right)\right]
+ +\lambda_w\lVert w-w_0\rVert_2^2
+ +\lambda_a\lVert a-a_0\rVert_2^2
+ +\lambda_T\lVert\log T-\log T_0\rVert_2^2.
+\]
+The first term trains discrimination. The second keeps learned evidence weights near initial Splink or domain-informed values, the third regularizes the transformed $m/u$ parameters, and the fourth prevents temperatures from collapsing into unstable hard thresholds. The sigmoid parameterizations keep $m$, $u$, and $T$ in valid ranges; additional monotonicity constraints such as $m_{fj}>u_{fj}$ can be enforced by reparameterizing $a^m_{fj}=a^u_{fj}+\operatorname{softplus}(\delta_{fj})$. All terms have well-defined partial derivatives with respect to the trainable parameters.
+
+Comparison algorithms can be tuned only when expressed as a differentiable relaxation. For example, if $s_f^{(1)},\ldots,s_f^{(K)}$ are candidate similarities, use
+\[
+ s_f(q,r)=\sum_{k=1}^{K}\operatorname{softmax}(\gamma_f)_k\,s_f^{(k)}(q,r),
+\]
+where $\gamma_f$ learns a mixture of character, token, and edit-based similarities. A discrete algorithm choice cannot receive a useful gradient directly; the relaxed mixture can be optimized and then evaluated or distilled as a discrete production choice.
+
+A practical procedure is therefore:
 \begin{enumerate}[leftmargin=*]
-  \item export Splink comparison features and agreement levels for labelled pairs;
-  \item replace hard thresholds with temperature-controlled soft gates, such as a sigmoid over Jaro--Winkler distance;
-  \item learn field weights and soft $m/u$ parameters with gradient descent;
-  \item distill the learned scoring function back into Splink-compatible comparison levels or calibrated weights; and
-  \item evaluate whether the distilled model preserves Splink's interpretability and SQL execution properties.
+  \item build a labelled training set from FAISS candidate pairs, including hard negatives and missingness patterns;
+  \item freeze FAISS candidates and compute the soft comparison features for each pair;
+  \item initialize $m/u$, field weights, thresholds, temperatures, and optional similarity-mixture parameters from the current Splink configuration;
+  \item optimize $\mathcal{L}(\theta)$ with gradient descent, using validation data to select regularization and the final decision threshold;
+  \item calibrate the resulting probabilities and compare blocking recall plus final precision, recall, F1, and calibration against the original Splink model; and
+  \item distill the trained parameters into Splink comparison levels or retain the differentiable scorer as a separate training-time model, while keeping the production scoring path interpretable and reproducible.
 \end{enumerate}
 
-End-to-end back-propagation through top-$k$ FAISS selection is harder because nearest-neighbor selection is discrete. Candidate retrieval can initially be held fixed while optimizing Splink parameters. Later experiments can use a soft top-$k$ relaxation, hard-negative mining, or a separate contrastive loss for the embedding model. The system should retain a non-differentiable production path if the differentiable surrogate is only used for training.
+This procedure does not claim end-to-end gradients through FAISS. If embedding parameters are later tuned, they require a separate retrieval objective, such as contrastive loss over positives and hard negatives, and a separate evaluation of top-$k$ blocking recall. The linkage objective should not be used to imply that a missing true candidate can be recovered by changing Splink parameters.
 
 \subsection{Alternative embedding engines}
 The current MiniLM encoder is a useful baseline, but it is not specialized for entity resolution or structured rows. Candidate alternatives include:

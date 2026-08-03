@@ -23,8 +23,8 @@ Query person -> MiniLM embedding -> FAISS top-k blocking -> Splink matching
 - **Splink probabilistic matching** with field comparisons:
   1. First Name (Jaro-Winkler, high weight)
   2. Last Name (Jaro-Winkler, high weight)
-  3. Date of Birth (Exact match, highest weight)
-  4. Email (Jaro-Winkler, medium weight)
+  3. Date of Birth (Date-of-birth comparison, highest weight)
+  4. Email (Email comparison, medium weight)
   5. Address (Jaro-Winkler, lower weight - handles variations)
 - **Configurable top-k blocking and match thresholds**
 - **Reproducible confusion-matrix and Section 7 benchmark evaluations**
@@ -80,10 +80,10 @@ serialization indexes. It evaluates 15,000 labelled queries, blocking recall
 at `k=10,20,50,100`, thresholds from `0.50` through `0.95`, calibration bins,
 latency, storage, build time, and controlled field/perturbation ablations.
 
-The latest paper-scale run reported, for the default serialization, 99.88%
-top-20 blocking recall, 99.71% precision, 99.93% recall, and 99.82% F1 at a
-0.85 threshold. The compact serialization reached 99.94% top-20 blocking
-recall and 99.84% F1. Results are stored in `section7_results.json` and
+The latest paper-scale run reported, for the default serialization, 99.84%
+top-20 blocking recall, 99.58% precision, 99.80% recall, and 99.69% F1 at a
+0.85 threshold. The compact serialization reached 99.95% top-20 blocking
+recall and 99.77% F1. Results are stored in `section7_results.json` and
 `section7_metrics.csv`.
 
 ### Python API
@@ -145,8 +145,8 @@ The Splink model is configured with the following priority order:
 |----------|-------|------------|--------|
 | 1 (Highest) | First Name | Jaro-Winkler (0.9/0.8/0.7) | Core identity |
 | 1 (Highest) | Last Name | Jaro-Winkler (0.9/0.8/0.7) | Core identity |
-| 1 (Highest) | Date of Birth | Exact Match | Immutable identifier |
-| 2 (Medium) | Email | Jaro-Winkler (0.95/0.85/0.75) | Stable when present |
+| 1 (Highest) | Date of Birth | Date-of-birth comparison | Immutable identifier |
+| 2 (Medium) | Email | Email comparison | Stable when present |
 | 3 (Lower) | Address | Jaro-Winkler (0.85/0.75/0.65) | Changes frequently |
 
 ## Artifacts and Caveats

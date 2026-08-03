@@ -12,15 +12,15 @@
     "seed": 42
   },
   "timing": {
-    "index_build_seconds": 31.496395199996186,
-    "query_seconds": 108.94902300002286,
-    "mean_query_milliseconds": 7.263268200001524
+    "index_build_seconds": 37.96755550001399,
+    "query_seconds": 108.72864159999881,
+    "mean_query_milliseconds": 7.2485761066665875
   },
   "confusion_matrix": {
-    "TP": 9955,
-    "FN": 45,
-    "FP": 43,
-    "TN": 4957
+    "TP": 9943,
+    "FN": 57,
+    "FP": 52,
+    "TN": 4948
   },
   "by_category": {
     "identical": {
@@ -30,20 +30,20 @@
     },
     "close_same_entity": {
       "expected_match": true,
-      "TP": 4955,
-      "FN": 45
+      "TP": 4943,
+      "FN": 57
     },
     "unrelated": {
       "expected_match": false,
-      "FP": 43,
-      "TN": 4957
+      "FP": 52,
+      "TN": 4948
     }
   },
   "metrics": {
-    "accuracy": 0.9941333333333333,
-    "precision": 0.9956991398279655,
-    "recall": 0.9955,
-    "specificity": 0.9914,
-    "f1": 0.9955995599559956
+    "accuracy": 0.9927333333333334,
+    "precision": 0.9947973986993497,
+    "recall": 0.9943,
+    "specificity": 0.9896,
+    "f1": 0.9945486371592899
   }
 }

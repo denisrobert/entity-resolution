@@ -15,16 +15,19 @@ import tempfile
 import time
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import faiss
 import numpy as np
 import pandas as pd
 import splink
-from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from splink import Linker, block_on
-from splink.comparison_library import ExactMatch, JaroWinklerAtThresholds
+from splink.comparison_library import (
+    DateOfBirthComparison,
+    EmailComparison,
+    JaroWinklerAtThresholds,
+)
 
 from generate_data import Person, generate_people, introduce_variations
 
@@ -32,6 +35,7 @@ from generate_data import Person, generate_people, introduce_variations
 DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 DEFAULT_THRESHOLDS = (0.50, 0.65, 0.75, 0.85, 0.90, 0.95)
 DEFAULT_K_VALUES = (10, 20, 50, 100)
+DEFAULT_SCORING_K = 20
 
 
 def serialize(person: Person, strategy: str) -> str:
@@ -159,8 +163,8 @@ def splink_scores(cases: list[dict[str, Any]], candidate_indices: np.ndarray, pe
         "comparisons": [
             JaroWinklerAtThresholds("first_name", [0.9, 0.8, 0.7]),
             JaroWinklerAtThresholds("last_name", [0.9, 0.8, 0.7]),
-            ExactMatch("date_of_birth"),
-            JaroWinklerAtThresholds("email", [0.95, 0.85, 0.75]),
+            DateOfBirthComparison("date_of_birth", input_is_string=True),
+            EmailComparison("email"),
             JaroWinklerAtThresholds("address", [0.85, 0.75, 0.65]),
         ],
         "blocking_rules_to_generate_predictions": [block_on("block_id")],
@@ -246,7 +250,8 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
         max_k = max(args.k_values)
         _, candidate_indices, latencies = search_candidates(cases, embedding, index, strategy, max_k)
         splink_start = time.perf_counter()
-        probabilities = splink_scores(cases, candidate_indices, people)
+        scoring_k = min(DEFAULT_SCORING_K, candidate_indices.shape[1])
+        probabilities = splink_scores(cases, candidate_indices[:, :scoring_k], people)
         splink_batch_seconds = time.perf_counter() - splink_start
         blocking = {}
         for k in args.k_values:
@@ -267,6 +272,7 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
             "build_seconds": build_seconds,
             "storage": {**storage, "total_bytes": sum(storage.values())},
             "blocking_recall": blocking,
+            "scoring_k": scoring_k,
             "threshold_metrics": thresholds,
             "calibration": calibration_bins(cases, probabilities),
             "latency_ms": {
@@ -302,7 +308,8 @@ def run_ablations(people: list[Person], embedding: Any, index: Any, strategy: st
     for name, variant_people in variants.items():
         variant_cases = [{"id": f"{name}_{i}", "category": name, "person": person, "true_index": i, "label": 1} for i, person in enumerate(variant_people)]
         _, candidate_indices, _ = search_candidates(variant_cases, embedding, index, strategy, max(args.k_values))
-        probabilities = splink_scores(variant_cases, candidate_indices, people)
+        scoring_k = min(DEFAULT_SCORING_K, candidate_indices.shape[1])
+        probabilities = splink_scores(variant_cases, candidate_indices[:, :scoring_k], people)
         output[name] = {
             "count": len(variant_cases),
             "blocking_recall": {str(k): sum(case["true_index"] in row[:k] for case, row in zip(variant_cases, candidate_indices)) / len(variant_cases) for k in args.k_values},

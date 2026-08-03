@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (MiKTeX 26.5) (preloaded format=pdflatex 2026.8.3)  3 AUG 2026 13:36
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (MiKTeX 26.5) (preloaded format=pdflatex 2026.8.3)  3 AUG 2026 17:46
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -492,25 +492,39 @@ LaTeX Font Info:    External font `lmex10' loaded for size
 (Font)              <7> on input line 230.
 LaTeX Font Info:    External font `lmex10' loaded for size
 (Font)              <5> on input line 230.
- [7] [8] [9] [10] [11] (entity_resolution_whitepaper.aux)
+ [7] [8]
+Overfull \hbox (36.61859pt too wide) detected at line 344
+\OMS/lmsy/m/n/10.95 L\OT1/lmr/m/n/10.95 (\OML/lmm/m/it/10.95 ^^R\OT1/lmr/m/n/10
+.95 ) = \OMS/lmsy/m/n/10.95 ^^@[] [] [] \OT1/lmr/m/n/10.95 + \OML/lmm/m/it/10.9
+5 ^^U[]\OMS/lmsy/m/n/10.95 k\OML/lmm/m/it/10.95 w \OMS/lmsy/m/n/10.95 ^^@ \OML/
+lmm/m/it/10.95 w[]\OMS/lmsy/m/n/10.95 k[] \OT1/lmr/m/n/10.95 + \OML/lmm/m/it/10
+.95 ^^U[]\OMS/lmsy/m/n/10.95 k\OML/lmm/m/it/10.95 a \OMS/lmsy/m/n/10.95 ^^@ \OM
+L/lmm/m/it/10.95 a[]\OMS/lmsy/m/n/10.95 k[] \OT1/lmr/m/n/10.95 + \OML/lmm/m/it/
+10.95 ^^U[]\OMS/lmsy/m/n/10.95 k[] \OML/lmm/m/it/10.95 T \OMS/lmsy/m/n/10.95 ^^
+@ [] \OML/lmm/m/it/10.95 T[]\OMS/lmsy/m/n/10.95 k[]\OML/lmm/m/it/10.95 :
+ []
+
+[9{C:/Users/denis/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/lm/lm-mathex.en
+c}] [10] [11] [12] (entity_resolution_whitepaper.aux)
  ***********
 LaTeX2e <2026-06-01>
 L3 programming layer <2026-06-18>
  ***********
 Package rerunfilecheck Info: File `entity_resolution_whitepaper.out' has not ch
 anged.
-(rerunfilecheck)             Checksum: 5D62B4821C055ED1CF0EFC97FC5DE085;3610.
+(rerunfilecheck)             Checksum: 8AFAA109A349A705D2FE5EE6F3E953F7;3600.
  ) 
 Here is how much of TeX's memory you used:
- 10665 strings out of 467510
- 165857 string characters out of 5408795
+ 10668 strings out of 467510
+ 165884 string characters out of 5408795
  601439 words of memory out of 5000000
  39708 multiletter control sequences out of 15000+600000
  688822 words of font info for 76 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 74i,9n,79p,1461b,637s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 74i,9n,79p,1510b,637s stack positions out of 10000i,1000n,20000p,200000b,200000s
 <C:/Users/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx10.pf
 b><C:/Users/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx12.pf
+b><C:/Users/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmex10.pf
 b><C:/Users/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi10.pf
 b><C:/Users/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi7.pfb
 ><C:/Users/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi8.pfb>
@@ -523,9 +537,9 @@ rs/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmri10.pfb><C:/Use
 rs/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy10.pfb><C:/Use
 rs/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy8.pfb><C:/User
 s/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmtt10.pfb>
-Output written on entity_resolution_whitepaper.pdf (11 pages, 328102 bytes).
+Output written on entity_resolution_whitepaper.pdf (12 pages, 347987 bytes).
 PDF statistics:
- 282 PDF objects out of 1000 (max. 8388607)
- 61 named destinations out of 1000 (max. 500000)
+ 293 PDF objects out of 1000 (max. 8388607)
+ 63 named destinations out of 1000 (max. 500000)
  153 words of extra memory for PDF output out of 10000 (max. 10000000)
 

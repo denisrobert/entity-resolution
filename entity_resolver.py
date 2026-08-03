@@ -7,6 +7,8 @@ from splink import Linker, SettingsCreator, block_on
 from splink.comparison_library import (
     JaroWinklerAtThresholds,
     ExactMatch,
+    EmailComparison,
+    DateOfBirthComparison,
 )
 import pandas as pd
 
@@ -47,12 +49,9 @@ class PersonEntityResolver:
                     score_threshold_or_thresholds=[0.9, 0.8, 0.7],
                 ),
                 # Highest priority: Date of Birth (exact)
-                ExactMatch("date_of_birth"),
+                DateOfBirthComparison("date_of_birth", input_is_string=True),
                 # Medium priority: Email (exact + fuzzy when present)
-                JaroWinklerAtThresholds(
-                    "email",
-                    score_threshold_or_thresholds=[0.95, 0.85, 0.75],
-                ),
+                EmailComparison("email"),
                 # Lower priority: Address (fuzzy, handles variations)
                 JaroWinklerAtThresholds(
                     "address",
