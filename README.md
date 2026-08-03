@@ -138,6 +138,25 @@ for m in matches:
     print(m.match_probability, m.record.first_name, m.record.last_name)
 ```
 
+An in-memory store can be persisted to and restored from disk, and exposes
+`update`/`delete` (which rebuild the index) alongside `add`:
+
+```python
+from entity_pipeline import MemoryVectorDatabase, HuggingFaceEmbeddingModel, FlatIndexingStrategy
+
+db = MemoryVectorDatabase(HuggingFaceEmbeddingModel(), FlatIndexingStrategy())
+db.add(people)
+db.save("data2")                                # writes index.faiss + records.pkl + metadata.json
+db.update([person], [3])                        # replace record at position 3
+db.delete([7])                                  # remove record at position 7
+
+db2 = MemoryVectorDatabase.load("data2")        # restore without re-embedding
+print(len(db2))
+```
+
+External stores implement `VectorDatabase` (update methods only) and do not
+need persistence.
+
 ## Project Structure
 
 ```

@@ -1,0 +1,89 @@
+{
+  "parameters": {
+    "reference_records": 50000,
+    "query_rows": 2000,
+    "queries_per_row": 3,
+    "total_queries": 6000,
+    "missing_rate": 0.3,
+    "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+    "blocking_k": 20,
+    "match_threshold": 0.85,
+    "close_variation_rate": 0.15,
+    "seed": 42
+  },
+  "timing": {
+    "load_seconds": 4.745826100028353,
+    "training_seconds": 4.684614800004056,
+    "blocking_seconds": 149.02549470000667,
+    "query_total_ms": {
+      "untrained": 1691.894499992486,
+      "trained": 1600.2360999991652
+    }
+  },
+  "m_u": {
+    "training": {
+      "method": "supervised (labelled pairs)",
+      "probability_two_random_records_match": 0.0001
+    }
+  },
+  "variants": {
+    "untrained": {
+      "confusion_matrix": {
+        "TP": 3966,
+        "FN": 34,
+        "FP": 130,
+        "TN": 1870
+      },
+      "by_category": {
+        "identical": {
+          "TP": 2000,
+          "FN": 0
+        },
+        "close_same_entity": {
+          "TP": 1966,
+          "FN": 34
+        },
+        "unrelated": {
+          "FP": 130,
+          "TN": 1870
+        }
+      },
+      "metrics": {
+        "accuracy": 0.9726666666666667,
+        "precision": 0.96826171875,
+        "recall": 0.9915,
+        "specificity": 0.935,
+        "f1": 0.9797430830039525
+      }
+    },
+    "trained": {
+      "confusion_matrix": {
+        "TP": 3968,
+        "FN": 32,
+        "FP": 485,
+        "TN": 1515
+      },
+      "by_category": {
+        "identical": {
+          "TP": 2000,
+          "FN": 0
+        },
+        "close_same_entity": {
+          "TP": 1968,
+          "FN": 32
+        },
+        "unrelated": {
+          "FP": 485,
+          "TN": 1515
+        }
+      },
+      "metrics": {
+        "accuracy": 0.9138333333333334,
+        "precision": 0.8910846620256008,
+        "recall": 0.992,
+        "specificity": 0.7575,
+        "f1": 0.9388382822666509
+      }
+    }
+  }
+}

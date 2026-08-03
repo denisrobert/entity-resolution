@@ -12,12 +12,21 @@ The Blocker is built on abstract components -- an embedding model, an indexing
 strategy, and a vector database -- so the concrete retrieval stack can be
 swapped without changing the pipeline. A default FAISS flat-index
 implementation is provided for out-of-the-box use.
+
+Stores implement :class:`VectorDatabase` and expose update methods
+(``add``/``update``/``delete``) for evolving their contents. In-memory stores
+additionally implement :class:`PersistableVectorDatabase` and can be written to
+and restored from disk with ``save``/``load``; external stores do not persist
+and only need the update methods.
 """
 
 from __future__ import annotations
 
 import abc
+import json
+import pickle
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Generic, List, Optional, Sequence, Tuple, TypeVar
 
 import numpy as np
@@ -26,6 +35,10 @@ from splink import block_on
 DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 DEFAULT_K = 20
 DEFAULT_TAU = 0.85
+
+VECTOR_FILE = "index.faiss"
+RECORDS_FILE = "records.pkl"
+METADATA_FILE = "metadata.json"
 
 T = TypeVar("T")
 Vector = Sequence[float]
@@ -83,8 +96,25 @@ class IndexingStrategy(abc.ABC):
         """Return ``(indices, scores)`` of the k nearest vectors to query."""
 
     @abc.abstractmethod
+    def clear(self) -> None:
+        """Remove all vectors from the index, leaving it ready for reuse."""
+
+    @abc.abstractmethod
     def __len__(self) -> int:
         """Number of vectors currently in the index."""
+
+    def save(self, path: Any) -> None:
+        """Persist the index to ``path`` (optional; unsupported by default)."""
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support index persistence"
+        )
+
+    @classmethod
+    def load(cls, path: Any, **kwargs: Any) -> "IndexingStrategy":
+        """Restore an index from ``path`` (optional)."""
+        raise NotImplementedError(
+            f"{cls.__name__} does not support index persistence"
+        )
 
 
 class VectorDatabase(abc.ABC, Generic[T]):
@@ -93,6 +123,10 @@ class VectorDatabase(abc.ABC, Generic[T]):
     The database owns the three retrieval components abstractly: an embedding
     model producing vectors, an indexing strategy over those vectors, and the
     record payloads that the positional index entries map back to.
+
+    Every store supports updating its contents (``add``/``update``/``delete``).
+    Persistence (``save``/``load``) is only required of in-memory stores; an
+    external store implements this interface without persistence.
     """
 
     @property
@@ -107,7 +141,15 @@ class VectorDatabase(abc.ABC, Generic[T]):
 
     @abc.abstractmethod
     def add(self, records: Sequence[T]) -> None:
-        """Embed and index the given records."""
+        """Insert the given records into the store."""
+
+    @abc.abstractmethod
+    def update(self, records: Sequence[T], positions: Sequence[int]) -> None:
+        """Replace the records currently at ``positions`` with ``records``."""
+
+    @abc.abstractmethod
+    def delete(self, positions: Sequence[int]) -> None:
+        """Remove the records at ``positions`` from the store."""
 
     @abc.abstractmethod
     def record_at(self, position: int) -> T:
@@ -116,6 +158,25 @@ class VectorDatabase(abc.ABC, Generic[T]):
     @abc.abstractmethod
     def __len__(self) -> int:
         """Number of records in the database."""
+
+
+class PersistableVectorDatabase(VectorDatabase[T], abc.ABC):
+    """A vector store that can be serialized to and restored from disk.
+
+    Only in-memory stores are expected to implement persistence. External
+    stores need only the update methods defined on :class:`VectorDatabase`.
+    """
+
+    @abc.abstractmethod
+    def save(self, directory: Any) -> None:
+        """Persist the store (index, records, and metadata) to ``directory``."""
+
+    @classmethod
+    @abc.abstractmethod
+    def load(
+        cls, directory: Any, **kwargs: Any
+    ) -> "PersistableVectorDatabase[T]":
+        """Restore a store previously written with :meth:`save`."""
 
 
 # ---------------------------------------------------------------------------
@@ -181,12 +242,35 @@ class FlatIndexingStrategy(IndexingStrategy):
         scores, indices = self._index.search(q, kk)
         return (list(indices[0]), list(scores[0]))
 
+    def clear(self) -> None:
+        if self._index is not None:
+            self._index.reset()
+
+    def save(self, path: Any) -> None:
+        if self._index is None:
+            raise RuntimeError("index is empty; nothing to save")
+        self._faiss.write_index(self._index, str(path))
+
+    @classmethod
+    def load(cls, path: Any, normalize: bool = True) -> "FlatIndexingStrategy":
+        import faiss  # local import keeps the module importable without FAISS
+
+        instance = cls(normalize=normalize)
+        instance._index = faiss.read_index(str(path))
+        return instance
+
     def __len__(self) -> int:
         return 0 if self._index is None else int(self._index.ntotal)
 
 
-class MemoryVectorDatabase(VectorDatabase[T]):
-    """In-memory vector database composing an embedding model and an index."""
+class MemoryVectorDatabase(PersistableVectorDatabase[T]):
+    """In-memory vector database composing an embedding model and an index.
+
+    Because it is an in-memory store it supports persistence (``save``/``load``)
+    in addition to the shared update methods. Updating or deleting records
+    rebuilds the underlying index, which for a flat index is an O(n) re-index
+    of the remaining population.
+    """
 
     def __init__(
         self,
@@ -211,11 +295,92 @@ class MemoryVectorDatabase(VectorDatabase[T]):
         self._index.add(vectors)
         self._records.extend(records)
 
+    def update(self, records: Sequence[T], positions: Sequence[int]) -> None:
+        positions = [int(p) for p in positions]
+        if len(records) != len(positions):
+            raise ValueError("update requires one position per record")
+        for record, position in zip(records, positions):
+            if not 0 <= position < len(self._records):
+                raise IndexError(f"position {position} out of range")
+            self._records[position] = record
+        self._reindex()
+
+    def delete(self, positions: Sequence[int]) -> None:
+        positions = sorted({int(p) for p in positions})
+        if not positions:
+            return
+        if positions[0] < 0 or positions[-1] >= len(self._records):
+            raise IndexError("position out of range")
+        for position in reversed(positions):
+            del self._records[position]
+        self._reindex()
+
+    def _reindex(self) -> None:
+        """Rebuild the index from the current record population."""
+        self._index.clear()
+        if self._records:
+            texts = [_record_text(r) for r in self._records]
+            vectors = self._embedding.embed_many(texts)
+            self._index.add(vectors)
+
     def record_at(self, position: int) -> T:
         return self._records[position]
 
     def __len__(self) -> int:
         return len(self._records)
+
+    def save(self, directory: Any) -> None:
+        directory = Path(directory)
+        directory.mkdir(parents=True, exist_ok=True)
+        self._index.save(directory / VECTOR_FILE)
+        with (directory / RECORDS_FILE).open("wb") as handle:
+            pickle.dump(self._records, handle)
+        metadata = {
+            "embedding_model_name": getattr(self._embedding, "model_name", None),
+            "index_class": f"{type(self._index).__name__}",
+            "records": len(self._records),
+        }
+        (directory / METADATA_FILE).write_text(
+            json.dumps(metadata, indent=2), encoding="utf-8"
+        )
+
+    @classmethod
+    def load(
+        cls,
+        directory: Any,
+        embedding: Optional[EmbeddingModel] = None,
+        index: Optional[IndexingStrategy] = None,
+        model_name: str = DEFAULT_MODEL,
+        normalize: bool = True,
+    ) -> "MemoryVectorDatabase[T]":
+        directory = Path(directory)
+        if (directory / VECTOR_FILE).exists() and (directory / RECORDS_FILE).exists():
+            with (directory / RECORDS_FILE).open("rb") as handle:
+                records = pickle.load(handle)
+            index_path = directory / VECTOR_FILE
+        elif (directory / "people.faiss").exists() and (directory / "people.json").exists():
+            # Legacy FaissPersonStore layout (people.faiss + people.json). Records
+            # are reconstructed as Person objects from the metadata payload.
+            from generate_data import Person
+
+            metadata = json.loads(
+                (directory / "people.json").read_text(encoding="utf-8")
+            )
+            records = [Person.from_dict(person) for person in metadata["people"]]
+            normalize = bool(metadata.get("normalize", True))
+            model_name = metadata.get("model_name") or model_name
+            index_path = directory / "people.faiss"
+        else:
+            raise FileNotFoundError(
+                f"no supported store files found in {directory}"
+            )
+        if embedding is None:
+            embedding = HuggingFaceEmbeddingModel(model_name)
+        if index is None:
+            index = FlatIndexingStrategy.load(index_path, normalize=normalize)
+        database = cls(embedding, index)
+        database._records = list(records)
+        return database
 
 
 # ---------------------------------------------------------------------------
@@ -591,6 +756,94 @@ def default_comparisons() -> List[Any]:
         EmailComparison("email"),
         JaroWinklerAtThresholds("address", [0.85, 0.75, 0.65]),
     ]
+
+
+def calibrate_comparisons_from_pairs(
+    pair_df: Any,
+    comparisons: Optional[Sequence[Any]] = None,
+    smoothing: float = 0.5,
+    sql_dialect: str = "duckdb",
+) -> List[dict]:
+    """Fit supervised m/u probabilities from labelled comparison pairs.
+
+    ``pair_df`` must contain a boolean ``is_match`` column (1 = match, 0 =
+    non-match) and, for each field compared by ``comparisons``, a pair of
+    columns named ``<field>_l`` and ``<field>_r``. For every comparison level the
+    empirical match probability (``m``) and non-match probability (``u``) are
+    computed over the labelled pairs and written into the resolved comparison
+    dicts.
+
+    Laplace ``smoothing`` is added to every level count so no level is assigned
+    a zero probability. This is a supervised calibration: it requires labelled
+    match/non-match pairs, which is the defensible alternative to unsupervised
+    expectation maximisation over a near-duplicate-free reference population.
+
+    Returns
+    -------
+    list[dict]
+        Resolved comparison dictionaries (as used in a Splink settings dict)
+        with trained ``m_probability``/``u_probability`` values on every level.
+    """
+    import numpy as np
+    import pandas as pd
+
+    from splink import DuckDBAPI
+
+    comparisons = list(comparisons) if comparisons else default_comparisons()
+    pair_df = pd.DataFrame(pair_df)
+    is_match = pair_df["is_match"].to_numpy()
+    m_total = int((is_match == 1).sum())
+    u_total = int((is_match == 0).sum())
+    if m_total == 0 or u_total == 0:
+        raise ValueError("pair_df must contain both match (1) and non-match (0) rows")
+
+    con = DuckDBAPI()._con
+    con.register("pair_training", pair_df)
+    n = len(pair_df)
+
+    resolved: List[dict] = []
+    for comparison in comparisons:
+        comparison_obj = comparison.get_comparison(sql_dialect)
+        levels = comparison_obj.comparison_levels
+        assigned = np.full(n, -1, dtype=int)
+        else_index = len(levels) - 1
+        for index, level in enumerate(levels):
+            condition = str(level.sql_condition).strip()
+            if condition.upper() == "ELSE":
+                else_index = index
+                continue
+            mask = (
+                con.execute(f"SELECT ({condition}) AS b FROM pair_training")
+                .fetchdf()["b"]
+                .fillna(False)
+                .to_numpy()
+                .astype(bool)
+            )
+            need = (assigned == -1) & mask
+            assigned[need] = index
+        assigned[assigned == -1] = else_index
+
+        trained_levels = []
+        for index, level in enumerate(levels):
+            trained_level = {
+                "sql_condition": level.sql_condition,
+                "label_for_charts": level.label_for_charts,
+            }
+            if not level.is_null_level:
+                m_count = int(((assigned == index) & (is_match == 1)).sum())
+                u_count = int(((assigned == index) & (is_match == 0)).sum())
+                trained_level["m_probability"] = float(
+                    (m_count + smoothing) / (m_total + smoothing * len(levels))
+                )
+                trained_level["u_probability"] = float(
+                    (u_count + smoothing) / (u_total + smoothing * len(levels))
+                )
+            trained_levels.append(trained_level)
+        resolved.append({
+            "output_column_name": comparison_obj.output_column_name,
+            "comparison_levels": trained_levels,
+        })
+    return resolved
 
 
 def build_default_pipeline(

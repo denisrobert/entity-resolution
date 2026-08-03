@@ -23,12 +23,8 @@ import pandas as pd
 import splink
 from langchain_huggingface import HuggingFaceEmbeddings
 from splink import Linker, block_on
-from splink.comparison_library import (
-    DateOfBirthComparison,
-    EmailComparison,
-    JaroWinklerAtThresholds,
-)
 
+from entity_pipeline import default_comparisons
 from generate_data import Person, generate_people, introduce_variations
 
 
@@ -160,13 +156,7 @@ def splink_scores(cases: list[dict[str, Any]], candidate_indices: np.ndarray, pe
         "link_type": "link_only",
         "unique_id_column_name": "unique_id",
         "source_dataset_column_name": "source_dataset",
-        "comparisons": [
-            JaroWinklerAtThresholds("first_name", [0.9, 0.8, 0.7]),
-            JaroWinklerAtThresholds("last_name", [0.9, 0.8, 0.7]),
-            DateOfBirthComparison("date_of_birth", input_is_string=True),
-            EmailComparison("email"),
-            JaroWinklerAtThresholds("address", [0.85, 0.75, 0.65]),
-        ],
+        "comparisons": default_comparisons(),
         "blocking_rules_to_generate_predictions": [block_on("block_id")],
         "probability_two_random_records_match": 0.0001,
     }
