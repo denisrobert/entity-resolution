@@ -26,13 +26,13 @@
 \maketitle
 
 \begin{abstract}
-This paper presents and evaluates a two-stage entity resolution pipeline for incomplete Canadian person records. A synthetic reference population is represented with normalized \texttt{all-MiniLM-L6-v2} embeddings and persisted in a FAISS \texttt{IndexFlatIP} store. Each query is first blocked to its top 20 vector neighbors, after which Splink performs interpretable probabilistic linkage using Jaro--Winkler comparisons for names, email, and address, together with exact date-of-birth comparison. The implementation supports persisted-index reload without re-embedding the reference population and independently models 30\% missingness for address and email. In a 15,000-query experiment comprising identical, close-variation, and unrelated records, the pipeline achieved 99.41\% accuracy, 99.57\% precision, 99.55\% recall, 99.14\% specificity, and a 99.56\% F1 score, with a mean query time of 7.26\,ms in the validation environment. The paper also discusses memory scaling, operational limits, calibration of Splink parameters, and alternatives to linear-scan FAISS indexing.
+This paper presents and evaluates a two-stage entity resolution pipeline for incomplete Canadian person records. A synthetic reference population is represented with normalized \texttt{all-MiniLM-L6-v2} embeddings and persisted in a FAISS \texttt{IndexFlatIP} store. Each query is first blocked to its top 20 vector neighbors, after which Splink performs interpretable probabilistic linkage using Jaro--Winkler comparisons for names, email, and address, together with exact date-of-birth comparison. The approach is similar in overall architecture to the FAISS-plus-linkage workflow described by Strojny and Ber\k{e}sewicz~\cite{strojny2026}, although the present pipeline was independently derived and uses a different implementation and evaluation design. The implementation supports persisted-index reload without re-embedding the reference population and independently models 30\% missingness for address and email. In a 15,000-query experiment comprising identical, close-variation, and unrelated records, the pipeline achieved 99.41\% accuracy, 99.57\% precision, 99.55\% recall, 99.14\% specificity, and a 99.56\% F1 score, with a mean query time of 7.26\,ms in the validation environment. The paper also discusses memory scaling, operational limits, calibration of Splink parameters, and alternatives to linear-scan FAISS indexing.
 \end{abstract}
 
 \section{Introduction}
 Entity resolution attempts to determine whether two records refer to the same real-world entity. This task is difficult when records contain typographical variation, missing values, stale addresses, or inconsistent contact information. Comparing every query against every reference record is also unnecessarily expensive: for $N$ reference records, exhaustive comparison requires $O(N)$ candidate comparisons per query.
 
-The implementation in the \href{https://github.com/denisrobert/entity-resolution}{entity-resolution repository} addresses this problem with a retrieval-and-linkage architecture. A dense vector index performs approximate or exact nearest-neighbor retrieval, reducing the candidate set to the closest $k$ records. Splink then evaluates those candidates with explicit field comparisons and returns a match only when its probability exceeds a configurable threshold.
+The implementation in the \href{https://github.com/denisrobert/entity-resolution}{entity-resolution repository} addresses this problem with a retrieval-and-linkage architecture. A dense vector index performs approximate or exact nearest-neighbor retrieval, reducing the candidate set to the closest $k$ records. This use of dense retrieval for blocking follows a line of work including DeepER~\cite{ebreheem2018}, pre-trained embedding comparisons~\cite{zeakis2023}, and universal dense blocking~\cite{wang2024}. Splink then evaluates those candidates with explicit field comparisons and returns a match only when its probability exceeds a configurable threshold.
 
 The representation choice is informed by recent work comparing tabular representation approaches. Vogel et al.'s \emph{Towards Universal Tabular Embeddings: A Benchmark Across Data Tasks} (arXiv:2604.21696v1, \url{https://arxiv.org/abs/2604.21696v1})~\cite{vogel2026} benchmark embeddings at cell, row, column, and table levels and show that performance depends on the downstream task and representation level; in the relevant current evaluation, textual embeddings outperform the dedicated tabular alternatives for retrieval. Franz et al.'s \emph{Universal Embeddings of Tabular Data} (arXiv:2507.05904v1, \url{https://arxiv.org/abs/2507.05904v1})~\cite{franz2025} describes a different strategy that transforms tabular data into a graph, learns entity embeddings with graph auto-encoders, and aggregates them into row embeddings. This graph-based approach may bear fruit for entity resolution in future experiments because it is designed to capture relationships among tabular entities and to embed unseen samples composed of similar entities. The present system therefore uses a row-level textual representation as its current baseline while leaving room to replace the embedding engine as these alternatives become more capable.
 
@@ -128,7 +128,7 @@ Given a query record $q$, the online process embeds the same textual representat
 which is cosine similarity in the range $[-1,1]$. This stage is optimized for recall: the true match must be included in the candidate set for the second stage to recover it.
 
 \subsection{Probabilistic linkage}
-The candidate set is passed to Splink as a small deduplication problem containing the query and the retrieved records. The configured comparisons are:
+The candidate set is passed to Splink as a small deduplication problem containing the query and the retrieved records. Splink implements a scalable form of probabilistic linkage grounded in the Fellegi--Sunter framework~\cite{fellegi1969,linacre2022}. The configured comparisons are:
 \begin{table}[h]
 \centering
 \caption{Field comparisons and intended evidence priority.}
@@ -336,16 +336,54 @@ Future work should estimate Splink parameters from labelled operational samples,
 \section{Conclusion}
 The implemented architecture combines a fast vector retrieval layer with an interpretable probabilistic linkage layer. FAISS narrows a 50,000-record population to 20 candidates, while Splink compares identity, contact, and address fields under a configurable decision threshold. Persisting the index and metadata makes the workflow operationally reusable. The most important next steps are to train and calibrate Splink parameters on labelled pairs, investigate differentiable surrogates for its metaparameters, and benchmark alternative row and tabular embedding engines using blocking recall as a first-class metric.
 
-\begin{thebibliography}{9}
+\begin{thebibliography}{99}
+\bibitem{fellegi1969}
+Ivan P. Fellegi and Alan B. Sunter.
+\newblock A theory for record linkage.
+\newblock Journal of the American Statistical Association, 64(328):1183--1210, 1969.
+\newblock \url{https://doi.org/10.1080/01621459.1969.10501049}.
+
+\bibitem{linacre2022}
+Robin Linacre, Sam Lindsay, Theodore Manassis, Zoe Slade, Tom Hepworth, Ross Kennedy, and Andrew Bond.
+\newblock Splink: Free software for probabilistic record linkage at scale.
+\newblock International Journal of Population Data Science, 7(3), 2022.
+\newblock \url{https://doi.org/10.23889/ijpds.v7i3.1794}.
+\newblock Software repository: \url{https://github.com/moj-analytical-services/splink}.
+
+\bibitem{wang2024}
+Tianyi Wang, Hongyu Lin, Xu Han, Xu Chen, Bo Cao, and Liang Sun.
+\newblock Towards universal dense blocking for entity resolution.
+\newblock 2024.
+\newblock Code repository: \url{https://github.com/tshu-w/uniblocker}.
+
+\bibitem{zeakis2023}
+Alexandros Zeakis, George Papadakis, Dimitrios Skoutas, and Manolis Koubarakis.
+\newblock Pre-trained embeddings for entity resolution: An experimental analysis.
+\newblock Proceedings of the VLDB Endowment, 16(9):2225--2238, 2023.
+\newblock \url{https://doi.org/10.14778/3598581.3598594}.
+
+\bibitem{ebreheem2018}
+Muhammad Ebraheem, Saravanan Thirumuruganathan, Shafiq Joty, Mourad Ouzzani, and Nan Tang.
+\newblock Distributed representations of tuples for entity resolution.
+\newblock Proceedings of the VLDB Endowment, 11(11):1454--1467, 2018.
+\newblock \url{https://doi.org/10.14778/3236187.3236198}.
+
+\bibitem{strojny2026}
+Tymoteusz Strojny and Maciej Ber\k{e}sewicz.
+\newblock BlockingPy: Approximate nearest neighbours for blocking of records for entity resolution.
+\newblock SoftwareX, 34:102583, 2026.
+\newblock \url{https://doi.org/10.1016/j.softx.2026.102583}.
+\newblock Software repository: \url{https://github.com/ncn-foreigners/BlockingPy}.
+
 \bibitem{franz2025}
 Astrid Franz, Frederik Hoppe, Marianne Michaelis, and Udo G\"obel.
-\newblock Universal Embeddings of Tabular Data.
+\newblock Universal embeddings of tabular data.
 \newblock arXiv:2507.05904v1, 2025.
 \newblock \url{https://arxiv.org/abs/2507.05904v1}.
 
 \bibitem{vogel2026}
 Liane Vogel, Kavitha Srinivas, Niharika D'Souza, Sola Shirai, Oktie Hassanzadeh, and Horst Samulowitz.
-\newblock Towards Universal Tabular Embeddings: A Benchmark Across Data Tasks.
+\newblock Towards universal tabular embeddings: A benchmark across data tasks.
 \newblock arXiv:2604.21696v1, 2026.
 \newblock \url{https://arxiv.org/abs/2604.21696v1}.
 \end{thebibliography}
