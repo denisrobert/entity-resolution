@@ -1,0 +1,14 @@
+# Search a saved entity index from the command line.
+#
+# The project root `requirements.txt` provides the core pipeline dependencies
+# (entity_pipeline needs: numpy, faiss-cpu, sentence-transformers,
+# langchain-huggingface, splink, pandas). This example builds on those and adds
+# nothing else, so installing the project requirements is sufficient:
+#
+#   pip install -r ../../requirements.txt
+#
+# Then run:
+#   python examples/cli_search/search.py --help
+#
+# Note: `generate_data.Person` is used only to build the query row from the
+# command line; the persisted-store loading and matching live in entity_pipeline.

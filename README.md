@@ -182,10 +182,34 @@ entity-resolution/
 │   ├── evaluate_section7.py      # Whitepaper Section 7 benchmark suite
 │   └── compare_mu.py     # Trained vs. untrained Splink m/u comparison
 ├── data/                 # Persisted FAISS index and person metadata
+├── examples/             # Runnable example projects (search a saved index)
+│   ├── cli_search/       #   Command-line search tool
+│   └── rest_service/     #   FastAPI REST search service
 ├── section7_results.json # Latest Section 7 JSON results
 ├── section7_metrics.csv  # Latest Section 7 flat metric table
 └── .docs/                # Whitepaper LaTeX source and PDF
 ```
+
+## Examples
+
+Two self-contained example projects search a persisted index (defaulting to
+`data/`) for a candidate row using `entity_pipeline`:
+
+- **Command-line tool** — `examples/cli_search/`:
+  ```bash
+  python examples/cli_search/search.py --index-dir data \
+    --first-name Robert --last-name Martinez --date-of-birth 1985-06-15 --threshold 0.85
+  ```
+- **REST service** — `examples/rest_service/` (FastAPI):
+  ```bash
+  pip install -r requirements.txt fastapi "uvicorn[standard]" pydantic
+  python examples/rest_service/app.py
+  curl -s http://127.0.0.1:8000/health
+  ```
+  `POST /search` accepts a JSON person body (plus optional `k`/`threshold`) and
+  returns ranked matches with probabilities.
+
+Each has its own `README.md` with full usage.
 
 ## Splink Comparison Priority
 

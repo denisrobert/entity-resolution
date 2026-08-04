@@ -1,0 +1,11 @@
+# REST service for entity-index search.
+#
+# In addition to the project root dependencies (see ../../requirements.txt),
+# this example needs a web framework:
+#
+#   pip install -r ../../requirements.txt fastapi "uvicorn[standard]" pydantic
+#
+# Run the server (from the repository root):
+#   python examples/rest_service/app.py
+#   # or
+#   uvicorn examples.rest_service.app:app --host 127.0.0.1 --port 8000
