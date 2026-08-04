@@ -1,16 +1,35 @@
-"""Entity resolution package for FAISS + Splink person matching."""
+"""Entity resolution pipeline: vector blocking + Splink linkage."""
 
-from .generate_data import Person, generate_people, generate_person, introduce_variations
-from .vector_store import FaissPersonStore, build_person_store
-from .entity_resolver import PersonEntityResolver, create_resolver
+from .entity_pipeline import (
+    Blocker,
+    BlockedCandidate,
+    EmbeddingModel,
+    FlatIndexingStrategy,
+    HuggingFaceEmbeddingModel,
+    IndexingStrategy,
+    Linker,
+    MatchResult,
+    MemoryVectorDatabase,
+    PersistableVectorDatabase,
+    VectorDatabase,
+    build_default_pipeline,
+    calibrate_comparisons_from_pairs,
+    default_comparisons,
+)
 
 __all__ = [
-    'Person',
-    'generate_people',
-    'generate_person',
-    'introduce_variations',
-    'FaissPersonStore',
-    'build_person_store',
-    'PersonEntityResolver',
-    'create_resolver',
+    'Blocker',
+    'BlockedCandidate',
+    'EmbeddingModel',
+    'FlatIndexingStrategy',
+    'HuggingFaceEmbeddingModel',
+    'IndexingStrategy',
+    'Linker',
+    'MatchResult',
+    'MemoryVectorDatabase',
+    'PersistableVectorDatabase',
+    'VectorDatabase',
+    'build_default_pipeline',
+    'calibrate_comparisons_from_pairs',
+    'default_comparisons',
 ]

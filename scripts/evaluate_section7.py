@@ -11,11 +11,18 @@ import argparse
 import csv
 import json
 import statistics
+import sys
 import tempfile
 import time
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
+
+# Make the project root (pipeline module) and this scripts/ folder (legacy
+# support modules) importable regardless of how the script is invoked.
+_PATH_CURRENT = Path(__file__).resolve().parent
+sys.path.insert(0, str(_PATH_CURRENT.parent))
+sys.path.insert(0, str(_PATH_CURRENT))
 
 import faiss
 import numpy as np

@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (MiKTeX 26.5) (preloaded format=pdflatex 2026.8.3)  3 AUG 2026 19:04
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (MiKTeX 26.5) (preloaded format=pdflatex 2026.8.3)  4 AUG 2026 03:13
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -479,8 +479,14 @@ ansformers/all-MiniLM-L6-v2 \T1/lmr/m/n/10.95 through \T1/lmtt/m/n/10.95 Huggin
 gFaceEmbeddings\T1/lmr/m/n/10.95 . 
  []
 
-[3] [4{C:/Users/denis/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/lm/lm-maths
-y.enc}]
+[3]
+Overfull \hbox (1.64113pt too wide) in paragraph at lines 161--161
+[]\T1/lmtt/m/n/10.95 python scripts/generate_data.py --count 50000 --missing-ra
+te 0.3 --output-dir data[] 
+ []
+
+[4{C:/Users/denis/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/lm/lm-mathsy.en
+c}]
 Overfull \hbox (7.10953pt too wide) in paragraph at lines 173--182
  [][] 
  []
@@ -492,39 +498,29 @@ LaTeX Font Info:    External font `lmex10' loaded for size
 (Font)              <7> on input line 230.
 LaTeX Font Info:    External font `lmex10' loaded for size
 (Font)              <5> on input line 230.
- [7] [8] [9]
-Overfull \hbox (36.61859pt too wide) detected at line 368
-\OMS/lmsy/m/n/10.95 L\OT1/lmr/m/n/10.95 (\OML/lmm/m/it/10.95 ^^R\OT1/lmr/m/n/10
-.95 ) = \OMS/lmsy/m/n/10.95 ^^@[] [] [] \OT1/lmr/m/n/10.95 + \OML/lmm/m/it/10.9
-5 ^^U[]\OMS/lmsy/m/n/10.95 k\OML/lmm/m/it/10.95 w \OMS/lmsy/m/n/10.95 ^^@ \OML/
-lmm/m/it/10.95 w[]\OMS/lmsy/m/n/10.95 k[] \OT1/lmr/m/n/10.95 + \OML/lmm/m/it/10
-.95 ^^U[]\OMS/lmsy/m/n/10.95 k\OML/lmm/m/it/10.95 a \OMS/lmsy/m/n/10.95 ^^@ \OM
-L/lmm/m/it/10.95 a[]\OMS/lmsy/m/n/10.95 k[] \OT1/lmr/m/n/10.95 + \OML/lmm/m/it/
-10.95 ^^U[]\OMS/lmsy/m/n/10.95 k[] \OML/lmm/m/it/10.95 T \OMS/lmsy/m/n/10.95 ^^
-@ [] \OML/lmm/m/it/10.95 T[]\OMS/lmsy/m/n/10.95 k[]\OML/lmm/m/it/10.95 :
- []
 
-[10{C:/Users/denis/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/lm/lm-mathex.e
-nc}] [11] [12] [13] (entity_resolution_whitepaper.aux)
+
+LaTeX Warning: `h' float specifier changed to `ht'.
+
+[7] [8] [9] [10] [11] (entity_resolution_whitepaper.aux)
  ***********
 LaTeX2e <2026-06-01>
 L3 programming layer <2026-06-18>
  ***********
 Package rerunfilecheck Info: File `entity_resolution_whitepaper.out' has not ch
 anged.
-(rerunfilecheck)             Checksum: 02F2CE12FF8E45DD6EE9AE2CC2E23648;3885.
+(rerunfilecheck)             Checksum: CC8D277FA48CCDF502ABB0CAD166F426;3600.
  ) 
 Here is how much of TeX's memory you used:
- 10673 strings out of 467510
- 165950 string characters out of 5408795
- 601481 words of memory out of 5000000
+ 10664 strings out of 467510
+ 165880 string characters out of 5408795
+ 601492 words of memory out of 5000000
  39710 multiletter control sequences out of 15000+600000
  688822 words of font info for 76 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 74i,9n,79p,1510b,637s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 74i,9n,79p,1510b,639s stack positions out of 10000i,1000n,20000p,200000b,200000s
 <C:/Users/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx10.pf
 b><C:/Users/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx12.pf
-b><C:/Users/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmex10.pf
 b><C:/Users/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi10.pf
 b><C:/Users/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi7.pfb
 ><C:/Users/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi8.pfb>
@@ -537,9 +533,9 @@ rs/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmri10.pfb><C:/Use
 rs/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy10.pfb><C:/Use
 rs/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy8.pfb><C:/User
 s/denis/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmtt10.pfb>
-Output written on entity_resolution_whitepaper.pdf (13 pages, 352420 bytes).
+Output written on entity_resolution_whitepaper.pdf (11 pages, 327622 bytes).
 PDF statistics:
- 304 PDF objects out of 1000 (max. 8388607)
- 66 named destinations out of 1000 (max. 500000)
- 161 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 285 PDF objects out of 1000 (max. 8388607)
+ 58 named destinations out of 1000 (max. 500000)
+ 153 words of extra memory for PDF output out of 10000 (max. 10000000)
 

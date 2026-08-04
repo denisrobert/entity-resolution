@@ -19,7 +19,7 @@
 }
 
 \title{A Two-Stage Entity Resolution Pipeline\\with FAISS Blocking and Splink Matching}
-\author{Denis Robert\\Independent Researcher}
+\author{Denis Robert}
 \date{August 2026}
 
 \begin{document}
@@ -32,7 +32,7 @@ This paper presents and evaluates a two-stage entity resolution pipeline for inc
 \section{Introduction}
 Entity resolution attempts to determine whether two records refer to the same real-world entity. This task is difficult when records contain typographical variation, missing values, stale addresses, or inconsistent contact information. Comparing every query against every reference record is also unnecessarily expensive: for $N$ reference records, exhaustive comparison requires $O(N)$ candidate comparisons per query.
 
-The implementation in the \href{https://github.com/denisrobert/entity-resolution}{entity-resolution repository} addresses this problem with a retrieval-and-linkage architecture. A dense vector index performs approximate or exact nearest-neighbor retrieval, reducing the candidate set to the closest $k$ records. This use of dense retrieval for blocking follows a line of work including DeepER~\cite{ebreheem2018}, pre-trained embedding comparisons~\cite{zeakis2023}, and universal dense blocking~\cite{wang2024}. Splink then evaluates those candidates with explicit field comparisons and returns a match only when its probability exceeds a configurable threshold.
+The implementation in the \href{https://github.com/denisrobert/entity-resolution}{entity-resolution repository} addresses this problem with a retrieval-and-linkage architecture. A dense vector index~\cite{johnson2019} performs approximate or exact nearest-neighbor retrieval, reducing the candidate set to the closest $k$ records. This use of dense retrieval for blocking follows a line of work including DeepER~\cite{ebreheem2018}, pre-trained embedding comparisons~\cite{zeakis2023}, and universal dense blocking~\cite{wang2024}. Splink then evaluates those candidates with explicit field comparisons and returns a match only when its probability exceeds a configurable threshold.
 
 The representation choice is informed by recent work comparing tabular representation approaches. Vogel et al.'s \emph{Towards Universal Tabular Embeddings: A Benchmark Across Data Tasks} (arXiv:2604.21696v1, \url{https://arxiv.org/abs/2604.21696v1})~\cite{vogel2026} benchmark embeddings at cell, row, column, and table levels and show that performance depends on the downstream task and representation level; in the relevant current evaluation, textual embeddings outperform the dedicated tabular alternatives for retrieval. Franz et al.'s \emph{Universal Embeddings of Tabular Data} (arXiv:2507.05904v1, \url{https://arxiv.org/abs/2507.05904v1})~\cite{franz2025} describes a different strategy that transforms tabular data into a graph, learns entity embeddings with graph auto-encoders, and aggregates them into row embeddings. This graph-based approach may bear fruit for entity resolution in future experiments because it is designed to capture relationships among tabular entities and to embed unseen samples composed of similar entities. The present system therefore uses a row-level textual representation as its current baseline while leaving room to replace the embedding engine as these alternatives become more capable.
 
@@ -125,7 +125,7 @@ Given a query record $q$, the online process embeds the same textual representat
 \[
  s_{\mathrm{FAISS}}(q,r) = e(q)^T e(r),
 \]
-which is cosine similarity in the range $[-1,1]$. This stage is optimized for recall: the true match must be included in the candidate set for the second stage to recover it.
+which is cosine similarity in the range $[-1,1]$. This stage is optimized for recall: the true match must be included in the candidate set for the second stage to recover it. FAISS~\cite{johnson2019} provides this nearest-neighbour search.
 
 \subsection{Probabilistic linkage}
 The candidate set is passed to Splink as a small deduplication problem containing the query and the retrieved records. Splink implements a scalable form of probabilistic linkage grounded in the Fellegi--Sunter framework~\cite{fellegi1969,linacre2022}. The configured comparisons are:
@@ -156,8 +156,8 @@ The implementation uses FAISS for blocking and Splink 4.x inference for linkage.
 \section{Persistence and Operational Workflow}
 The workflow has two explicit commands:
 \begin{verbatim}
-python generate_data.py --count 50000 --missing-rate 0.3 --output-dir data
-python main.py --index-dir data --input-json query.json --threshold 0.85
+python scripts/generate_data.py --count 50000 --missing-rate 0.3 --output-dir data
+python scripts/main.py --index-dir data --input-json query.json --threshold 0.85
 \end{verbatim}
 
 The first command is an offline or scheduled job. The second command loads the persisted index, retrieves 20 candidates, performs Splink linkage, and emits either a match with both scores and the matched metadata or a no-match decision. This separation prevents expensive population embedding from occurring for every query and makes the index a deployable artifact.
@@ -184,7 +184,7 @@ Available RAM & Raw capacity & Raw index size & Raw metadata size & Recommended 
 \noindent
 $^*$Recommended capacity reserves 30\% of RAM for the operating system, Python process, model weights, FAISS temporary allocations, and query concurrency. The raw capacity is a sizing upper bound, not a production recommendation. During generation, peak memory can be higher because embeddings may be materialized before being added to FAISS. Building large indexes should therefore use batches and measure peak resident set size rather than relying only on final file size.
 
-For this flat \texttt{IndexFlatIP} design, a query scans all vectors, so memory capacity and query latency are coupled to the record count. At tens of millions of records, an approximate index such as HNSW or an inverted-file/product-quantized index should be evaluated. Quantization can reduce memory substantially, but may reduce blocking recall and must be measured against the downstream Splink match rate. Regardless of the FAISS index type, the metadata mapping must preserve vector-to-person row order and should be loaded with equivalent memory budgeting.
+For this flat \texttt{IndexFlatIP} design, a query scans all vectors, so memory capacity and query latency are coupled to the record count. At tens of millions of records, an approximate index such as HNSW or an inverted-file/product-quantized index should be evaluated; FAISS~\cite{johnson2019} ships several such indexes. Quantization can reduce memory substantially, but may reduce blocking recall and must be measured against the downstream Splink match rate. Regardless of the FAISS index type, the metadata mapping must preserve vector-to-person row order and should be loaded with equivalent memory budgeting.
 
 \subsection{When an external vector database becomes appropriate}
 An external vector database is not automatically better than FAISS. For a single service instance, a stable reference population, and a dataset that fits comfortably in memory, local FAISS has fewer moving parts and avoids network latency. The decision should be based on operational bounds as well as raw capacity. With the measured baseline, 10 million records would require approximately 17.5 GB for the flat index plus metadata, while 50 million records would require approximately 87.3 GB before runtime overhead. These sizes place a single-process deployment near or beyond the recommended envelope of a 16 or 32 GB host and make a 128 GB host increasingly specialized.
@@ -319,73 +319,11 @@ Trained (supervised, labelled pairs) & 91.38\% & 89.11\% & 99.20\% & 75.75\% & 9
 \end{tabular}
 \end{table}
 
-The supervised calibration is well behaved and changes the operating point in a measurable way. Recall is essentially unchanged (99.15\% to 99.20\%), while precision falls from 96.83\% to 89.11\% and specificity from 93.50\% to 75.75\%, giving an F1 of 93.88\% versus 97.97\% untrained. In absolute terms the trained variant trades a small reduction in false negatives (34 to 32) for a substantially larger increase in false positives (130 to 485). The results therefore confirm that reported figures are sensitive to how $m/u$ are obtained, and they motivate the labelled-pair and differentiable calibration directions discussed in Section~\ref{sec:further-research}. As a rule, parameters should be trained on labelled operationally representative pairs and evaluated for calibration before reported numbers are treated as production expectations.
+The supervised calibration is well behaved and changes the operating point in a measurable way. Recall is essentially unchanged (99.15\% to 99.20\%), while precision falls from 96.83\% to 89.11\% and specificity from 93.50\% to 75.75\%, giving an F1 of 93.88\% versus 97.97\% untrained. In absolute terms the trained variant trades a small reduction in false negatives (34 to 32) for a substantially larger increase in false positives (130 to 485). The results therefore confirm that reported figures are sensitive to how $m/u$ are obtained, and they motivate the labelled-pair calibration and related research directions discussed in Section~\ref{sec:further-research}. As a rule, parameters should be trained on labelled operationally representative pairs and evaluated for calibration before reported numbers are treated as production expectations.
 
 
 \section{Further Research}
 \label{sec:further-research}
-\subsection{Differentiable tuning of linkage parameters}
-The useful back-propagation target is the linkage model after blocking, not the entire retrieval-and-linkage pipeline. FAISS top-$k$ selection is a discrete operation: a record omitted from the candidate set has no comparison feature through which a gradient can flow. The proposed method therefore holds the candidate pairs fixed and uses labelled pairs to tune the comparison model's $m/u$ parameters, field weights, thresholds, missing-value treatment, and, where possible, the comparison functions themselves. Blocking recall must be measured separately and remains an upper bound on end-to-end recall.
-
-For a candidate pair $(q,r)$ and field $f$, first define a differentiable similarity $s_f(q,r) \in [0,1]$. Examples include a character $n$-gram cosine similarity, a soft edit similarity, or a differentiable approximation to Jaro--Winkler. Let $o_f(q,r) \in \{0,1\}$ indicate that both values are observed. For comparison level $j$ with threshold $t_{fj}$ and temperature $T_f>0$, define the soft agreement feature
-\[
- c_{f j,\theta}(q,r) = o_f(q,r)\,
- \sigma\!\left(\frac{s_f(q,r)-t_{fj}}{T_f}\right),
- \qquad
- \sigma(x)=\frac{1}{1+\exp(-x)}.
-\]
-The complete soft comparison vector is
-\[
- c_\theta(q,r)=\bigl(c_{fj,\theta}(q,r),\ o_f(q,r),\ 1-o_f(q,r)\bigr)_{f,j}.
-\]
-The observation indicators permit missingness to have its own learned evidence instead of silently treating a missing value as disagreement. Exact date-of-birth agreement can be included as a fixed binary feature; if a graded date comparison is desired, it can instead use a differentiable distance-based similarity.
-
-To make the connection to Splink explicit, parameterize each soft comparison's match and non-match probabilities as
-\[
- m_{fj}=\sigma(a^m_{fj}),\qquad u_{fj}=\sigma(a^u_{fj}),
- \qquad
- w_{fj}=\log\frac{m_{fj}(1-u_{fj})}{u_{fj}(1-m_{fj})}.
-\]
-Here $m_{fj}$ is the probability of observing agreement level $j$ for a true match, $u_{fj}$ is the corresponding probability for a non-match, and $w_{fj}$ is its log-likelihood-ratio weight. A differentiable linkage score can then be written as
-\[
- z_\theta(q,r)=b_\theta+
- \sum_{f,j}w_{fj}c_{fj,\theta}(q,r)+
- \sum_f\left(v_f^\mathrm{obs}o_f(q,r)+v_f^\mathrm{miss}(1-o_f(q,r))\right),
- \qquad
- p_\theta(q,r)=\sigma\!\left(z_\theta(q,r)\right).
-\]
-The intercept $b_\theta$ represents the prior log-odds of a match. The $v$ terms allow observed and missing fields to contribute separately, while the $w$ terms are soft analogues of Splink's agreement-level log-likelihood ratios. A production decision threshold is applied to $p_\theta$ after training; it is not required to be differentiated during pairwise training.
-
-For labelled pairs $(q_i,r_i,y_i)$, $y_i\in\{0,1\}$, the concrete training objective is regularized binary cross-entropy:
-\[
- \mathcal{L}(\theta)=
- -\frac{1}{n}\sum_{i=1}^{n}
- \left[y_i\log p_\theta(q_i,r_i)+
- (1-y_i)\log\left(1-p_\theta(q_i,r_i)\right)\right]
- +\lambda_w\lVert w-w_0\rVert_2^2
- +\lambda_a\lVert a-a_0\rVert_2^2
- +\lambda_T\lVert\log T-\log T_0\rVert_2^2.
-\]
-The first term trains discrimination. The second keeps learned evidence weights near initial Splink or domain-informed values, the third regularizes the transformed $m/u$ parameters, and the fourth prevents temperatures from collapsing into unstable hard thresholds. The sigmoid parameterizations keep $m$, $u$, and $T$ in valid ranges; additional monotonicity constraints such as $m_{fj}>u_{fj}$ can be enforced by reparameterizing $a^m_{fj}=a^u_{fj}+\operatorname{softplus}(\delta_{fj})$. All terms have well-defined partial derivatives with respect to the trainable parameters.
-
-Comparison algorithms can be tuned only when expressed as a differentiable relaxation. For example, if $s_f^{(1)},\ldots,s_f^{(K)}$ are candidate similarities, use
-\[
- s_f(q,r)=\sum_{k=1}^{K}\operatorname{softmax}(\gamma_f)_k\,s_f^{(k)}(q,r),
-\]
-where $\gamma_f$ learns a mixture of character, token, and edit-based similarities. A discrete algorithm choice cannot receive a useful gradient directly; the relaxed mixture can be optimized and then evaluated or distilled as a discrete production choice.
-
-A practical procedure is therefore:
-\begin{enumerate}[leftmargin=*]
-  \item build a labelled training set from FAISS candidate pairs, including hard negatives and missingness patterns;
-  \item freeze FAISS candidates and compute the soft comparison features for each pair;
-  \item initialize $m/u$, field weights, thresholds, temperatures, and optional similarity-mixture parameters from the current Splink configuration;
-  \item optimize $\mathcal{L}(\theta)$ with gradient descent, using validation data to select regularization and the final decision threshold;
-  \item calibrate the resulting probabilities and compare blocking recall plus final precision, recall, F1, and calibration against the original Splink model; and
-  \item distill the trained parameters into Splink comparison levels or retain the differentiable scorer as a separate training-time model, while keeping the production scoring path interpretable and reproducible.
-\end{enumerate}
-
-This procedure does not claim end-to-end gradients through FAISS. If embedding parameters are later tuned, they require a separate retrieval objective, such as contrastive loss over positives and hard negatives, and a separate evaluation of top-$k$ blocking recall. The linkage objective should not be used to imply that a missing true candidate can be recovered by changing Splink parameters.
-
 \subsection{Alternative embedding engines}
 The current MiniLM encoder is a useful baseline, but it is not specialized for entity resolution or structured rows. Candidate alternatives include:
 \begin{itemize}[leftmargin=*]
@@ -403,7 +341,7 @@ The comparison should measure not only final linkage quality but also whether th
 Future work should estimate Splink parameters from labelled operational samples, quantify probability calibration, and introduce drift monitoring for names, domains, postal formats, and address conventions. Privacy-preserving evaluation is also important: synthetic data is useful for development, but production validation must control access to personally identifying information and log only the minimum necessary evidence.
 
 \section{Conclusion}
-The implemented architecture combines a fast vector retrieval layer with an interpretable probabilistic linkage layer. FAISS narrows a 50,000-record population to 20 candidates, while Splink compares identity, contact, and address fields under a configurable decision threshold. Persisting the index and metadata makes the workflow operationally reusable. The most important next steps are to train and calibrate Splink parameters on labelled pairs, investigate differentiable surrogates for its metaparameters, and benchmark alternative row and tabular embedding engines using blocking recall as a first-class metric.
+The implemented architecture combines a fast vector retrieval layer with an interpretable probabilistic linkage layer. FAISS narrows a 50,000-record population to 20 candidates, while Splink compares identity, contact, and address fields under a configurable decision threshold. Persisting the index and metadata makes the workflow operationally reusable. The most important next steps are to train and calibrate Splink parameters on labelled pairs and benchmark alternative row and tabular embedding engines using blocking recall as a first-class metric.
 
 \begin{thebibliography}{99}
 \bibitem{fellegi1969}
@@ -455,6 +393,13 @@ Liane Vogel, Kavitha Srinivas, Niharika D'Souza, Sola Shirai, Oktie Hassanzadeh,
 \newblock Towards universal tabular embeddings: A benchmark across data tasks.
 \newblock arXiv:2604.21696v1, 2026.
 \newblock \url{https://arxiv.org/abs/2604.21696v1}.
+
+\bibitem{johnson2019}
+Jeff Johnson, Matthijs Douze, and Herv\'e J\'egou.
+\newblock Billion-scale similarity search with GPUs.
+\newblock IEEE Transactions on Big Data, 7(3):535--547, 2019.
+\newblock \url{https://doi.org/10.1109/TBDATA.2019.2921572}.
+\newblock Preprint: \url{https://arxiv.org/abs/1702.08734}.
 \end{thebibliography}
 
 \end{document}

@@ -43,10 +43,10 @@ Run commands from the repository root. Python 3.10 or newer is required.
 
 ```bash
 # Generate people, create embeddings, and persist the FAISS index plus metadata
-python generate_data.py --count 50000 --missing-rate 0.3 --output-dir data
+python scripts/generate_data.py --count 50000 --missing-rate 0.3 --output-dir data
 
 # Resolve a person using the persisted index
-python main.py \
+python scripts/main.py \
   --index-dir data \
   --first-name John \
   --last-name Smith \
@@ -57,14 +57,18 @@ python main.py \
   --blocking-k 20
 
 # Or provide the input record as JSON
-python main.py --index-dir data --input-json query.json
+python scripts/main.py --index-dir data --input-json query.json
 
 # Run the 5,000-row confusion-matrix experiment
-python test_confusion_matrix.py --count 5000 --output confusion_matrix_results.json
+python scripts/test_confusion_matrix.py --count 5000 --output confusion_matrix_results.json
 
 # Run the full Section 7 evaluation plan
-python evaluate_section7.py --count 5000 --ablation-count 500 \
+python scripts/evaluate_section7.py --count 5000 --ablation-count 500 \
   --output section7_results.json --csv-output section7_metrics.csv
+
+# Compare trained vs. untrained Splink m/u on the persisted 50k index
+python scripts/compare_mu.py --index-dir data --query-count 2000 \
+  --output compare_mu_results.json
 ```
 
 The Section 7 evaluator reports blocking recall at `k=10,20,50,100`, threshold
@@ -88,7 +92,12 @@ recall and 99.77% F1. Results are stored in `section7_results.json` and
 
 ### Python API
 
+The project-root module `entity_pipeline` provides the primary pipeline API. The
+legacy resolver stack (`generate_data`, `vector_store`, `entity_resolver`) is
+maintained under `scripts/`.
+
 ```python
+# Legacy resolver API (modules live under scripts/; run with scripts/ on sys.path)
 from generate_data import Person, generate_people
 from entity_resolver import create_resolver
 from vector_store import FaissPersonStore, build_person_store
@@ -119,9 +128,9 @@ if result:
     print(f"Matched: {result['matched_person'].first_name} {result['matched_person'].last_name}")
 ```
 
-The abstract `Blocker`/`Linker` classes in `entity_pipeline.py` expose the two
-stages separately and support training the Splink `m/u` parameters on the
-vector store:
+The abstract `Blocker`/`Linker` classes in `entity_pipeline.py` (the root module)
+expose the two stages separately and support training the Splink `m/u` parameters
+on the vector store:
 
 ```python
 from entity_pipeline import Blocker, Linker, default_comparisons
@@ -161,14 +170,17 @@ need persistence.
 
 ```
 entity-resolution/
-├── __init__.py           # Package exports
+├── __init__.py           # Package exports (entity_pipeline API)
 ├── requirements.txt      # Dependencies
-├── generate_data.py      # Synthetic Canadian person generation
-├── vector_store.py       # FAISS vector store with LangChain interface
-├── entity_resolver.py    # Splink-based probabilistic matching
-├── main.py               # Load index and resolve one input person
-├── test_confusion_matrix.py # Confusion-matrix evaluation
-├── evaluate_section7.py  # Whitepaper Section 7 benchmark suite
+├── entity_pipeline.py    # Abstract Blocker/Linker pipeline + in-memory store
+├── scripts/              # Command-line / whitepaper evaluation scripts
+│   ├── generate_data.py  # Synthetic Canadian person generation
+│   ├── vector_store.py   # Legacy FAISS vector store (LangChain interface)
+│   ├── entity_resolver.py # Legacy Splink-based resolver
+│   ├── main.py           # Load index and resolve one input person
+│   ├── test_confusion_matrix.py  # Confusion-matrix evaluation
+│   ├── evaluate_section7.py      # Whitepaper Section 7 benchmark suite
+│   └── compare_mu.py     # Trained vs. untrained Splink m/u comparison
 ├── data/                 # Persisted FAISS index and person metadata
 ├── section7_results.json # Latest Section 7 JSON results
 ├── section7_metrics.csv  # Latest Section 7 flat metric table
@@ -190,8 +202,8 @@ The Splink model is configured with the following priority order:
 ## Artifacts and Caveats
 
 The resolver produces match probabilities, FAISS cosine similarity scores,
-matched person records, and candidate rankings. `generate_data.py` persists
-`data/people.faiss` and `data/people.json`.
+matched person records, and candidate rankings. `scripts/generate_data.py`
+persists `data/people.faiss` and `data/people.json`.
 
 The included data is synthetic and intended for evaluation. Splink currently
 uses untrained default `m/u` parameters; production use requires calibration

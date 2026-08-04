@@ -17,7 +17,7 @@ Usual run (full 50k reference index, sample of queries for feasibility):
 
 .. code-block:: powershell
 
-    python compare_mu.py --index-dir data --query-count 2000 --output compare_mu_results.json
+    python scripts/compare_mu.py --index-dir data --query-count 2000 --output compare_mu_results.json
 """
 
 from __future__ import annotations
@@ -25,9 +25,16 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import sys
 import time
 from pathlib import Path
 from typing import Any
+
+# Make the project root (dependencies) and this scripts/ folder importable
+# regardless of how the script is invoked.
+_SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(_SCRIPT_DIR.parent))
+sys.path.insert(0, str(_SCRIPT_DIR))
 
 import numpy as np
 import pandas as pd

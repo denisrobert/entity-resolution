@@ -2,7 +2,14 @@
 
 import argparse
 import json
+import sys
 from pathlib import Path
+
+# Make the project root (pipeline module) and this scripts/ folder (legacy
+# support modules) importable regardless of how the script is invoked.
+_PATH_CURRENT = Path(__file__).resolve().parent
+sys.path.insert(0, str(_PATH_CURRENT.parent))
+sys.path.insert(0, str(_PATH_CURRENT))
 
 from generate_data import Person
 from vector_store import FaissPersonStore

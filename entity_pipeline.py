@@ -360,13 +360,13 @@ class MemoryVectorDatabase(PersistableVectorDatabase[T]):
             index_path = directory / VECTOR_FILE
         elif (directory / "people.faiss").exists() and (directory / "people.json").exists():
             # Legacy FaissPersonStore layout (people.faiss + people.json). Records
-            # are reconstructed as Person objects from the metadata payload.
-            from generate_data import Person
-
+            # are stored as their raw metadata dicts; the generic pipeline only
+            # needs payloads that support dict/to_dict access, so no Person class
+            # dependency is required.
             metadata = json.loads(
                 (directory / "people.json").read_text(encoding="utf-8")
             )
-            records = [Person.from_dict(person) for person in metadata["people"]]
+            records = [dict(person) for person in metadata["people"]]
             normalize = bool(metadata.get("normalize", True))
             model_name = metadata.get("model_name") or model_name
             index_path = directory / "people.faiss"
