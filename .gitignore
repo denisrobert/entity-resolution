@@ -1,2 +1,13 @@
 .kilo/
 context.md
+__pycache__/
+*.pyc
+
+# pdflatex compilation byproducts
+.docs/*.aux
+.docs/*.log
+.docs/*.out
+
+# generated evaluation artifacts
+scripts/*_results.json
+scripts/*_metrics.csv

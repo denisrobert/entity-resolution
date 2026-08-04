@@ -321,6 +321,25 @@ Trained (supervised, labelled pairs) & 91.38\% & 89.11\% & 99.20\% & 75.75\% & 9
 
 The supervised calibration is well behaved and changes the operating point in a measurable way. Recall is essentially unchanged (99.15\% to 99.20\%), while precision falls from 96.83\% to 89.11\% and specificity from 93.50\% to 75.75\%, giving an F1 of 93.88\% versus 97.97\% untrained. In absolute terms the trained variant trades a small reduction in false negatives (34 to 32) for a substantially larger increase in false positives (130 to 485). The results therefore confirm that reported figures are sensitive to how $m/u$ are obtained, and they motivate the labelled-pair calibration and related research directions discussed in Section~\ref{sec:further-research}. As a rule, parameters should be trained on labelled operationally representative pairs and evaluated for calibration before reported numbers are treated as production expectations.
 
+\subsection{Large duplicate-bearing benchmark at 100K rows}
+The experiments above evaluate a near-duplicate-free reference. To stress the resolver under a realistic mix of true duplicates and unrelated records, \texttt{compare\_training.py} builds a 100{,}000-record base population and adds a near-duplicate twin (small field differences at the same 0.15 variation rate) for 3\% of base records, yielding a 103{,}000-record reference index that genuinely contains matching records. The evaluation uses 6{,}000 balanced queries: 3{,}000 positives are fresh small-difference variants that are \emph{not verbatim} in the index but each match a base record, and 3{,}000 negatives are independently generated unrelated people. Queries are blocked to the top 20 FAISS neighbours and scored with Splink at $\tau=0.85$; only the linkage parameters differ. Three schemes are compared: the untrained default $m/u$ with a fixed prior of $0.0001$; supervised calibration of $m/u$ from labelled duplicate/non-match pairs; and unsupervised expectation maximisation over the reference population, which here contains genuine duplicate pairs for EM to exploit.
+
+\begin{table}[h]
+\centering
+\caption{Large duplicate-bearing benchmark: 100{,}000 base records plus 3{,}000 duplicates (103{,}000-record index) and 6{,}000 queries ($\tau=0.85$, $k=20$).}
+\begin{tabular}{lrrrrr}
+\toprule
+Variant & Accuracy & Precision & Recall & Specificity & F1 \\
+\midrule
+Untrained (default $m/u$, prior 0.0001) & 93.12\% & 89.59\% & 97.57\% & 88.67\% & 93.41\% \\
+Supervised (labelled pairs) & 82.52\% & 74.85\% & 97.93\% & 67.10\% & 84.85\% \\
+Unsupervised (EM, prior 0.0071) & 61.57\% & 56.69\% & 98.03\% & 25.10\% & 71.84\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+In confusion-matrix terms the untrained variant produced TP \(=2{,}927\), FN \(=73\), FP \(=340\), TN \(=2{,}660\); supervised TP \(=2{,}938\), FN \(=62\), FP \(=987\), TN \(=2{,}013\); and EM TP \(=2{,}941\), FN \(=59\), FP \(=2{,}247\), TN \(=753\).Recall is comparable across all three (97.6--98.0\%), but the trained schemes increasingly sacrifice precision and specificity for that recall: supervised precision falls to 74.9\% and specificity to 67.1\%; EM falls to 56.7\% precision and a very low 25.1\% specificity. The EM run also estimates a much larger match prior (0.0071 versus the fixed 0.0001), which, together with EM-fitted $m/u$, drives the gross over-matching. The untrained default thus yields the best F1 (93.41\%) on this duplicate-bearing population, reinforcing that the choice of $m/u$ strongly affects the measured operating point and that reported figures must be tied to the exact parameter configuration used.
+
 
 \section{Further Research}
 \label{sec:further-research}

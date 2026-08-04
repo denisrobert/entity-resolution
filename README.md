@@ -180,7 +180,8 @@ entity-resolution/
 │   ├── main.py           # Load index and resolve one input person
 │   ├── test_confusion_matrix.py  # Confusion-matrix evaluation
 │   ├── evaluate_section7.py      # Whitepaper Section 7 benchmark suite
-│   └── compare_mu.py     # Trained vs. untrained Splink m/u comparison
+│   ├── compare_mu.py     # Trained vs. untrained Splink m/u comparison
+│   └── compare_training.py  # 100k base benchmark: untrained vs supervised vs EM
 ├── data/                 # Persisted FAISS index and person metadata
 ├── examples/             # Runnable example projects (search a saved index)
 │   ├── cli_search/       #   Command-line search tool
