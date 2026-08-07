@@ -20,8 +20,9 @@ import pandas as pd
 import splink
 from splink import Linker, block_on
 
+from common import classify, load_records, make_non_identical_close_person
 from entity_pipeline import default_comparisons, weaken_comparison
-from generate_data import Person, generate_people, introduce_variations
+from generate_data import Person, generate_people
 from vector_store import build_person_store
 
 
@@ -30,41 +31,6 @@ DEFAULT_MISSING_RATE = 0.3
 DEFAULT_BLOCKING_K = 20
 DEFAULT_THRESHOLD = 0.85
 DEFAULT_CLOSE_VARIATION_RATE = 0.15
-
-
-def make_non_identical_close_person(person: Person, variation_rate: float) -> Person:
-    """Perturb a person until the generated same-entity row is not identical."""
-    for _ in range(10):
-        candidate = introduce_variations(person, variation_rate)
-        if candidate.to_dict() != person.to_dict():
-            return candidate
-
-    # Ensure rows with both optional fields missing still receive a controlled
-    # same-entity perturbation when the random mutations made no change.
-    first_name = person.first_name
-    replacement = "a" if first_name[-1].lower() != "a" else "e"
-    candidate = Person(
-        first_name=first_name[:-1] + replacement,
-        last_name=person.last_name,
-        date_of_birth=person.date_of_birth,
-        address=person.address,
-        email=person.email,
-    )
-    if candidate.to_dict() == person.to_dict():
-        raise RuntimeError("Could not generate a non-identical close test row")
-    return candidate
-
-
-def classify(expected_match: bool, result: dict[str, Any] | None) -> str:
-    """Return the confusion-matrix cell for one expected/predicted outcome."""
-    predicted_match = result is not None
-    if expected_match and predicted_match:
-        return "TP"
-    if expected_match and not predicted_match:
-        return "FN"
-    if not expected_match and predicted_match:
-        return "FP"
-    return "TN"
 
 
 def predict_batch(
@@ -139,10 +105,20 @@ def run_test(
     close_variation_rate: float = DEFAULT_CLOSE_VARIATION_RATE,
     seed: int = 42,
     address_strength: float = 1.0,
+    input_records: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Build a reference index and evaluate three generated rows per person."""
+    """Build a reference index and evaluate three generated rows per person.
+
+    When ``input_records`` is provided, the base reference population is loaded
+    from that file (JSON/CSV) instead of being generated synthetically, so the
+    experiment can be re-run on another data set.
+    """
     random.seed(seed)
-    people = generate_people(count, missing_rate=missing_rate, seed=seed)
+    if input_records:
+        people = load_records(input_file=input_records, count=count, missing_rate=missing_rate, seed=seed)
+        count = len(people)
+    else:
+        people = generate_people(count, missing_rate=missing_rate, seed=seed)
     unrelated_people = generate_people(count, missing_rate=missing_rate, seed=seed + 1)
 
     print(f"Building FAISS index for {count:,} reference records...")
@@ -229,6 +205,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--address-strength", type=float, default=1.0,
                         help="Weaken address evidence: scale address agreement m by this factor (<1 = weaker)")
+    parser.add_argument("--input-records", type=Path, default=None,
+                        help="JSON/CSV file of person records to use as the base population (instead of synthetic)")
     parser.add_argument("--output", default="confusion_matrix_results.json")
     args = parser.parse_args()
 
@@ -241,6 +219,7 @@ def main() -> None:
         close_variation_rate=args.close_variation_rate,
         seed=args.seed,
         address_strength=args.address_strength,
+        input_records=args.input_records,
     )
     Path(args.output).write_text(json.dumps(results, indent=2), encoding="utf-8")
 

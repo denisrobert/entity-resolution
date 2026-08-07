@@ -9,7 +9,7 @@ maximum probability and scored as a confusion matrix + F1. The sweep reports the
 
 Usage::
 
-    python scripts/f1_sweep.py --count 5000 \\
+    python scripts/experiment_f1_sweep.py --count 5000 \\
         --address-strengths 0.6 0.8 1.0 1.2 \\
         --thresholds 0.85 0.87 0.9 0.92 0.95 \\
         --output f1_sweep_results.json
@@ -39,7 +39,7 @@ from splink import Linker, block_on  # noqa: E402
 
 from entity_pipeline import default_comparisons, weaken_comparison  # noqa: E402
 from generate_data import Person, generate_people  # noqa: E402
-from test_confusion_matrix import make_non_identical_close_person  # noqa: E402
+from common import load_records, make_non_identical_close_person  # noqa: E402
 from vector_store import build_person_store  # noqa: E402
 
 DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
@@ -138,7 +138,11 @@ def evaluate_threshold(cases, probs: dict[str, float], threshold: float) -> dict
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
     random.seed(args.seed)
-    people = generate_people(args.count, missing_rate=args.missing_rate, seed=args.seed)
+    if args.input_records:
+        people = load_records(input_file=args.input_records, count=args.count, missing_rate=args.missing_rate, seed=args.seed)
+        args.count = len(people)
+    else:
+        people = generate_people(args.count, missing_rate=args.missing_rate, seed=args.seed)
     unrelated = generate_people(args.count, missing_rate=args.missing_rate, seed=args.seed + 1)
     cases = build_cases(people, unrelated, args.close_variation_rate)
     queries = [(query_id, person) for query_id, _, person, _ in cases]
@@ -208,6 +212,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--thresholds", type=float, nargs="+", default=list(DEFAULT_THRESHOLDS))
     parser.add_argument("--address-strengths", type=float, nargs="+", default=list(DEFAULT_ADDRESS_STRENGTHS))
+    parser.add_argument("--input-records", type=Path, default=None,
+                        help="JSON/CSV file of person records to use as the base population (instead of synthetic)")
     parser.add_argument("--output", default="f1_sweep_results.json")
     args = parser.parse_args()
 

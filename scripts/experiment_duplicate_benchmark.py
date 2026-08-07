@@ -17,13 +17,13 @@ reported as a confusion matrix plus metrics, with F1 highlighted.
 
 Example::
 
-    python scripts/compare_training.py --base-count 100000 --match-rate 0.03 \\
+    python scripts/experiment_duplicate_benchmark.py --base-count 100000 --match-rate 0.03 \\
         --k 20 --threshold 0.85 \\
         --output training_results.json
 
 Quick smoke test with a small base::
 
-    python scripts/compare_training.py --base-count 3000 --match-rate 0.03 --k 10
+    python scripts/experiment_duplicate_benchmark.py --base-count 3000 --match-rate 0.03 --k 10
 """
 
 from __future__ import annotations
@@ -43,10 +43,12 @@ sys.path.insert(0, str(_PATH_CURRENT))
 
 import pandas as pd  # noqa: E402
 
-from compare_mu import (  # noqa: E402
+from common import (  # noqa: E402
     COMPARISON_FIELDS,
     UNTRAINED_PRIOR,
     build_batch,
+    load_records,
+    make_non_identical_close_person,
     score_batch,
     to_link_settings,
     untrained_settings,
@@ -61,7 +63,6 @@ from entity_pipeline import (  # noqa: E402
     default_comparisons,
 )
 from generate_data import generate_people  # noqa: E402
-from test_confusion_matrix import make_non_identical_close_person  # noqa: E402
 
 DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 DEFAULT_MISSING_RATE = 0.3
@@ -76,6 +77,7 @@ def build_dataset(
     missing_rate: float,
     close_variation_rate: float,
     seed: int,
+    base: list[Any] | None = None,
 ) -> tuple[list[Any], list[Any], list[tuple[Any, Any]], list[Any]]:
     """Return ``(base, reference, pairs, query_variants)``.
 
@@ -85,10 +87,13 @@ def build_dataset(
     ``pairs`` lists each ``(base, twin)`` duplicate pair used as supervised
     training matches. ``query_variants`` are fresh small-difference records
     (not verbatim in the index) that match a base record -- these make the
-    positive queries non-trivial.
+    positive queries non-trivial. If ``base`` is provided (e.g. loaded from an
+    external data set), it is used instead of generating a synthetic population.
     """
     random.seed(seed)
-    base = generate_people(base_count, missing_rate=missing_rate, seed=seed)
+    if base is None:
+        base = generate_people(base_count, missing_rate=missing_rate, seed=seed)
+    base_count = len(base)
     match_count = int(round(base_count * match_rate))
     matched_indexes = random.sample(range(base_count), match_count)
     reference = list(base)
@@ -177,10 +182,17 @@ def evaluate(cases: list[tuple[str, str, Any, bool]], matched_ids: set[str]) -> 
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
     param_start = time.perf_counter()
+    external_base = (
+        load_records(input_file=args.input_records, count=args.base_count,
+                     missing_rate=args.missing_rate, seed=args.seed)
+        if args.input_records
+        else None
+    )
     base, reference, pairs, query_variants = build_dataset(
         args.base_count, args.match_rate, args.missing_rate,
-        args.close_variation_rate, args.seed,
+        args.close_variation_rate, args.seed, base=external_base,
     )
+    args.base_count = len(base)
     cases = build_cases(query_variants, args.missing_rate, args.seed)
     query_tuples = [(query_id, person) for query_id, _, person, _ in cases]
     dataset_seconds = time.perf_counter() - param_start
@@ -279,6 +291,8 @@ def main() -> None:
     parser.add_argument("--max-iterations", type=int, default=20)
     parser.add_argument("--em-convergence", type=float, default=0.001)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--input-records", type=Path, default=None,
+                        help="JSON/CSV file of person records to use as the base population (duplicates are then injected)")
     parser.add_argument("--output", default="training_results.json")
     args = parser.parse_args()
 

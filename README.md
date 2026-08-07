@@ -46,7 +46,7 @@ Run commands from the repository root. Python 3.10 or newer is required.
 python scripts/generate_data.py --count 50000 --missing-rate 0.3 --output-dir data
 
 # Resolve a person using the persisted index
-python scripts/main.py \
+python scripts/search_cli.py \
   --index-dir data \
   --first-name John \
   --last-name Smith \
@@ -57,19 +57,20 @@ python scripts/main.py \
   --blocking-k 20
 
 # Or provide the input record as JSON
-python scripts/main.py --index-dir data --input-json query.json
+python scripts/search_cli.py --index-dir data --input-json query.json
 
 # Run the 5,000-row confusion-matrix experiment
-python scripts/test_confusion_matrix.py --count 5000 --output confusion_matrix_results.json
+python scripts/experiment_confusion_matrix.py --count 5000 --output confusion_matrix_results.json
 
 # Run the full Section 7 evaluation plan
-python scripts/evaluate_section7.py --count 5000 --ablation-count 500 \
+python scripts/experiment_section7_eval.py --count 5000 --ablation-count 500 \
   --output section7_results.json --csv-output section7_metrics.csv
 
-# Compare trained vs. untrained Splink m/u on the persisted 50k index
-python scripts/compare_mu.py --index-dir data --query-count 2000 \
-  --output compare_mu_results.json
+# Compare m/u calibration (supervised vs EM vs untrained) on the persisted 50k index
+python scripts/experiment_mu_calibration.py --index-dir data --query-count 2000 \
+  --output mu_calibration_results.json
 ```
+
 
 The Section 7 evaluator reports blocking recall at `k=10,20,50,100`, threshold
 metrics including precision, recall, F1, and false-match rate, calibration
@@ -174,14 +175,17 @@ entity-resolution/
 ├── requirements.txt      # Dependencies
 ├── entity_pipeline.py    # Abstract Blocker/Linker pipeline + in-memory store
 ├── scripts/              # Command-line / whitepaper evaluation scripts
+│   ├── common.py         # Shared helpers + dataset loader (reuse on other data)
 │   ├── generate_data.py  # Synthetic Canadian person generation
 │   ├── vector_store.py   # Legacy FAISS vector store (LangChain interface)
 │   ├── entity_resolver.py # Legacy Splink-based resolver
-│   ├── main.py           # Load index and resolve one input person
-│   ├── test_confusion_matrix.py  # Confusion-matrix evaluation
-│   ├── evaluate_section7.py      # Whitepaper Section 7 benchmark suite
-│   ├── compare_mu.py     # Trained vs. untrained Splink m/u comparison
-│   └── compare_training.py  # 100k base benchmark: untrained vs supervised vs EM
+│   ├── search_cli.py     # Load index and resolve one input person
+│   ├── experiment_confusion_matrix.py  # Section 8 confusion-matrix experiment
+│   ├── experiment_section7_eval.py     # Section 7 benchmark suite
+│   ├── experiment_mu_calibration.py    # Section 8.1: supervised/EM vs untrained m/u
+│   ├── experiment_duplicate_benchmark.py  # Section 8.2: 100k duplicate-bearing benchmark
+│   ├── experiment_f1_sweep.py          # Section 8.3: threshold/address-weight F1 sweep
+│   └── *_results.json    # Saved experiment outputs
 ├── data/                 # Persisted FAISS index and person metadata
 ├── examples/             # Runnable example projects (search a saved index)
 │   ├── cli_search/       #   Command-line search tool

@@ -31,6 +31,7 @@ import splink
 from langchain_huggingface import HuggingFaceEmbeddings
 from splink import Linker, block_on
 
+from common import load_records
 from entity_pipeline import default_comparisons
 from generate_data import Person, generate_people, introduce_variations
 
@@ -233,7 +234,11 @@ def calibration_bins(cases: list[dict[str, Any]], probabilities: dict[str, float
 
 
 def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
-    people = generate_people(args.count, missing_rate=args.missing_rate, seed=args.seed)
+    if args.input_records:
+        people = load_records(input_file=args.input_records, count=args.count,
+                              missing_rate=args.missing_rate, seed=args.seed)
+    else:
+        people = generate_people(args.count, missing_rate=args.missing_rate, seed=args.seed)
     cases = make_cases(people, args.seed)
     parameters = {
         key: str(value) if isinstance(value, Path) else value
@@ -333,6 +338,8 @@ def write_csv(results: dict[str, Any], output: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Section 7 entity-resolution evaluations")
     parser.add_argument("--count", type=int, default=1000, help="Reference rows; use 5000 for the paper-scale run")
+    parser.add_argument("--input-records", type=Path, default=None,
+                        help="JSON/CSV file of person records to use as the reference population (instead of synthetic)")
     parser.add_argument("--ablation-count", type=int, default=250)
     parser.add_argument("--missing-rate", type=float, default=0.3)
     parser.add_argument("--model", default=DEFAULT_MODEL)
