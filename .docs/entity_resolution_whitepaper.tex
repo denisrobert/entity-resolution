@@ -338,7 +338,36 @@ Unsupervised (EM, prior 0.0071) & 61.57\% & 56.69\% & 98.03\% & 25.10\% & 71.84\
 \end{tabular}
 \end{table}
 
-In confusion-matrix terms the untrained variant produced TP \(=2{,}927\), FN \(=73\), FP \(=340\), TN \(=2{,}660\); supervised TP \(=2{,}938\), FN \(=62\), FP \(=987\), TN \(=2{,}013\); and EM TP \(=2{,}941\), FN \(=59\), FP \(=2{,}247\), TN \(=753\).Recall is comparable across all three (97.6--98.0\%), but the trained schemes increasingly sacrifice precision and specificity for that recall: supervised precision falls to 74.9\% and specificity to 67.1\%; EM falls to 56.7\% precision and a very low 25.1\% specificity. The EM run also estimates a much larger match prior (0.0071 versus the fixed 0.0001), which, together with EM-fitted $m/u$, drives the gross over-matching. The untrained default thus yields the best F1 (93.41\%) on this duplicate-bearing population, reinforcing that the choice of $m/u$ strongly affects the measured operating point and that reported figures must be tied to the exact parameter configuration used.
+In confusion-matrix terms the untrained variant produced TP \(=2{,}927\), FN \(=73\), FP \(=340\), TN \(=2{,}660\); supervised TP \(=2{,}938\), FN \(=62\), FP \(=987\), TN \(=2{,}013\); and EM TP \(=2{,}941\), FN \(=59\), FP \(=2{,}247\), TN \(=753\). Recall is comparable across all three (97.6--98.0\%), but the trained schemes increasingly sacrifice precision and specificity for that recall: supervised precision falls to 74.9\% and specificity to 67.1\%; EM falls to 56.7\% precision and a very low 25.1\% specificity. The EM run also estimates a much larger match prior (0.0071 versus the fixed 0.0001), which, together with EM-fitted $m/u$, drives the gross over-matching. The untrained default thus yields the best F1 (93.41\%) on this duplicate-bearing population, reinforcing that the choice of $m/u$ strongly affects the measured operating point and that reported figures must be tied to the exact parameter configuration used.
+
+\subsection{Decision-threshold and address-weight sensitivity}
+A grid search over the decision threshold $\tau$ and the address comparison weight was run on the same 5{,}000-record / 15{,}000-query confusion-matrix population. For each address weight the pipeline was scored once (all candidate pairs emitted at threshold zero) and each candidate decision threshold applied afterwards, giving 30 operating points for a small computational cost. The two findings below concern $\tau$ (where tuning helps) and the address weight (where it does not, on this data set).
+
+\paragraph{Raising the decision threshold improves F1.}
+At the default (full-strength) address comparison, increasing $\tau$ from 0.85 to 0.95 improves the F1 while keeping accuracy essentially flat. Because recall was already near its ceiling, the higher threshold removes the weakest false positives with only a modest recall penalty.
+
+\begin{table}[h]
+\centering
+\caption{F1 versus decision threshold at full address weight on the 5{,}000-record confusion-matrix population (15{,}000 queries).}
+\begin{tabular}{lrrrrr}
+\toprule
+$\tau$ & Accuracy & Precision & Recall & Specificity & F1 \\
+\midrule
+0.85 & 99.37\% & 99.62\% & 99.44\% & 99.24\% & 99.53\% \\
+0.87 & 99.30\% & 99.62\% & 99.33\% & 99.24\% & 99.47\% \\
+0.90 & 99.28\% & 99.62\% & 99.30\% & 99.24\% & 99.46\% \\
+0.92 & 99.28\% & 99.62\% & 99.30\% & 99.24\% & 99.46\% \\
+0.95 & 99.51\% & 99.96\% & 99.30\% & 99.92\% & 99.63\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+At $\tau=0.95$ the confusion matrix is TP \(=9{,}930\), FN \(=70\), FP \(=4\), TN \(=4{,}996\): false positives fall from 38 to 4 (precision 99.62\% to 99.96\%, specificity 99.24\% to 99.92\%) while recall falls only from 99.44\% to 99.30\% (F1 99.53\% to 99.63\%). The improvement is modest but consistent with the analysis above: in a regime where recall has headroom, the decision threshold is an effective precision lever and should be tuned on a validation set rather than fixed at 0.85.
+
+\paragraph{Weakening the address comparison did not help.}
+The intuition that address is too volatile to trust as an identity signal was tested by scaling the address agreement probabilities down (``weakening'' the comparison) and re-running the sweep for strengths 0.6--0.95. On this data set the approach did not improve performance: after threshold tuning, every weakened configuration topped out at roughly 98.5\% F1, well below the 99.63\% reached by the full-strength address comparison at $\tau=0.95$. The reason is that the address field here is genuinely informative: 30\% of addresses are missing independently, and the addresses that do exist are long and highly discriminative, so address agreement is valuable evidence for correctly rescuing the close same-entity queries. Downgrading that evidence cost more true positives than it suppressed false ones.
+
+This result is intentionally reported as a negative and should not be generalised. Its scope is limited to the synthetic Canadian population and its mutation model, where addresses are strongly identifying. There may be regimes in which weakening a volatile field is beneficial --- for example, addresses that change frequently between legitimate records of the same entity, noisy or generic addresses (unit-only entries, post-office boxes), or populations with many address collisions in high-density buildings. Establishing whether and exactly when a weak-address weighting is viable requires controlled experiments across data sets with tunable address volatility; the implementation foresees this and \texttt{f1\_sweep.py} plus \texttt{weaken\_comparison} make such a study straightforward to run. That investigation is left as future work.
 
 
 \section{Further Research}
@@ -361,6 +390,8 @@ Future work should estimate Splink parameters from labelled operational samples,
 
 \section{Conclusion}
 The implemented architecture combines a fast vector retrieval layer with an interpretable probabilistic linkage layer. FAISS narrows a 50,000-record population to 20 candidates, while Splink compares identity, contact, and address fields under a configurable decision threshold. Persisting the index and metadata makes the workflow operationally reusable. The most important next steps are to train and calibrate Splink parameters on labelled pairs and benchmark alternative row and tabular embedding engines using blocking recall as a first-class metric.
+
+The measured experiments also isolate which control levers move the F1 across the validation population and which do not. Three levers had a clear effect. The decision threshold $\tau$ is the cheapest and most effective precision lever: because recall already sat near its ceiling, raising $\tau$ from 0.85 to 0.95 on the confusion-matrix population lifted F1 from 99.53\% to 99.63\% (precision 99.62\% to 99.96\%, specificity 99.24\% to 99.92\%) at a small recall cost. The row serialization strategy also matters: the compact representation raised top-20 blocking recall to 99.95\% and F1 to 99.77\%, confirming that retrieval recall is a first-order lever for end-to-end F1. So is the blocking size $k$, which sets an upper bound on end-to-end recall; the default $k=20$ already achieves 99.84\% blocking recall, so increasing $k$ buys only a marginal recall gain while adding retrieval cost. Two levers did not help on this data set. Weakening the address comparison (scaling its agreement probabilities down by factors 0.6--0.95) never improved F1, topping out near 98.5\% rather than the 99.63\% reached at full address strength, because address agreement is genuinely informative for the close same-entity queries here. Likewise, retraining $m/u$ on the synthetic population --- whether supervised or by expectation maximisation --- over-matched and lowered F1 relative to the untrained default: calibration only helps when it is driven by labelled, operationally representative pairs, which the synthetic reference does not contain.
 
 \begin{thebibliography}{99}
 \bibitem{fellegi1969}

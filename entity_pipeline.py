@@ -846,6 +846,75 @@ def calibrate_comparisons_from_pairs(
     return resolved
 
 
+def weaken_comparison(
+    comparison: Any,
+    strength: float = 0.1,
+    sql_dialect: str = "duckdb",
+) -> dict:
+    """Return a Splink-ready comparison dict with weaker match evidence.
+
+    ``strength`` in ``(0, 1]`` scales down the ``m`` probabilities of a
+    comparison's agreement levels (exact match and fuzzy thresholds), shifting
+    the freed probability mass onto its catch-all ``else`` level. Because a
+    comparison level's match weight is ``log2(m/u)``, lowering ``m`` reduces how
+    strongly agreement on this field pushes a pair toward a match. Use this to
+    express that a field (e.g. address) is weaker evidence of a match than the
+    identity fields.
+
+    The returned comparison dict can be used directly in a Splink settings
+    ``comparisons`` list, in place of the corresponding default comparison.
+
+    Notes
+    -----
+    This is a deterministic override: it changes the relative weighting but
+    leaves the agreement structure unchanged. The fully data-driven alternative
+    is :func:`calibrate_comparisons_from_pairs` with labelled pairs that reflect
+    how volatile the field is between true matches; its learned ``m/u`` then
+    capture the same effect automatically.
+    """
+    strength = float(strength)
+    if not 0 < strength <= 1:
+        raise ValueError("strength must be in (0, 1]")
+
+    obj = comparison.get_comparison(sql_dialect)
+    levels = obj.comparison_levels
+
+    agreement_indices = [
+        index
+        for index, level in enumerate(levels)
+        if not level.is_null_level
+        and str(level.sql_condition).strip().upper() != "ELSE"
+    ]
+    else_indices = [
+        index
+        for index, level in enumerate(levels)
+        if not level.is_null_level
+        and str(level.sql_condition).strip().upper() == "ELSE"
+    ]
+    else_index = else_indices[0] if else_indices else len(levels) - 1
+
+    new_m = {index: float(levels[index].m_probability) for index in agreement_indices}
+    for index in new_m:
+        new_m[index] *= strength
+    new_m[else_index] = max(1.0 - sum(new_m.values()), 0.0)
+
+    trained_levels = []
+    for index, level in enumerate(levels):
+        entry = {
+            "sql_condition": level.sql_condition,
+            "label_for_charts": level.label_for_charts,
+        }
+        if not level.is_null_level:
+            entry["m_probability"] = new_m.get(index, float(level.m_probability))
+            entry["u_probability"] = float(level.u_probability)
+        trained_levels.append(entry)
+
+    return {
+        "output_column_name": obj.output_column_name,
+        "comparison_levels": trained_levels,
+    }
+
+
 def build_default_pipeline(
     people: Sequence[T],
     model_name: str = DEFAULT_MODEL,

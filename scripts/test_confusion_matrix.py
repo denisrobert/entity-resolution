@@ -20,7 +20,7 @@ import pandas as pd
 import splink
 from splink import Linker, block_on
 
-from entity_pipeline import default_comparisons
+from entity_pipeline import default_comparisons, weaken_comparison
 from generate_data import Person, generate_people, introduce_variations
 from vector_store import build_person_store
 
@@ -72,8 +72,12 @@ def predict_batch(
     store: Any,
     blocking_k: int,
     threshold: float,
+    address_strength: float = 1.0,
 ) -> set[str]:
     """Run FAISS blocking and one batched Splink prediction for all queries."""
+    comparisons = default_comparisons()
+    if address_strength < 1.0:
+        comparisons = [*comparisons[:4], weaken_comparison(comparisons[4], strength=address_strength)]
     query_records = []
     candidate_records = []
     query_texts = [person.to_text() for _, person in queries]
@@ -107,7 +111,7 @@ def predict_batch(
         "link_type": "link_only",
         "unique_id_column_name": "unique_id",
         "source_dataset_column_name": "source_dataset",
-        "comparisons": default_comparisons(),
+        "comparisons": comparisons,
         "blocking_rules_to_generate_predictions": [block_on("block_id")],
         "probability_two_random_records_match": 0.0001,
     }
@@ -134,6 +138,7 @@ def run_test(
     threshold: float = DEFAULT_THRESHOLD,
     close_variation_rate: float = DEFAULT_CLOSE_VARIATION_RATE,
     seed: int = 42,
+    address_strength: float = 1.0,
 ) -> dict[str, Any]:
     """Build a reference index and evaluate three generated rows per person."""
     random.seed(seed)
@@ -167,6 +172,7 @@ def run_test(
         store,
         blocking_k,
         threshold,
+        address_strength,
     )
     query_seconds = time.perf_counter() - start
 
@@ -199,6 +205,7 @@ def run_test(
             "match_threshold": threshold,
             "close_variation_rate": close_variation_rate,
             "seed": seed,
+            "address_strength": address_strength,
         },
         "timing": {
             "index_build_seconds": build_seconds,
@@ -220,6 +227,8 @@ def main() -> None:
     parser.add_argument("--threshold", type=float, default=DEFAULT_THRESHOLD)
     parser.add_argument("--close-variation-rate", type=float, default=DEFAULT_CLOSE_VARIATION_RATE)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--address-strength", type=float, default=1.0,
+                        help="Weaken address evidence: scale address agreement m by this factor (<1 = weaker)")
     parser.add_argument("--output", default="confusion_matrix_results.json")
     args = parser.parse_args()
 
@@ -231,6 +240,7 @@ def main() -> None:
         threshold=args.threshold,
         close_variation_rate=args.close_variation_rate,
         seed=args.seed,
+        address_strength=args.address_strength,
     )
     Path(args.output).write_text(json.dumps(results, indent=2), encoding="utf-8")
 

@@ -15,6 +15,7 @@ from .entity_pipeline import (
     build_default_pipeline,
     calibrate_comparisons_from_pairs,
     default_comparisons,
+    weaken_comparison,
 )
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     'build_default_pipeline',
     'calibrate_comparisons_from_pairs',
     'default_comparisons',
+    'weaken_comparison',
 ]
