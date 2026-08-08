@@ -455,6 +455,9 @@ The implemented architecture combines a fast vector retrieval layer with an inte
 
 The measured experiments also isolate which control levers move the F1 across the validation population and which do not. Three levers had a clear effect. The decision threshold $\tau$ is the cheapest and most effective precision lever: because recall already sat near its ceiling, raising $\tau$ from 0.85 to 0.95 on the confusion-matrix population lifted F1 from 99.53\% to 99.63\% (precision 99.62\% to 99.96\%, specificity 99.24\% to 99.92\%) at a small recall cost. The row serialization strategy also matters: the compact representation raised top-20 blocking recall to 99.95\% and F1 to 99.77\%, confirming that retrieval recall is a first-order lever for end-to-end F1. So is the blocking size $k$, which sets an upper bound on end-to-end recall; the default $k=20$ already achieves 99.84\% blocking recall, so increasing $k$ buys only a marginal recall gain while adding retrieval cost. Two levers did not help on this data set. Weakening the address comparison (scaling its agreement probabilities down by factors 0.6--0.95) never improved F1, topping out near 98.5\% rather than the 99.63\% reached at full address strength, because address agreement is genuinely informative for the close same-entity queries here. Likewise, retraining $m/u$ on the synthetic population --- whether supervised or by expectation maximisation --- over-matched and lowered F1 relative to the untrained default: calibration only helps when it is driven by labelled, operationally representative pairs, which the synthetic reference does not contain.
 
+\section*{Use of Artificial Intelligence}
+During the preparation of this work the author used an AI coding and writing assistant --- the DeepSeek V4 Flash 0731 large language model accessed through an interactive coding agent --- to assist with drafting and editing the manuscript, authoring and debugging the code that implements and evaluates the pipeline, and running the experiments and automation that produced the reported numbers. The tool was not listed as an author, as it cannot take responsibility for the work. All numerical results reported in this paper were obtained by executing the repository code and were independently re-checked for accuracy. Every claim, table, figure, result, and conclusion was thoroughly reviewed and verified by the author, who takes full responsibility for the content of this document, including any errors or omissions that remain.
+
 \begin{thebibliography}{99}
 \bibitem{fellegi1969}
 Ivan P. Fellegi and Alan B. Sunter.
@@ -543,7 +546,6 @@ Sidharth Mudgal, Han Li, Theodoros Rekatsinas, AnHai Doan, Youngchoon Park, Gane
 North Carolina State Board of Elections.
 \newblock Voter registration data (public data download).
 \newblock \url{https://www.ncsbe.gov/results-data/voter-registration-data}.
-\newblock Kaggle mirror: \url{https://www.kaggle.com/datasets/jerimee/north-carolina-voter-file}.
 \end{thebibliography}
 
 \end{document}

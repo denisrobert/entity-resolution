@@ -264,7 +264,6 @@ The Section 9 experiments use the **North Carolina statewide voter-registration
 export**. Download it from the official source:
 
 - NCSBE voter registration data: <https://www.ncsbe.gov/results-data/voter-registration-data> (statewide file `ncvoter_Statewide.txt`).
-- Mirror: <https://www.kaggle.com/datasets/jerimee/north-carolina-voter-file>.
 
 Place the file at `datasets/ncvoter/ncvoter_Statewide.txt`. The export is a
 tab-separated, quote-delimited file (~4 GB) with columns including `last_name`,
