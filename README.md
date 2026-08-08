@@ -180,13 +180,23 @@ entity-resolution/
 │   ├── vector_store.py   # Legacy FAISS vector store (LangChain interface)
 │   ├── entity_resolver.py # Legacy Splink-based resolver
 │   ├── search_cli.py     # Load index and resolve one input person
+│   ├── extract_ncvoter.py # Pre-process the NC voter export into a person CSV
 │   ├── experiment_confusion_matrix.py  # Section 8 confusion-matrix experiment
 │   ├── experiment_section7_eval.py     # Section 7 benchmark suite
 │   ├── experiment_mu_calibration.py    # Section 8.1: supervised/EM vs untrained m/u
 │   ├── experiment_duplicate_benchmark.py  # Section 8.2: 100k duplicate-bearing benchmark
 │   ├── experiment_f1_sweep.py          # Section 8.3: threshold/address-weight F1 sweep
+│   ├── experiment_mu_tau_interaction.py   # Calibration-paradox decomposition
+│   ├── experiment_mu_prior_tau_surface.py # Joint (tau, prior) F1 surface
+│   ├── ncvoter/          # Real-data NC-voter experiments (mutation model)
+│   │   ├── ncvoter_util.py              # person mapping + mutation model
+│   │   ├── prepare_sample.py            # subsample the records CSV
+│   │   ├── experiment_blocking_recall.py
+│   │   ├── experiment_resolution.py
+│   │   └── experiment_f1_sweep.py
 │   └── *_results.json    # Saved experiment outputs
-├── data/                 # Persisted FAISS index and person metadata
+├── data/                 # Persisted FAISS index and person metadata (synthetic)
+├── datasets/ncvoter/     # NC voter export + derived CSVs (not committed)
 ├── examples/             # Runnable example projects (search a saved index)
 │   ├── cli_search/       #   Command-line search tool
 │   └── rest_service/     #   FastAPI REST search service
@@ -215,6 +225,112 @@ Two self-contained example projects search a persisted index (defaulting to
   returns ranked matches with probabilities.
 
 Each has its own `README.md` with full usage.
+
+## Reproducing the Experiments
+
+This section gives a reviewer everything needed to re-run every experiment
+reported in `.docs/entity_resolution_whitepaper.pdf`. Run all commands from the
+repository root after `pip install -r requirements.txt`. Every experiment script
+supports `--help`; the defaults reproduce the numbers reported in the paper.
+
+The embedding model (`sentence-transformers/all-MiniLM-L6-v2`) is downloaded
+from Hugging Face on first use; set `HF_HOME`/`HF_TOKEN` if you run offline. The
+**synthetic** experiments are fully self-contained and deterministic by seed
+(default 42). Only the NC Voter replication requires downloading an external
+export first (see below).
+
+### Synthetic experiments (paper Sections 7, 8, and calibration)
+
+| Paper section | Script | Command |
+|---|---|---|
+| §7 benchmark suite | `scripts/experiment_section7_eval.py` | `python scripts/experiment_section7_eval.py --count 5000 --ablation-count 500 --output section7_results.json --csv-output section7_metrics.csv` |
+| §8 confusion matrix | `scripts/experiment_confusion_matrix.py` | `python scripts/experiment_confusion_matrix.py --count 5000 --output confusion_matrix_results.json` (add `--address-strength 0.8` for the weakened-address run) |
+| §8.1 m/u (supervised/EM vs untrained) | `scripts/experiment_mu_calibration.py` | `python scripts/experiment_mu_calibration.py --index-dir data --query-count 2000 --output mu_calibration_results.json` |
+| §8.2 duplicate-bearing benchmark | `scripts/experiment_duplicate_benchmark.py` | `python scripts/experiment_duplicate_benchmark.py --base-count 100000 --match-rate 0.03 --output training_results.json` |
+| §8.3 threshold/address-weight sweep | `scripts/experiment_f1_sweep.py` | `python scripts/experiment_f1_sweep.py --count 5000 --output f1_sweep_results.json` |
+| Calibration-paradox decomposition | `scripts/experiment_mu_tau_interaction.py` | `python scripts/experiment_mu_tau_interaction.py --base-count 5000 --match-rate 0.03 --output mu_tau_interaction.json` |
+| Joint (τ, prior) F1 surface | `scripts/experiment_mu_prior_tau_surface.py` | `python scripts/experiment_mu_prior_tau_surface.py --base-count 5000 --output mu_prior_tau_surface.json` |
+
+`experiment_mu_calibration.py` loads the persisted 50,000-record index from
+`--index-dir data`. If that artifact is absent, regenerate it first:
+
+```bash
+python scripts/generate_data.py --count 50000 --missing-rate 0.3 --output-dir data
+```
+
+### NC Voter replication (paper Section 9) — data source and pre-processing
+
+The Section 9 experiments use the **North Carolina statewide voter-registration
+export**. Download it from the official source:
+
+- NCSBE voter registration data: <https://www.ncsbe.gov/results-data/voter-registration-data> (statewide file `ncvoter_Statewide.txt`).
+- Mirror: <https://www.kaggle.com/datasets/jerimee/north-carolina-voter-file>.
+
+Place the file at `datasets/ncvoter/ncvoter_Statewide.txt`. The export is a
+tab-separated, quote-delimited file (~4 GB) with columns including `last_name`,
+`first_name`, `birth_year`, and the residential address fields
+(`res_street_address`, `res_city_desc`, `state_cd`, `zip_code`). It contains
+**no** full birth date and **no** email.
+
+Pre-process it into a standard person CSV (extract the relevant columns, keep
+birth year, omit the absent email, and drop rows with no first/last name):
+
+```bash
+python scripts/extract_ncvoter.py \
+  --input datasets/ncvoter/ncvoter_Statewide.txt \
+  --output datasets/ncvoter/ncvoter_records.csv
+```
+
+Then subsample a workable subset (the full file has ~9.2M records; the paper
+uses a 5,000-record uniform sample):
+
+```bash
+python scripts/ncvoter/prepare_sample.py \
+  --input datasets/ncvoter/ncvoter_records.csv \
+  --output datasets/ncvoter/sample_5000.csv --count 5000 --seed 42
+```
+
+### NC Voter experiments (with the mutation model)
+
+Because the registration file is already de-duplicated (no known duplicate
+pairs), these scripts apply a **synthetic mutation model** (`ncvoter_util.py`)
+to create realistic noisy duplicates: name typos (~55%), address
+changes/omissions (55%/20%), and birth-year shifts (~10%). Mutation rates and
+`--mutation-seed` are configurable.
+
+```bash
+# Blocking recall: does a mutated duplicate recover its clean base at k=5..100?
+python scripts/ncvoter/experiment_blocking_recall.py \
+  --sample datasets/ncvoter/sample_5000.csv --query-count 1000 --k 5 10 20 50 100
+
+# Confusion matrix + F1 (re-run with --k 50 / --k 100 for the k-scaling analysis)
+python scripts/ncvoter/experiment_resolution.py \
+  --sample datasets/ncvoter/sample_5000.csv \
+  --in-index 3000 --pos-queries 1500 --neg-queries 1500 --k 20 --threshold 0.85
+
+# Threshold/address-weight F1 sweep
+python scripts/ncvoter/experiment_f1_sweep.py \
+  --sample datasets/ncvoter/sample_5000.csv \
+  --in-index 3000 --pos-queries 1500 --neg-queries 1500 \
+  --thresholds 0.85 0.9 0.95 --address-strengths 0.8 1.0
+```
+
+Performance note for reviewers: `--k` grows the candidate set, and the scripts
+report the batched Splink scoring time alongside F1 (see Table `tab:ncvoter-k`
+in the paper). The `datasets/` folder — including the raw NC export and the
+derived CSVs — is not committed to the repository; reviewers must download or
+re-generate it exactly as described above.
+
+### Interpreting outputs
+
+Each experiment writes a JSON file (named by its `--output` argument) containing
+a `parameters` block (dataset size, `k`, `τ`, seed, missing rate), a `timing`
+block (index build, blocking, and Splink scoring seconds), and the result: a
+`confusion_matrix` + `metrics {accuracy, precision, recall, specificity, f1}`,
+or for the sweeps an `f1_by_tau` / `surface` / `best` grid. Trained-prior values
+(such as `mu_prior_em` or `em_prior_fitted`) capture the fitted
+`probability_two_random_records_match` discussed in the calibration-paradox
+section.
 
 ## Splink Comparison Priority
 

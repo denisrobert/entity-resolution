@@ -11,3 +11,5 @@ __pycache__/
 # generated evaluation artifacts
 scripts/*_results.json
 scripts/*_metrics.csv
+
+datasets/ncvoter
