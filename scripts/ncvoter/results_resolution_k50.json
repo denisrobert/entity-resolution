@@ -1,0 +1,33 @@
+{
+  "parameters": {
+    "records_in_index": 3000,
+    "positive_queries": 1500,
+    "negative_queries": 1500,
+    "blocking_k": 50,
+    "match_threshold": 0.85,
+    "address_strength": 1.0,
+    "mutation_model": "name/address/dob perturbations",
+    "mutation_seed": 7,
+    "seed": 42,
+    "data": "ncvoter (real) + synthetic mutations",
+    "sample": "datasets\\ncvoter\\sample_5000.csv"
+  },
+  "timing": {
+    "index_build_seconds": 26.6170104000048,
+    "blocking_seconds": 49.88014739999198,
+    "query_seconds": 1.4508579000103055
+  },
+  "confusion_matrix": {
+    "TP": 1312,
+    "FN": 188,
+    "FP": 0,
+    "TN": 1500
+  },
+  "metrics": {
+    "accuracy": 0.9373333333333334,
+    "precision": 1.0,
+    "recall": 0.8746666666666667,
+    "specificity": 1.0,
+    "f1": 0.9331436699857752
+  }
+}
