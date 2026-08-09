@@ -8,10 +8,6 @@ __pycache__/
 .docs/*.log
 .docs/*.out
 
-# generated evaluation artifacts
-scripts/*_results.json
-scripts/*_metrics.csv
-
 
 # Removed from git for either size or privacy reasons. These files are not needed to run the code, but some of them are needed to reproduce the experiments. If you want to reproduce the experiments, you will need to download these files from their original sources and place them in the appropriate locations.
 datasets

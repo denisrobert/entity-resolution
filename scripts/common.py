@@ -214,7 +214,8 @@ def build_batch(
         })
         query_records.append(record)
         for candidate in blocker.block(person, k=blocking_k):
-            cand = candidate.record.to_dict()
+            cand_record = candidate.record
+            cand = dict(cand_record) if isinstance(cand_record, dict) else cand_record.to_dict()
             cand.update({
                 "unique_id": f"C_{query_index}_{candidate.position}",
                 "block_id": query_index,

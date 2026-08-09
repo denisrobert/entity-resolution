@@ -18,8 +18,8 @@
     "mutation_seed": 7
   },
   "timing": {
-    "index_build_seconds": 30.04651630000444,
-    "blocking_seconds": 54.51479439999093
+    "index_build_seconds": 34.0879283999966,
+    "blocking_seconds": 54.774529699992854
   },
   "grid": [
     {
@@ -38,7 +38,7 @@
         "specificity": 0.9106666666666666,
         "f1": 0.8937034529451591
       },
-      "score_seconds": 2.586711000010837
+      "score_seconds": 2.5450342999829445
     },
     {
       "address_strength": 0.8,
@@ -56,7 +56,7 @@
         "specificity": 0.9106666666666666,
         "f1": 0.8738800827015851
       },
-      "score_seconds": 2.586711000010837
+      "score_seconds": 2.5450342999829445
     },
     {
       "address_strength": 0.8,
@@ -74,7 +74,7 @@
         "specificity": 0.9106666666666666,
         "f1": 0.8738800827015851
       },
-      "score_seconds": 2.586711000010837
+      "score_seconds": 2.5450342999829445
     },
     {
       "address_strength": 1.0,
@@ -92,7 +92,7 @@
         "specificity": 1.0,
         "f1": 0.9224137931034483
       },
-      "score_seconds": 2.209037400010857
+      "score_seconds": 2.494209199998295
     },
     {
       "address_strength": 1.0,
@@ -110,7 +110,7 @@
         "specificity": 1.0,
         "f1": 0.88268156424581
       },
-      "score_seconds": 2.209037400010857
+      "score_seconds": 2.494209199998295
     },
     {
       "address_strength": 1.0,
@@ -128,7 +128,7 @@
         "specificity": 1.0,
         "f1": 0.88268156424581
       },
-      "score_seconds": 2.209037400010857
+      "score_seconds": 2.494209199998295
     }
   ],
   "best": {
@@ -147,6 +147,6 @@
       "specificity": 1.0,
       "f1": 0.9224137931034483
     },
-    "score_seconds": 2.209037400010857
+    "score_seconds": 2.494209199998295
   }
 }
