@@ -10,28 +10,40 @@ size: 16:9
 
 <style>
   section {
-    padding: 1.6em 2.2em;
+    padding: 1.3em 2em;
     box-sizing: border-box;
   }
-  h1 { font-size: 2.0em; margin: 0 0 .35em 0; }
-  h2 { font-size: 1.3em; margin: 0 0 .35em 0; color: #444; }
-  ul, ol { margin: .2em 0; }
-  li { margin: .18em 0; line-height: 1.35; }
+  h1 { font-size: 1.7em; margin: 0 0 .3em 0; }
+  h2 { font-size: 1.1em; margin: 0 0 .3em 0; color: #444; }
+  ul, ol { margin: .1em 0; }
+  li { margin: .12em 0; line-height: 1.28; }
+  p { line-height: 1.28; }
   pre {
     white-space: pre-wrap;
     word-break: break-word;
-    font-size: 0.8em;
-    line-height: 1.25;
-    padding: .6em 1em;
+    font-size: 0.72em;
+    line-height: 1.2;
+    padding: .4em .8em;
   }
   code { word-break: break-word; }
-  table { width: 100%; font-size: 0.82em; border-collapse: collapse; }
-  th, td { padding: .25em .4em; word-break: break-word; }
-  blockquote { margin: .3em 0 0 0; padding: .3em .8em; font-size: .85em; }
+  table { width: 100%; font-size: 0.74em; border-collapse: collapse; }
+  th, td { padding: .12em .3em; word-break: break-word; line-height: 1.2; }
+  blockquote { margin: .2em 0 0 0; padding: .25em .7em; font-size: .8em; line-height: 1.25; }
+  /* Dense slides (theme CSS has higher specificity, so use !important) */
+  .compact { font-size: 17px !important; }
+  .compact h1 { font-size: 1.2em !important; margin: 0 0 .15em 0; }
+  .compact h2 { font-size: .95em !important; }
+  .compact ul, .compact ol { margin: .05em 0 !important; }
+  .compact li { margin: .04em 0 !important; line-height: 1.15 !important; }
+  .compact p { margin: .08em 0 !important; }
+  .compact blockquote { line-height: 1.2 !important; }
+  .compact table { font-size: .62em !important; line-height: 1.1 !important; }
+  .compact th, .compact td { padding: .03em .2em !important; }
+  .compact pre { font-size: .6em !important; padding: .2em .5em; }
 </style>
 
 <!--
-Note (presenter): One deck, three audience-tuned parts. Part 1 C-suite (why),
+Note (presenter): One deck, three audience-tuned parts. Part 1 Executive Summary (why),
 Part 2 Engineering leadership (architecture & design), Part 3 Line engineers
 (orientation; these teammates read the paper after the talk).
 -->
@@ -47,7 +59,7 @@ Denis Robert
 
 | Part | Audience | Focus | After the talk |
 |---|---|---|---|
-| **1** | C-suite | Value, risk, cost | Decision / review |
+| **1** | Executive Summary | Value, risk, cost | Decision / review |
 | **2** | Engineering leadership | Architecture, design, roadmap | Carry it forward |
 | **3** | Line engineers | Orientation + map to the paper | **Read the paper** |
 
@@ -55,7 +67,7 @@ Denis Robert
 
 ---
 
-# Part 1 · C-Suite
+# Part 1 · Executive Summary
 ## The 60-second version
 
 ---
@@ -231,13 +243,13 @@ See paper §8.1 and the joint `τ × prior` table.
 # Operational readiness
 
 - Persisted, reload-friendly store with `update`/`delete`; external-store interface is the vector-DB swap point.
-- **Reproducibility built in:** every experiment maps to a script; scripts accept `--input` to run on other datasets.
+- **Reproducible:** every experiment maps to a script; scripts accept `--input`.
 
 **Roadmap**
 1. Invest in **linkage calibration** (labelled pairs + joint τ/prior tuning).
 2. Do **not** spend on blocking-engine research at this scale.
-3. Add a **validation/CI gate** that locks F1 on a held-out labelled set.
-4. Drive the NC-voter / real-data replication to a decision gate.
+3. Add a **CI gate** locking F1 on a held-out labelled set.
+4. **Gate go/no-go on internal corporate customer data** — the NC-voter run is only a public-data sanity check (pre-deduplicated; no DOB/email), so the production decision uses the org's own labelled data.
 
 ---
 
@@ -270,6 +282,8 @@ Store     : add / update / delete / save / load (no re-embed on load)
 
 ---
 
+<!-- _class: compact -->
+
 # Reproducing experiments
 
 Run from repo root; scripts have `--help` and deterministic seeds (default 42).
@@ -289,15 +303,24 @@ For **your** data: population-based scripts accept `--input-records FILE`.
 
 ---
 
-# Gotchas you will hit
+<!-- _class: compact -->
+
+# Gotchas — tuning & thresholds
 
 - **Don't "just retune" m/u.** It looks worse (prior/τ coupling). Anchor the prior and re-validate prior + `τ` + weights together (Appendix — Tuning the Match Prior).
+- **`τ` encodes business cost.** `τ* = C_FP/(C_FP+C_FN)`; exposed via `--threshold` / `--tau` and the F1 sweep. Raise `τ` for fewer wrong links, lower it for recall-first (Appendix — Deriving τ).
+- **Tune the prior properly.** Anchor `λ`, fit with the prior pinned, tune `τ` jointly, watch the score-shift guard (Appendix — Tuning the Match Prior).
+
+---
+
+<!-- _class: compact -->
+
+# Gotchas — blocking & data
+
 - **Blocking recall is a hard ceiling.** If recall is low, raise `k` or serialization, not the embedding model.
 - **Address weakening didn't help** here — test, don't assume.
 - **Real data needs a mutation/duplicate model** to score (`scripts/ncvoter/ncvoter_util.py`).
 - NC voter has **no full DOB and no email** — those comparisons are weak there.
-- **`τ` encodes business cost.** `τ* = C_FP/(C_FP+C_FN)`; the experiments expose this via `--threshold` / `--tau` and the F1 sweep. Raise `τ` for a precision-first (fewer wrong links) posture, lower it for recall-first. See the **Appendix — Deriving τ** for the cost/F1/GMM/transitivity methods.
-- **Tune the prior properly.** Anchor `λ` (default or blocking-adjusted), fit with the prior pinned, tune `τ` jointly, and watch the score-shift guard. See **Appendix — Tuning the Match Prior**.
 
 ---
 
