@@ -455,6 +455,49 @@ The implemented architecture combines a fast vector retrieval layer with an inte
 
 The measured experiments also isolate which control levers move the F1 across the validation population and which do not. Three levers had a clear effect. The decision threshold $\tau$ is the cheapest and most effective precision lever: because recall already sat near its ceiling, raising $\tau$ from 0.85 to 0.95 on the confusion-matrix population lifted F1 from 99.53\% to 99.63\% (precision 99.62\% to 99.96\%, specificity 99.24\% to 99.92\%) at a small recall cost. The row serialization strategy also matters: the compact representation raised top-20 blocking recall to 99.95\% and F1 to 99.77\%, confirming that retrieval recall is a first-order lever for end-to-end F1. So is the blocking size $k$, which sets an upper bound on end-to-end recall; the default $k=20$ already achieves 99.84\% blocking recall, so increasing $k$ buys only a marginal recall gain while adding retrieval cost. Two levers did not help on this data set. Weakening the address comparison (scaling its agreement probabilities down by factors 0.6--0.95) never improved F1, topping out near 98.5\% rather than the 99.63\% reached at full address strength, because address agreement is genuinely informative for the close same-entity queries here. Likewise, retraining $m/u$ on the synthetic population --- whether supervised or by expectation maximisation --- over-matched and lowered F1 relative to the untrained default: calibration only helps when it is driven by labelled, operationally representative pairs, which the synthetic reference does not contain.
 
+\appendix
+\section{Deriving the Decision Threshold $\tau$}
+The decision threshold $\tau$ should be treated as a statistical boundary rather than an arbitrary heuristic. The standard algorithms for deriving it are grouped here by whether labelled ground truth is available.
+
+\subsection{With labelled ground truth (supervised derivation)}
+If a labelled validation set of true matches and non-matches exists, classical optimisation applies.
+
+\paragraph{Expected-cost minimisation.} If a false positive carries a business cost $C_{FP}$ and a false negative a cost $C_{FN}$, decision theory states that the expected loss is minimised by declaring a pair a match exactly when its posterior match probability satisfies $P(M\mid \gamma)\ge \tau^*$, with
+\[
+\tau^* \;=\; \frac{C_{FP}}{C_{FP}+C_{FN}}\;.
+\]
+For example, if merging two distinct accounts ($C_{FP}$) is twenty times more costly than failing to link two records of the same person ($C_{FN}$), then $\tau^* = 20/(20+1) \approx 0.95$. This is the decision-theoretic framing that Fellegi and Sunter used to define optimal two-threshold linkage rules under cost~\cite{fellegi1969,winkler1993}.
+
+\paragraph{F1 maximisation.} Alternatively one maximises the empirical F1 score by sweeping candidate thresholds:
+\[
+\tau^* \;=\; \operatorname*{arg\,max}_{\tau\in[0.5,0.999]}\ \frac{2\cdot \mathrm{Precision}(\tau)\cdot \mathrm{Recall}(\tau)}
+{\mathrm{Precision}(\tau)+\mathrm{Recall}(\tau)}\;.
+\]
+Precision-recall trade-offs and threshold selection are standard practice for skewed classification~\cite{davis2006,christen2012}. The threshold and address-weight sweeps in this paper (Table~\ref{tab:f1-threshold} and the NC-voter experiments) instantiate this supervised rule on a labelled validation set.
+
+\subsection{Without labelled ground truth (unsupervised derivation)}
+When labels are absent, empirical precision and recall cannot be measured directly, and the boundary must be inferred from the data.
+
+\paragraph{Expected-F1 maximisation.} If the match probabilities $p_j=P(M\mid\gamma_j)$ estimated by the fitted model (e.g., by expectation maximisation) are well calibrated, the expected counts at any threshold $\tau$ can be computed without labels. With $D_\tau=\{j: p_j\ge \tau\}$ the pairs classified as matches, the expected true positives, false positives, and false negatives are
+\[
+E[TP(\tau)]=\sum_{j\in D_\tau}p_j,\qquad
+E[FP(\tau)]=\sum_{j\in D_\tau}(1-p_j),\qquad
+E[FN(\tau)]=\sum_{j\notin D_\tau}p_j,
+\]
+so the expected F1 reduces to
+\[
+E[F_1(\tau)]=\frac{2\sum_{j\in D_\tau}p_j}{|D_\tau|+\sum_{j}p_j},
+\]
+where $\sum_j p_j$ is the total expected number of matches in the candidate-pair set $S$. One then selects $\tau^*=\operatorname{arg\,max}_\tau E[F_1(\tau)]$ over a dense grid. This is a direct use of the calibrated posterior probabilities produced by the mixture/EM fitting of the Fellegi--Sunter model~\cite{mclachlan2000,christen2012}; it approximates the cost-based rule when the two error types are weighted equally.
+
+\paragraph{Gaussian-mixture valley detection.} The Fellegi--Sunter weights $w_j=\log_2 R(\gamma_j)$ are typically bimodal: a large peak of low-weight non-matches and a smaller high-weight match peak. Fitting a two-component Gaussian mixture~\cite{mclachlan2000} to the weights yields densities $f_U(w)$ and $f_M(w)$ for the non-match and match components; the threshold is placed at the intersection
+\[
+p\, f_M(w^*)=(1-p)\, f_U(w^*),
+\]
+with $p$ the prior match probability, and the weight $w^*$ converted back to a probability via the Bayes relation $\tau^*=\bigl(1+\frac{1-p}{p}\,2^{-w^*}\bigr)^{-1}$. This places the boundary at the statistical ``valley'' separating the two populations; frequency-based and decision-rule refinements of the Fellegi--Sunter weights also assume such well-separated weight distributions~\cite{winkler2000}.
+
+\paragraph{Graph-transitivity consistency.} Linkage is expected to be transitive (if $A$ matches $B$ and $B$ matches $C$, then $A$ matches $C$). For a candidate $\tau$, build a graph with an edge between records $i,j$ when $p_{ij}\ge \tau$, count transitivity violations (e.g., $A$ connected to $B$ and $B$ to $C$ but $A$ not to $C$), and select the $\tau$ that minimises violations while maximising cluster cohesion, for example the silhouette score of the resulting connected components. Record-linkage clustering under transitive closure is standard in the field~\cite{christen2012}.
+
 \section*{Use of Artificial Intelligence}
 During the preparation of this work the author used an AI coding and writing assistant --- the DeepSeek V4 Flash 0731 large language model accessed through an interactive coding agent --- to assist with drafting and editing the manuscript, authoring and debugging the code that implements and evaluates the pipeline, and running the experiments and automation that produced the reported numbers. The tool was not listed as an author, as it cannot take responsibility for the work. All numerical results reported in this paper were obtained by executing the repository code and were independently re-checked for accuracy. Every claim, table, figure, result, and conclusion was thoroughly reviewed and verified by the author, who takes full responsibility for the content of this document, including any errors or omissions that remain.
 
@@ -546,6 +589,34 @@ Sidharth Mudgal, Han Li, Theodoros Rekatsinas, AnHai Doan, Youngchoon Park, Gane
 North Carolina State Board of Elections.
 \newblock Voter registration data (public data download).
 \newblock \url{https://www.ncsbe.gov/results-data/voter-registration-data}.
+
+\bibitem{winkler1993}
+William E. Winkler.
+\newblock Improved decision rules in the Fellegi--Sunter model of record linkage.
+\newblock In Proceedings of the Section on Survey Research Methods, American Statistical Association, pages 274--279, 1993.
+
+\bibitem{winkler2000}
+William E. Winkler.
+\newblock Frequency-based matching in the Fellegi--Sunter model of record linkage.
+\newblock Statistical Research Division, U.S. Bureau of the Census, Research Report Series RR2000/06, 2000.
+\newblock \url{https://www.census.gov/library/working-papers/2000/adrm/rr2000-06.html}.
+
+\bibitem{davis2006}
+Jesse Davis and Mark Goadrich.
+\newblock The relationship between precision-recall and ROC curves.
+\newblock In Proceedings of the 23rd International Conference on Machine Learning (ICML), pages 233--240, 2006.
+\newblock \url{https://doi.org/10.1145/1143844.1143874}.
+
+\bibitem{christen2012}
+Peter Christen.
+\newblock Data Matching: Concepts and Techniques for Record Linkage, Entity Resolution, and Duplicate Detection.
+\newblock Springer, Data-Centric Systems and Applications, 2012.
+\newblock \url{https://doi.org/10.1007/978-3-642-31164-2}.
+
+\bibitem{mclachlan2000}
+Geoffrey McLachlan and David Peel.
+\newblock Finite Mixture Models.
+\newblock John Wiley \& Sons, Wiley Series in Probability and Statistics, 2000.
 \end{thebibliography}
 
 \end{document}
