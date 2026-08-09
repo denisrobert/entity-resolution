@@ -113,7 +113,7 @@ The offline process in \texttt{generate\_data.py} performs the following steps:
 \begin{enumerate}[leftmargin=*]
   \item Generate the reference population with a fixed random seed when reproducibility is required.
   \item Convert every person into its textual row representation.
-  \item Compute a dense vector with \texttt{sentence-transformers/all-MiniLM-L6-v2} through \texttt{HuggingFaceEmbeddings}.
+  \item Compute a dense vector with {\footnotesize\texttt{sentence-transformers/all-MiniLM-L6-v2}\allowbreak\ through \texttt{HuggingFaceEmbeddings}\kern-0.4pt}.
   \item L2-normalize each vector and add it to a FAISS \texttt{IndexFlatIP} index. Inner product on normalized vectors is cosine similarity.
   \item Persist the FAISS index as \texttt{people.faiss} and the person records, model name, and normalization setting as \texttt{people.json}.
 \end{enumerate}
@@ -156,10 +156,12 @@ The implementation uses FAISS for blocking and Splink 4.x inference for linkage.
 
 \section{Persistence and Operational Workflow}
 The workflow has two explicit commands:
+{\footnotesize
 \begin{verbatim}
 python scripts/generate_data.py --count 50000 --missing-rate 0.3 --output-dir data
 python scripts/search_cli.py --index-dir data --input-json query.json --threshold 0.85
 \end{verbatim}
+}
 
 The first command is an offline or scheduled job. The second command loads the persisted index, retrieves 20 candidates, performs Splink linkage, and emits either a match with both scores and the matched metadata or a no-match decision. This separation prevents expensive population embedding from occurring for every query and makes the index a deployable artifact.
 
@@ -174,7 +176,7 @@ The following extrapolation assumes the same embedding dimension, float32 storag
 \label{tab:capacity}
 \begin{tabular}{rrrrr}
 \toprule
-Available RAM & Raw capacity & Raw index size & Raw metadata size & Recommended capacity$^*$ \\
+Available RAM & Raw capacity & Index size & Metadata size & Recommended$^*$ \\
 \midrule
 16 GB & 9.84 million & 14.4 GB & 2.0 GB & 6.89 million \\
 32 GB & 19.68 million & 28.9 GB & 4.1 GB & 13.77 million \\
@@ -326,7 +328,7 @@ Trained (supervised, labelled pairs) & 91.38\% & 89.11\% & 99.20\% & 75.75\% & 9
 
 Table~\ref{tab:mu-train-untrain} compares the two variants at the fixed operating point. The supervised calibration is well behaved and changes the operating point in a measurable way. Recall is essentially unchanged (99.15\% to 99.20\%), while precision falls from 96.83\% to 89.11\% and specificity from 93.50\% to 75.75\%, giving an F1 of 93.88\% versus 97.97\% untrained. In absolute terms the trained variant trades a small reduction in false negatives (34 to 32) for a substantially larger increase in false positives (130 to 485). The results therefore confirm that reported figures are sensitive to how $m/u$ are obtained, and they motivate the labelled-pair calibration and related research directions discussed in Section~\ref{sec:further-research}. As a rule, parameters should be trained on labelled operationally representative pairs and evaluated for calibration before reported numbers are treated as production expectations.
 
-These results also raise a calibration paradox: refining $m/u$ produced worse F1 than leaving them untrained. \texttt{experiment\_mu\_tau\_interaction.py} decomposes the paradox on the duplicate-bearing population (5{,}000 base records, 3\% twins) into two distinct mechanisms. First, the untrained parameters are not tuned to any specific corpus. Splink's defaults are a constructed, internally consistent weight ladder --- an exact match contributes $+10$ bits, a full mismatch $-5$ bits, the exact-match $m$ is set to 0.95, and the default prior is $0.0001$. Retraining $m/u$ changes the evidence weights while the prior and the decision threshold stay at their old values, shifting the whole score distribution: the mean match probability of non-match pairs rose from 0.047 (untrained) to 0.236 (supervised) and 0.53 (EM), with the fitted EM prior ($0.0072$ versus $0.0001$) the dominant driver. Jointly re-optimising the prior and threshold strongly favours the trained model only at a low prior and a high threshold, whereas the untrained defaults are robust across the whole operating-point region, as Table~\ref{tab:mu-tau-surface} shows. The prior/threshold coupling therefore explains most of the apparent gap --- EM at the naive fixed point is poor, and re-tuning the prior and $\tau$ recovers a large part of the difference --- but it is not the whole story. Second, even after jointly optimising $(\tau,\ \text{prior})$ for each model, the trained $m/u$ stay below the defaults (EM optimum F1 $0.951$ versus $0.997$ untrained), because the trained models assign more weight to the partial-similarity levels that non-match pairs also exhibit. The practical lesson is that the default configuration is a coherent bundle: any change to $m/u$ should be accompanied by re-estimation of the prior and re-selection of $\tau$ on a validation set, otherwise the reported metrics are measured at an unintended operating point.
+These results also raise a calibration paradox: refining $m/u$ produced worse F1 than leaving them untrained.\label{sec:calibration-paradox} \texttt{experiment\_mu\_tau\_interaction.py} decomposes the paradox on the duplicate-bearing population (5{,}000 base records, 3\% twins) into two distinct mechanisms. First, the untrained parameters are not tuned to any specific corpus. Splink's defaults are a constructed, internally consistent weight ladder --- an exact match contributes $+10$ bits, a full mismatch $-5$ bits, the exact-match $m$ is set to 0.95, and the default prior is $0.0001$. Retraining $m/u$ changes the evidence weights while the prior and the decision threshold stay at their old values, shifting the whole score distribution: the mean match probability of non-match pairs rose from 0.047 (untrained) to 0.236 (supervised) and 0.53 (EM), with the fitted EM prior ($0.0072$ versus $0.0001$) the dominant driver. Jointly re-optimising the prior and threshold strongly favours the trained model only at a low prior and a high threshold, whereas the untrained defaults are robust across the whole operating-point region, as Table~\ref{tab:mu-tau-surface} shows. The prior/threshold coupling therefore explains most of the apparent gap --- EM at the naive fixed point is poor, and re-tuning the prior and $\tau$ recovers a large part of the difference --- but it is not the whole story. Second, even after jointly optimising $(\tau,\ \text{prior})$ for each model, the trained $m/u$ stay below the defaults (EM optimum F1 $0.951$ versus $0.997$ untrained), because the trained models assign more weight to the partial-similarity levels that non-match pairs also exhibit. The practical lesson is that the default configuration is a coherent bundle: any change to $m/u$ should be accompanied by re-estimation of the prior and re-selection of $\tau$ on a validation set, otherwise the reported metrics are measured at an unintended operating point.
 
 \begin{table}[h]
 \centering
@@ -457,6 +459,7 @@ The measured experiments also isolate which control levers move the F1 across th
 
 \appendix
 \section{Deriving the Decision Threshold $\tau$}
+\label{app:derive-tau}
 The decision threshold $\tau$ should be treated as a statistical boundary rather than an arbitrary heuristic. The standard algorithms for deriving it are grouped here by whether labelled ground truth is available.
 
 \subsection{With labelled ground truth (supervised derivation)}
@@ -497,6 +500,28 @@ p\, f_M(w^*)=(1-p)\, f_U(w^*),
 with $p$ the prior match probability, and the weight $w^*$ converted back to a probability via the Bayes relation $\tau^*=\bigl(1+\frac{1-p}{p}\,2^{-w^*}\bigr)^{-1}$. This places the boundary at the statistical ``valley'' separating the two populations; frequency-based and decision-rule refinements of the Fellegi--Sunter weights also assume such well-separated weight distributions~\cite{winkler2000}.
 
 \paragraph{Graph-transitivity consistency.} Linkage is expected to be transitive (if $A$ matches $B$ and $B$ matches $C$, then $A$ matches $C$). For a candidate $\tau$, build a graph with an edge between records $i,j$ when $p_{ij}\ge \tau$, count transitivity violations (e.g., $A$ connected to $B$ and $B$ to $C$ but $A$ not to $C$), and select the $\tau$ that minimises violations while maximising cluster cohesion, for example the silhouette score of the resulting connected components. Record-linkage clustering under transitive closure is standard in the field~\cite{christen2012}.
+
+\section{Tuning the Match Prior $\lambda$}
+\label{app:tune-prior}
+The calibration-paradox analysis (Section~\ref{sec:calibration-paradox}) showed that retraining $m/u$ produced worse results than leaving them untrained, and decomposed the effect into prior coupling and a genuine $m/u$ residual. The dominant, addressable part is the prior: EM's free estimate of the match prior $\lambda$ (here $0.0072$ versus the default $0.0001$) inflated the match probabilities and produced gross over-matching. This appendix outlines an algorithm that tunes the prior and the decision threshold together, which is the fix the paradox calls for. Let $\lambda=\mathit{probability\_two\_random\_records\_match}$ and $\tau$ be the decision threshold.
+
+\paragraph{Step 0 (baseline).} Set $\lambda_0 = 0.0001$ (the Splink default).
+
+\paragraph{Step 1 (estimate a principled prior; do not use EM's free prior).}
+\begin{itemize}
+  \item \emph{With labels:} $\lambda_\mathrm{est}=\tfrac{\text{proportion of candidate pairs that are true matches}}{\text{blocking recall}}$, i.e.\ the base match rate in random-record-pair space rather than within the blocked candidate set.
+  \item \emph{Without labels:} use Splink's estimator {\footnotesize\texttt{estimate\_probability\_two\_random\_records\_match}}, called with the blocking rules and a \texttt{recall}; it divides the expected matches by the blocking coverage. If no defensible match-rate assumption exists, keep $\lambda_0 = 0.0001$.
+\end{itemize}
+
+\paragraph{Step 2 (fit $m/u$ with the prior pinned).} Run Splink EM with \texttt{fix\_probability\_two\_random\_}\allowbreak\texttt{records\_match = True} so that EM estimates $m/u$ only, or keep the untrained defaults. This is the key divergence from the paradox setup: $m/u$ may change while $\lambda$ stays anchored.
+
+\paragraph{Step 3 (choose $(\lambda,\tau)$ jointly on validation).} Grid over $\lambda\in\{\lambda_0,\lambda_\mathrm{est}\}\times 10^{-k}$ and $\tau\in[0.5,\,0.999]$; for each cell score all pairs and evaluate the objective. \emph{With labels:} decision cost $C_{FP}\cdot FP + C_{FN}\cdot FN$ (or F1), selecting the minimiser/argmax. \emph{Without labels:} the expected-F1 or expected-cost from the calibrated posteriors, or the GMM-valley threshold, as defined in Appendix~\ref{app:derive-tau}.
+
+\paragraph{Step 4 (coherence guard).} Reject solutions whose \emph{mean posterior probability of non-match pairs} is high (EM's was about 0.53); this is the diagnostic that separates prior coupling from a genuine $m/u$ residual. Prefer a smaller $\lambda$, and verify that false positives and false negatives move monotonically with $\tau$ around the chosen $\lambda$.
+
+\paragraph{Step 5 (freeze and report).} Lock $(\lambda^*,\tau^*)$ on validation and measure once on a held-out test set, reporting $\lambda$, $\tau$, F1, and the false-positive/false-negative/cost outcome.
+
+Why this addresses the paradox: (i)~$\lambda$ is anchored --- the default or the blocking-adjusted estimate --- instead of letting EM inflate it to $0.0072$, which recovered EM's F1 from about 0.86 to 0.95--0.97 in our data; (ii)~$\lambda$ and $\tau$ are tuned together, matching the coherent-bundle rule that no single element is changed in isolation; (iii)~the score-shift guard distinguishes prior coupling from a real model-fitting problem before the numbers are trusted. Scope note: the blocking-adjusted step is Splink-native; the joint grid and guard are the contribution here. This appendix addresses the \emph{prior}; the remaining genuine residual (trained $m/u$ slightly below the defaults, $\le 0.974$ versus $0.997$) is a model-fitting question not solved by prior tuning.
 
 \section*{Use of Artificial Intelligence}
 During the preparation of this work the author used an AI coding and writing assistant --- the DeepSeek V4 Flash 0731 large language model accessed through an interactive coding agent --- to assist with drafting and editing the manuscript, authoring and debugging the code that implements and evaluates the pipeline, and running the experiments and automation that produced the reported numbers. The tool was not listed as an author, as it cannot take responsibility for the work. All numerical results reported in this paper were obtained by executing the repository code and were independently re-checked for accuracy. Every claim, table, figure, result, and conclusion was thoroughly reviewed and verified by the author, who takes full responsibility for the content of this document, including any errors or omissions that remain.

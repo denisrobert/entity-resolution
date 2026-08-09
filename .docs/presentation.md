@@ -214,6 +214,8 @@ Retraining the match model (`m/u`) made results **worse**, not better.
 
 > **Rule:** the default config is a coherent bundle (weights + prior + `τ`). Change any part and re-validate **all three** on held-out data.
 
+The fix is a recipe, not a guess: **anchor the prior** (default or blocking-adjusted), fit `m/u` with the prior pinned, then **tune `τ` jointly**, with a score-shift guard. Full algorithm: **Appendix — Tuning the Match Prior**.
+
 See paper §8.1 and the joint `τ × prior` table.
 
 ---
@@ -289,12 +291,13 @@ For **your** data: population-based scripts accept `--input-records FILE`.
 
 # Gotchas you will hit
 
-- **Don't "just retune" m/u.** It looks worse (prior/τ coupling). Re-validate prior + `τ` + weights together.
+- **Don't "just retune" m/u.** It looks worse (prior/τ coupling). Anchor the prior and re-validate prior + `τ` + weights together (Appendix — Tuning the Match Prior).
 - **Blocking recall is a hard ceiling.** If recall is low, raise `k` or serialization, not the embedding model.
 - **Address weakening didn't help** here — test, don't assume.
 - **Real data needs a mutation/duplicate model** to score (`scripts/ncvoter/ncvoter_util.py`).
 - NC voter has **no full DOB and no email** — those comparisons are weak there.
 - **`τ` encodes business cost.** `τ* = C_FP/(C_FP+C_FN)`; the experiments expose this via `--threshold` / `--tau` and the F1 sweep. Raise `τ` for a precision-first (fewer wrong links) posture, lower it for recall-first. See the **Appendix — Deriving τ** for the cost/F1/GMM/transitivity methods.
+- **Tune the prior properly.** Anchor `λ` (default or blocking-adjusted), fit with the prior pinned, tune `τ` jointly, and watch the score-shift guard. See **Appendix — Tuning the Match Prior**.
 
 ---
 
@@ -307,6 +310,7 @@ Whitepaper: `docs/entity_resolution_whitepaper.pdf` (source: `.tex`).
 - **§8, 8.1, 8.2, 8.3** — headline results and the "don't retune alone" evidence.
 - **§9 NC-voter** — real schema, mutation model, `k` scaling.
 - **Appendix: Deriving τ** — cost / F1 / GMM / transitivity methods.
+- **Appendix: Tuning the Match Prior** — anchor `λ`, then tune `(λ, τ)` jointly (the calibration-paradox fix).
 - **Use of AI** — disclosure and verification.
 
 ---
