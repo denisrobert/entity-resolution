@@ -1,0 +1,650 @@
+\documentclass[conference]{IEEEtran}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{listings}
+\lstset{basicstyle=\ttfamily\footnotesize, breaklines=true, columns=fullflexible, keepspaces=true, showstringspaces=false}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!black,
+  citecolor=blue!50!black,
+  urlcolor=blue!50!black,
+  pdftitle={A Two-Stage Entity Resolution Pipeline with FAISS and Splink},
+  pdfauthor={Denis Robert},
+}
+
+\title{A Two-Stage Entity Resolution Pipeline\\with FAISS Blocking and Splink Matching}
+\author{\IEEEauthorblockN{Denis Robert}\IEEEauthorblockA{\textit{Independent Researcher}}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This paper presents and evaluates a two-stage entity resolution pipeline for incomplete Canadian person records. A synthetic reference population is represented with normalized \texttt{all-MiniLM-L6-v2} embeddings and persisted in a FAISS \texttt{IndexFlatIP} store. Each query is first blocked to its top 20 vector neighbors, after which Splink performs interpretable probabilistic linkage using Jaro--Winkler comparisons for names and address, a dedicated email comparison, and a date-of-birth comparison that accounts for date structure. The approach is similar in overall architecture to the FAISS-plus-linkage workflow described by Strojny and Ber\k{e}sewicz~\cite{strojny2026}, although the present pipeline was independently derived and uses a different implementation and evaluation design. The implementation supports persisted-index reload without re-embedding the reference population and independently models 30\% missingness for address and email. In a 15,000-query experiment comprising identical, close-variation, and unrelated records, the updated pipeline achieved 99.27\% accuracy, 99.48\% precision, 99.43\% recall, 98.96\% specificity, and a 99.45\% F1 score, with a mean query time of 7.25\,ms in the validation environment. The paper also discusses memory scaling, operational limits, calibration of Splink parameters, and alternatives to linear-scan FAISS indexing.
+\end{abstract}
+
+\section{Introduction}
+Entity resolution attempts to determine whether two records refer to the same real-world entity. This task is difficult when records contain typographical variation, missing values, stale addresses, or inconsistent contact information. Comparing every query against every reference record is also unnecessarily expensive: for $N$ reference records, exhaustive comparison requires $O(N)$ candidate comparisons per query.
+
+The implementation in the \href{https://github.com/denisrobert/entity-resolution}{entity-resolution repository} addresses this problem with a retrieval-and-linkage architecture. A dense vector index~\cite{johnson2019} performs approximate or exact nearest-neighbor retrieval, reducing the candidate set to the closest $k$ records. This use of dense retrieval for blocking follows a line of work including DeepER~\cite{ebreheem2018}, pre-trained embedding comparisons~\cite{zeakis2023}, and universal dense blocking~\cite{wang2024}. Splink then evaluates those candidates with explicit field comparisons and returns a match only when its probability exceeds a configurable threshold.
+
+The representation choice is informed by recent work comparing tabular representation approaches. Vogel et al.'s \emph{Towards Universal Tabular Embeddings: A Benchmark Across Data Tasks} (arXiv:2604.21696v1, \url{https://arxiv.org/abs/2604.21696v1})~\cite{vogel2026} benchmark embeddings at cell, row, column, and table levels and show that performance depends on the downstream task and representation level; in the relevant current evaluation, textual embeddings outperform the dedicated tabular alternatives for retrieval. Franz et al.'s \emph{Universal Embeddings of Tabular Data} (arXiv:2507.05904v1, \url{https://arxiv.org/abs/2507.05904v1})~\cite{franz2025} describes a different strategy that transforms tabular data into a graph, learns entity embeddings with graph auto-encoders, and aggregates them into row embeddings. This graph-based approach may bear fruit for entity resolution in future experiments because it is designed to capture relationships among tabular entities and to embed unseen samples composed of similar entities. The present system therefore uses a row-level textual representation as its current baseline while leaving room to replace the embedding engine as these alternatives become more capable.
+
+\section{System Objective and Data Model}
+The reference population contains 50,000 synthetic Canadian person records. Each record has:
+\begin{itemize}[leftmargin=*]
+  \item first name;
+  \item last name;
+  \item date of birth;
+  \item a Canadian address; and
+  \item an email address.
+\end{itemize}
+
+Address and email are independently removed with a configurable default probability of 0.30. Consequently, first name, last name, and date of birth are the most consistently available identity attributes, while address and email are useful but incomplete evidence. Addresses are also treated as less stable because people move and formatting conventions change.
+
+A record is serialized into a structured text string:
+\begin{lstlisting}
+First Name: ...
+Last Name: ...
+Date of Birth: ...
+Address: ...
+Email: ...
+\end{lstlisting}
+Missing fields are omitted from the embedding text and retained as null metadata. The same person object is used for the query and for the persisted metadata, avoiding a second source of truth.
+
+\subsection{Row serialization strategies}
+The embedding ablation compares three textual representations of the same structured record. These representations affect only dense retrieval; Splink receives the original structured fields and uses the same comparisons in every experiment. For example, consider the record
+
+\begin{lstlisting}
+first_name    = Alice
+last_name     = Wong
+date_of_birth = 1985-06-15
+address       = 123 Main Street, Toronto, ON M5V 1A1
+email         = alice.wong@example.com
+\end{lstlisting}
+
+The \textbf{default} strategy is the production representation implemented by \texttt{Person.to\_text}. It uses labelled lines in identity, address, and email order:
+
+\begin{lstlisting}
+First Name: Alice
+Last Name: Wong
+Date of Birth: 1985-06-15
+Address: 123 Main Street, Toronto, ON M5V 1A1
+Email: alice.wong@example.com
+\end{lstlisting}
+
+The \textbf{identity-first} strategy retains the same labels and values but places the optional contact fields in email-then-address order after the identity fields:
+
+\begin{lstlisting}
+First Name: Alice
+Last Name: Wong
+Date of Birth: 1985-06-15
+Email: alice.wong@example.com
+Address: 123 Main Street, Toronto, ON M5V 1A1
+\end{lstlisting}
+
+This tests whether giving the embedding model an explicit identity prefix changes retrieval, without changing the vocabulary or the underlying data. The \textbf{compact} strategy removes labels and joins the fixed field sequence with pipe delimiters:
+
+\begin{lstlisting}
+Alice|Wong|1985-06-15|123 Main Street, Toronto, ON M5V 1A1|alice.wong@example.com
+\end{lstlisting}
+
+For a record with missing address and email, the labelled strategies omit those lines, whereas compact serialization preserves field positions with empty values:
+
+\begin{lstlisting}
+First Name: Alice
+Last Name: Wong
+Date of Birth: 1985-06-15
+
+Alice|Wong|1985-06-15||
+\end{lstlisting}
+
+The default strategy is the baseline used by the resolver and confusion-matrix experiment. Identity-first and compact are evaluation alternatives, not separate linkage models. Comparing them under the same FAISS index type, blocking sizes, Splink configuration, queries, and thresholds isolates the effect of row representation on candidate recall and downstream matching.
+
+\section{Two-Stage Algorithm}
+\subsection{Offline generation and indexing}
+The offline process in \texttt{generate\_data.py} performs the following steps:
+\begin{enumerate}[leftmargin=*]
+  \item Generate the reference population with a fixed random seed when reproducibility is required.
+  \item Convert every person into its textual row representation.
+  \item Compute a dense vector with {\footnotesize\texttt{sentence-transformers/all-MiniLM-L6-v2}\allowbreak\ through \texttt{HuggingFaceEmbeddings}\kern-0.4pt}.
+  \item L2-normalize each vector and add it to a FAISS \texttt{IndexFlatIP} index. Inner product on normalized vectors is cosine similarity.
+  \item Persist the FAISS index as \texttt{people.faiss} and the person records, model name, and normalization setting as \texttt{people.json}.
+\end{enumerate}
+
+The metadata file is deliberately separate from the FAISS binary index. FAISS stores the vectors and their positional order; the JSON file stores the record associated with each position. Loading reconstructs the embedding client and reuses the saved vectors without re-embedding the reference population.
+
+\subsection{Online blocking}
+Given a query record $q$, the online process embeds the same textual representation and searches the index for the top $k$ records. The default is $k=20$. If $e(q)$ and $e(r)$ are normalized query and reference vectors, the blocking score is
+\[
+ s_{\mathrm{FAISS}}(q,r) = e(q)^T e(r),
+\]
+which is cosine similarity in the range $[-1,1]$. This stage is optimized for recall: the true match must be included in the candidate set for the second stage to recover it. FAISS~\cite{johnson2019} provides this nearest-neighbour search.
+
+\subsection{Probabilistic linkage}
+The candidate set is passed to Splink as a small deduplication problem containing the query and the retrieved records. Splink implements a scalable form of probabilistic linkage grounded in the Fellegi--Sunter framework~\cite{fellegi1969,linacre2022}. The configured comparisons and their intended evidence priority are listed in Table~\ref{tab:evidence-priority}:
+\begin{table*}[t]
+\centering
+\caption{Field comparisons and intended evidence priority.}
+\label{tab:evidence-priority}
+\begin{tabular}{lll}
+\toprule
+Field & Comparison & Intended role \\
+\midrule
+First name & Jaro--Winkler thresholds & High-priority identity evidence \\
+Last name & Jaro--Winkler thresholds & High-priority identity evidence \\
+Date of birth & Date-of-birth comparison & Strong, stable evidence \\
+Email & Email comparison & Medium-priority evidence when present \\
+Address & Jaro--Winkler thresholds & Lower-priority, changeable evidence \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Splink produces a match probability from the comparison vector and its $m/u$ parameters. The resolver selects the highest-scoring candidate involving the query and returns it only when
+\[
+ P(\mathrm{match}\mid\text{comparisons}) \geq \tau,
+\]
+where $\tau$ is the configured match threshold. Missing values are not treated as negative evidence; they provide no comparison agreement and the remaining fields determine the result.
+
+The implementation uses FAISS for blocking and Splink 4.x inference for linkage. The current settings provide comparison ordering and thresholded similarity levels. In a production deployment, Splink's $m/u$ probabilities should be trained on representative labelled pairs rather than relying on defaults.
+
+\section{Persistence and Operational Workflow}
+The workflow has two explicit commands:
+\begin{lstlisting}
+python scripts/generate_data.py --count 50000 --missing-rate 0.3 --output-dir data
+python scripts/search_cli.py --index-dir data --input-json query.json --threshold 0.85
+\end{lstlisting}
+
+The first command is an offline or scheduled job. The second command loads the persisted index, retrieves 20 candidates, performs Splink linkage, and emits either a match with both scores and the matched metadata or a no-match decision. This separation prevents expensive population embedding from occurring for every query and makes the index a deployable artifact.
+
+\section{FAISS Applicability and Memory Bounds}
+The 50,000-record artifact generated by this implementation provides a concrete sizing baseline. On disk, the measured \texttt{people.faiss} file is 76.8 MB and the \texttt{people.json} metadata file is 10.5 MB, for a combined 87.3 MB. This corresponds to approximately 1,536 bytes per normalized 384-dimensional float32 vector, 210 bytes per serialized person record, and 1,746 bytes per record including both artifacts. The index dimension follows the MiniLM embedding model used by the baseline.
+
+The following extrapolation assumes the same embedding dimension, float32 storage, flat inner-product index, average metadata length, and one metadata record per vector. It uses binary RAM units (1 GiB $=2^{30}$ bytes), although the table labels them as the commonly used 16, 32, and 128 GB deployment sizes. It excludes the Python interpreter, embedding model, temporary construction buffers, allocator fragmentation, operating-system memory, and concurrent queries. Table~\ref{tab:capacity} summarises the resulting capacity bounds.
+
+\begin{table*}[t]
+\centering
+\caption{Estimated capacity when the FAISS index and person metadata share the available RAM.}
+\label{tab:capacity}
+\begin{tabular}{rrrrr}
+\toprule
+Available RAM & Raw capacity & Index size & Metadata size & Recommended$^*$ \\
+\midrule
+16 GB & 9.84 million & 14.4 GB & 2.0 GB & 6.89 million \\
+32 GB & 19.68 million & 28.9 GB & 4.1 GB & 13.77 million \\
+128 GB & 78.71 million & 115.3 GB & 16.5 GB & 55.10 million \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\noindent
+$^*$Recommended capacity reserves 30\% of RAM for the operating system, Python process, model weights, FAISS temporary allocations, and query concurrency. The raw capacity is a sizing upper bound, not a production recommendation. During generation, peak memory can be higher because embeddings may be materialized before being added to FAISS. Building large indexes should therefore use batches and measure peak resident set size rather than relying only on final file size.
+
+For this flat \texttt{IndexFlatIP} design, a query scans all vectors, so memory capacity and query latency are coupled to the record count. At tens of millions of records, an approximate index such as HNSW or an inverted-file/product-quantized index should be evaluated; FAISS~\cite{johnson2019} ships several such indexes. Quantization can reduce memory substantially, but may reduce blocking recall and must be measured against the downstream Splink match rate. Regardless of the FAISS index type, the metadata mapping must preserve vector-to-person row order and should be loaded with equivalent memory budgeting.
+
+\subsection{When an external vector database becomes appropriate}
+An external vector database is not automatically better than FAISS. For a single service instance, a stable reference population, and a dataset that fits comfortably in memory, local FAISS has fewer moving parts and avoids network latency. The decision should be based on operational bounds as well as raw capacity. With the measured baseline, 10 million records would require approximately 17.5 GB for the flat index plus metadata, while 50 million records would require approximately 87.3 GB before runtime overhead. These sizes place a single-process deployment near or beyond the recommended envelope of a 16 or 32 GB host and make a 128 GB host increasingly specialized.
+
+An external vector database is likely to become more appropriate under any of the following conditions:
+\begin{itemize}[leftmargin=*]
+  \item the working set approaches roughly 70\% of host RAM, leaving insufficient room for the embedding model, Python, Splink, index rebuilds, and concurrent queries;
+  \item the reference population is large enough that flat-index scan latency or index-build time violates the service-level objective, even after testing FAISS approximate indexes;
+  \item multiple application instances need a shared index, replicas, rolling updates, or failover without copying a large binary artifact to every host;
+  \item records require frequent inserts, deletes, or metadata updates, making immutable local snapshots operationally expensive; or
+  \item the system needs managed durability, access control, monitoring, backups, multi-tenant isolation, or independent scaling of storage and query capacity.
+\end{itemize}
+
+As a practical boundary, local FAISS is a strong default for the 50,000-record baseline and remains straightforward through the low millions. Between roughly 7 million and 14 million records, the 16/32 GB sizing envelope suggests benchmarking an approximate FAISS index against a managed or self-hosted vector database. Above roughly 50 million records, or whenever the index must be shared across services and regions, an external system is generally the safer operational choice. These are planning thresholds rather than algorithmic limits: compression, sharding, and hardware can move them, while a strict latency or availability requirement can move the decision earlier. The external database should still be evaluated by blocking recall at $k=20$, not only by vector-query latency, because Splink cannot recover a true match that the retrieval layer omits.
+
+\section{Complexity and Failure Modes}
+Let $d$ be the embedding dimension, $N$ the reference population size, and $k$ the blocking size. Building the flat FAISS index costs approximately $O(Nd)$ vector storage and embedding work. A flat inner-product query costs $O(Nd)$, although FAISS offers approximate indexes when the population grows beyond the intended scale. Splink then operates on only $k+1$ records, making the linkage stage independent of the full population size after blocking.
+
+The principal failure mode is blocking recall. A correct record omitted from the top $k$ candidates cannot be recovered by Splink. Other risks include embedding representations that overemphasize address tokens, duplicate or common names, poorly calibrated Splink probabilities, and distribution shift between synthetic data and operational data. Evaluation should therefore report blocking recall separately from final precision, recall, and calibration.
+
+\section{Evaluation Plan}
+A useful benchmark should contain labelled positive and negative pairs, controlled missingness, realistic address changes, spelling errors, and hard negatives sharing names or dates. The following metrics should be reported:
+\begin{enumerate}[leftmargin=*]
+  \item blocking recall at $k \in \{10,20,50,100\}$;
+  \item final precision, recall, F1, and false match rate at several thresholds;
+  \item precision--recall and calibration curves for Splink probabilities;
+  \item mean and tail query latency; and
+  \item index size and offline build time.
+\end{enumerate}
+
+The benchmark should include ablations for missing email, missing address, both fields missing, address changes, and name perturbations. It should also compare row serialization strategies so that improvements are attributable to representations rather than only to the matcher.
+
+\subsection{Measured Section 7 benchmark}
+These requirements were implemented in \texttt{experiment\_section7\_eval.py} and run with 5,000 reference records, 15,000 labelled queries, a 30\% independent missingness rate, and 500 records per ablation. The labelled queries consisted of identical positives, close same-entity variants, and unrelated negatives. Splink used its current untrained default $m/u$ parameters, so the measurements are an engineering baseline rather than calibrated production probabilities. The evaluator wrote the complete results to \texttt{section7\_results.json} and \texttt{section7\_metrics.csv}.
+
+Table~\ref{tab:section7-strategies} compares the three row serialization strategies. Blocking recall is measured over the 10,000 positive queries. Final linkage metrics use the production top-20 candidate set, while recall is also reported at $k=10,50,100$. Latency percentiles cover embedding plus FAISS blocking per query; the reported end-to-end mean adds the batched Splink inference time divided by the number of queries.
+
+\begin{table*}[t]
+\centering
+\caption{Measured serialization and retrieval/linkage results.}
+\label{tab:section7-strategies}
+\small
+\begin{tabular}{lrrrrrrr}
+\toprule
+Strategy & R@10 & R@20 & R@50 & R@100 & P$_{.85}$ & R$_{.85}$ & F1$_{.85}$ \\
+\midrule
+Default & 99.81\% & 99.84\% & 99.93\% & 99.96\% & 99.58\% & 99.80\% & 99.69\% \\
+Identity first & 99.81\% & 99.86\% & 99.94\% & 99.96\% & 99.59\% & 99.82\% & 99.71\% \\
+Compact & 99.95\% & 99.95\% & 99.97\% & 99.99\% & 99.64\% & 99.89\% & 99.77\% \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+The compact serialization was the strongest of the three in this run, improving top-20 blocking recall from 99.84\% to 99.95\% and reducing the false-match rate at threshold 0.85 from 0.84\% to 0.72\%. The difference is descriptive rather than statistically conclusive and should be retested on labelled operational data. For the default strategy, index build time was 37.13 seconds, p95 blocking latency was 24.13\,ms, and estimated mean end-to-end latency was 24.44\,ms. The corresponding values for identity-first were 36.22 seconds, 25.32\,ms, and 34.85\,ms; compact was 28.53 seconds, 19.95\,ms, and 21.22\,ms.
+
+\begin{table*}[t]
+\centering
+\caption{Blocking-recall ablations at $n=500$ per condition.}
+\label{tab:section7-ablations}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Condition & R@10 & R@20 & R@50 & R@100 \\
+\midrule
+Baseline & 100.0\% & 100.0\% & 100.0\% & 100.0\% \\
+Missing email & 100.0\% & 100.0\% & 100.0\% & 100.0\% \\
+Missing address & 99.6\% & 100.0\% & 100.0\% & 100.0\% \\
+Missing both & 98.2\% & 100.0\% & 100.0\% & 100.0\% \\
+Address change & 100.0\% & 100.0\% & 100.0\% & 100.0\% \\
+Name perturbation & 99.8\% & 100.0\% & 100.0\% & 100.0\% \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Table~\ref{tab:section7-ablations} summarises the blocking-recall ablations. At the default 0.85 threshold, every ablation query was accepted in this synthetic positive-only slice once it reached Splink, so the main observed degradation was retrieval: removing both optional fields reduced top-10 recall to 98.2\%, although all tested ablations reached 100.0\% by top 20. The evaluator also produces ten-bin reliability data and threshold curves; those outputs should be recalculated after Splink is trained on labelled pairs.
+
+\section{Confusion-Matrix Experiment}
+The implementation includes \texttt{experiment\_confusion\_matrix.py}, which evaluates the current algorithm on $n=5{,}000$ generated reference rows. For every reference person, the test creates three queries: an identical row labelled as the same entity, a close but non-identical row generated with controlled perturbations and labelled as the same entity, and an independently generated unrelated row labelled as a different entity. The latter is not present in the reference index. FAISS retrieves the top 20 candidates for every query, after which Splink applies the same field comparisons and decision threshold used by the resolver. The experiment batches the queries into one Splink link-only inference call for execution efficiency; this changes execution strategy but not the candidate pairs or scoring configuration. The experiment's metaparameters are listed in Table~\ref{tab:confusion-metaparameters}.
+
+\begin{table}[h]
+\centering
+\caption{Confusion-matrix experiment metaparameters.}
+\label{tab:confusion-metaparameters}
+\begin{tabular}{ll}
+\toprule
+Parameter & Value \\
+\midrule
+Reference/test rows ($n$) & 5,000 \\
+Queries per test row & 3 \\
+Total queries & 15,000 \\
+Missing address/email rate & 0.30 \\
+Embedding model & \texttt{all-MiniLM-L6-v2} \\
+FAISS blocking size ($k$) & 20 \\
+Splink match threshold ($\tau$) & 0.85 \\
+Close-row variation rate & 0.15 \\
+Random seed & 42 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Measured confusion matrix over 15,000 queries.}
+\label{tab:confusion-matrix}
+\begin{tabular}{lrr}
+\toprule
+ & Predicted match & Predicted no match \\
+\midrule
+Actual same entity & 9,943 (TP) & 57 (FN) \\
+Actual different entity & 52 (FP) & 4,948 (TN) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:confusion-matrix} summarises the measured confusion matrix. All 5,000 identical queries were correctly matched. Among the 5,000 close same-entity queries, 4,943 were matched and 57 were missed. Among the 5,000 unrelated queries, 52 were incorrectly accepted and 4,948 were rejected. The resulting accuracy was 99.27\%, precision 99.48\%, recall 99.43\%, specificity 98.96\%, and F1 99.45\%. Index construction took 37.97 seconds and batched query processing took 108.7 seconds, or 7.25 milliseconds per query on the test environment. These measurements are a baseline rather than a general performance guarantee; hardware, model caching, and Splink configuration affect both quality and latency.
+
+\subsection{Trained versus untrained linkage parameters}
+All figures reported so far use Splink's default, untrained $m/u$ values together with a fixed match prior of $0.0001$. Because the whitepaper's recommendations depend on the measured operating point, we quantify whether calibrating $m/u$ changes the results materially. We reuse the 50{,}000-record reference index and evaluate the same three-query-per-row protocol for 2{,}000 rows (6{,}000 queries) at $\tau=0.85$ and $k=20$, holding the match prior at $0.0001$ so that the comparison isolates the effect of $m/u$ alone.
+
+Two calibration schemes were considered. The first is Splink's unsupervised expectation maximisation over the reference population. Because the reference set is de-duplicated and contains essentially no true duplicate pairs, EM fits $m/u$ from ``different people who happen to share a name or date of birth,'' which inflates match probabilities and yields gross over-matching (F1 fell to roughly 0.71). This negative result is an important caveat: unsupervised EM on a near-duplicate-free reference is not a safe calibration strategy for streaming link-only resolution.
+
+The second, recommended scheme calibrates each comparison level's $m$ and $u$ directly from labelled pairs generated by the same process as the confusion experiment: identical rows and close-variant rows are labelled matches, and independently generated unrelated rows are labelled non-matches. Empirical level probabilities are computed over these pairs with Laplace smoothing ($0.5$), and null levels are left to Splink's data-driven handling. This supervised calibration is defensible because it uses genuine match and non-match evidence rather than the accidental shared-field structure of the reference population.
+
+\begin{table*}[t]
+\centering
+\caption{Trained versus untrained linkage parameters over 50,000 reference records and 6,000 queries ($\tau=0.85$, $k=20$, prior $0.0001$).}
+\label{tab:mu-train-untrain}
+\begin{tabular}{lrrrrr}
+\toprule
+Variant & Accuracy & Precision & Recall & Specificity & F1 \\
+\midrule
+Untrained (default $m/u$) & 97.27\% & 96.83\% & 99.15\% & 93.50\% & 97.97\% \\
+Trained (supervised, labelled pairs) & 91.38\% & 89.11\% & 99.20\% & 75.75\% & 93.88\% \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Table~\ref{tab:mu-train-untrain} compares the two variants at the fixed operating point. The supervised calibration is well behaved and changes the operating point in a measurable way. Recall is essentially unchanged (99.15\% to 99.20\%), while precision falls from 96.83\% to 89.11\% and specificity from 93.50\% to 75.75\%, giving an F1 of 93.88\% versus 97.97\% untrained. In absolute terms the trained variant trades a small reduction in false negatives (34 to 32) for a substantially larger increase in false positives (130 to 485). The results therefore confirm that reported figures are sensitive to how $m/u$ are obtained, and they motivate the labelled-pair calibration and related research directions discussed in Section~\ref{sec:further-research}. As a rule, parameters should be trained on labelled operationally representative pairs and evaluated for calibration before reported numbers are treated as production expectations.
+
+These results also raise a calibration paradox: refining $m/u$ produced worse F1 than leaving them untrained.\label{sec:calibration-paradox} \texttt{experiment\_mu\_tau\_interaction.py} decomposes the paradox on the duplicate-bearing population (5{,}000 base records, 3\% twins) into two distinct mechanisms. First, the untrained parameters are not tuned to any specific corpus. Splink's defaults are a constructed, internally consistent weight ladder --- an exact match contributes $+10$ bits, a full mismatch $-5$ bits, the exact-match $m$ is set to 0.95, and the default prior is $0.0001$. Retraining $m/u$ changes the evidence weights while the prior and the decision threshold stay at their old values, shifting the whole score distribution: the mean match probability of non-match pairs rose from 0.047 (untrained) to 0.236 (supervised) and 0.53 (EM), with the fitted EM prior ($0.0072$ versus $0.0001$) the dominant driver. Jointly re-optimising the prior and threshold strongly favours the trained model only at a low prior and a high threshold, whereas the untrained defaults are robust across the whole operating-point region, as Table~\ref{tab:mu-tau-surface} shows. The prior/threshold coupling therefore explains most of the apparent gap --- EM at the naive fixed point is poor, and re-tuning the prior and $\tau$ recovers a large part of the difference --- but it is not the whole story. Second, even after jointly optimising $(\tau,\ \text{prior})$ for each model, the trained $m/u$ stay below the defaults (EM optimum F1 $0.951$ versus $0.997$ untrained), because the trained models assign more weight to the partial-similarity levels that non-match pairs also exhibit. The practical lesson is that the default configuration is a coherent bundle: any change to $m/u$ should be accompanied by re-estimation of the prior and re-selection of $\tau$ on a validation set, otherwise the reported metrics are measured at an unintended operating point.
+
+\begin{table*}[t]
+\centering
+\caption{Joint decision behaviour of F1 (percent) over the match prior and threshold $\tau$, for the untrained and EM-trained $m/u$ on the duplicate-bearing population (5{,}000 base records, 3\% twins). The untrained defaults hold a high-F1 band across the region; the EM model matches only at a low prior and high threshold.}
+\label{tab:mu-tau-surface}
+\begin{tabular}{l ccc ccc}
+\toprule
+Prior & \multicolumn{3}{c}{Untrained F1} & \multicolumn{3}{c}{EM-trained F1}\\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+ & $\tau{=}0.85$ & $\tau{=}0.90$ & $\tau{=}0.95$ & $\tau{=}0.85$ & $\tau{=}0.90$ & $\tau{=}0.95$\\
+\midrule
+$10^{-4}$ & 98.4 & 98.4 & 99.7 & 93.3 & 93.6 & 94.2\\
+$10^{-3}$ & 97.1 & 97.1 & 97.1 & 81.7 & 81.9 & 84.7\\
+$10^{-2}$ & 95.8 & 96.1 & 96.4 & 81.0 & 81.0 & 81.4\\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Large duplicate-bearing benchmark at 100K rows}
+The experiments above evaluate a near-duplicate-free reference. To stress the resolver under a realistic mix of true duplicates and unrelated records, \texttt{experiment\_duplicate\_benchmark.py} builds a 100{,}000-record base population and adds a near-duplicate twin (small field differences at the same 0.15 variation rate) for 3\% of base records, yielding a 103{,}000-record reference index that genuinely contains matching records. The evaluation uses 6{,}000 balanced queries: 3{,}000 positives are fresh small-difference variants that are \emph{not verbatim} in the index but each match a base record, and 3{,}000 negatives are independently generated unrelated people. Queries are blocked to the top 20 FAISS neighbours and scored with Splink at $\tau=0.85$; only the linkage parameters differ. Three schemes are compared: the untrained default $m/u$ with a fixed prior of $0.0001$; supervised calibration of $m/u$ from labelled duplicate/non-match pairs; and unsupervised expectation maximisation over the reference population, which here contains genuine duplicate pairs for EM to exploit. The results are compared in Table~\ref{tab:100k-benchmark}.
+
+\begin{table*}[t]
+\centering
+\caption{Large duplicate-bearing benchmark: 100{,}000 base records plus 3{,}000 duplicates (103{,}000-record index) and 6{,}000 queries ($\tau=0.85$, $k=20$).}
+\label{tab:100k-benchmark}
+\begin{tabular}{lrrrrr}
+\toprule
+Variant & Accuracy & Precision & Recall & Specificity & F1 \\
+\midrule
+Untrained (default $m/u$, prior 0.0001) & 93.12\% & 89.59\% & 97.57\% & 88.67\% & 93.41\% \\
+Supervised (labelled pairs) & 82.52\% & 74.85\% & 97.93\% & 67.10\% & 84.85\% \\
+Unsupervised (EM, prior 0.0071) & 61.57\% & 56.69\% & 98.03\% & 25.10\% & 71.84\% \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+In confusion-matrix terms the untrained variant produced TP \(=2{,}927\), FN \(=73\), FP \(=340\), TN \(=2{,}660\); supervised TP \(=2{,}938\), FN \(=62\), FP \(=987\), TN \(=2{,}013\); and EM TP \(=2{,}941\), FN \(=59\), FP \(=2{,}247\), TN \(=753\). Recall is comparable across all three (97.6--98.0\%), but the trained schemes increasingly sacrifice precision and specificity for that recall: supervised precision falls to 74.9\% and specificity to 67.1\%; EM falls to 56.7\% precision and a very low 25.1\% specificity. The EM run also estimates a much larger match prior (0.0071 versus the fixed 0.0001), which, together with EM-fitted $m/u$, drives the gross over-matching. The untrained default thus yields the best F1 (93.41\%) on this duplicate-bearing population, reinforcing that the choice of $m/u$ strongly affects the measured operating point and that reported figures must be tied to the exact parameter configuration used.
+
+\subsection{Decision-threshold and address-weight sensitivity}
+A grid search over the decision threshold $\tau$ and the address comparison weight was run on the same 5{,}000-record / 15{,}000-query confusion-matrix population. For each address weight the pipeline was scored once (all candidate pairs emitted at threshold zero) and each candidate decision threshold applied afterwards, giving 30 operating points for a small computational cost. The two findings below concern $\tau$ (where tuning helps) and the address weight (where it does not, on this data set).
+
+\paragraph{Raising the decision threshold improves F1.}
+At the default (full-strength) address comparison, increasing $\tau$ from 0.85 to 0.95 improves the F1 while keeping accuracy essentially flat. Because recall was already near its ceiling, the higher threshold removes the weakest false positives with only a modest recall penalty. Table~\ref{tab:f1-threshold} reports the trade-off.
+
+\begin{table*}[t]
+\centering
+\caption{F1 versus decision threshold at full address weight on the 5{,}000-record confusion-matrix population (15{,}000 queries).}
+\label{tab:f1-threshold}
+\begin{tabular}{lrrrrr}
+\toprule
+$\tau$ & Accuracy & Precision & Recall & Specificity & F1 \\
+\midrule
+0.85 & 99.37\% & 99.62\% & 99.44\% & 99.24\% & 99.53\% \\
+0.87 & 99.30\% & 99.62\% & 99.33\% & 99.24\% & 99.47\% \\
+0.90 & 99.28\% & 99.62\% & 99.30\% & 99.24\% & 99.46\% \\
+0.92 & 99.28\% & 99.62\% & 99.30\% & 99.24\% & 99.46\% \\
+0.95 & 99.51\% & 99.96\% & 99.30\% & 99.92\% & 99.63\% \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+At $\tau=0.95$ the confusion matrix is TP \(=9{,}930\), FN \(=70\), FP \(=4\), TN \(=4{,}996\): false positives fall from 38 to 4 (precision 99.62\% to 99.96\%, specificity 99.24\% to 99.92\%) while recall falls only from 99.44\% to 99.30\% (F1 99.53\% to 99.63\%). The improvement is modest but consistent with the analysis above: in a regime where recall has headroom, the decision threshold is an effective precision lever and should be tuned on a validation set rather than fixed at 0.85.
+
+\paragraph{Weakening the address comparison did not help.}
+The intuition that address is too volatile to trust as an identity signal was tested by scaling the address agreement probabilities down (``weakening'' the comparison) and re-running the sweep for strengths 0.6--0.95. On this data set the approach did not improve performance: after threshold tuning, every weakened configuration topped out at roughly 98.5\% F1, well below the 99.63\% reached by the full-strength address comparison at $\tau=0.95$. The reason is that the address field here is genuinely informative: 30\% of addresses are missing independently, and the addresses that do exist are long and highly discriminative, so address agreement is valuable evidence for correctly rescuing the close same-entity queries. Downgrading that evidence cost more true positives than it suppressed false ones.
+
+This result is intentionally reported as a negative and should not be generalised. Its scope is limited to the synthetic Canadian population and its mutation model, where addresses are strongly identifying. There may be regimes in which weakening a volatile field is beneficial --- for example, addresses that change frequently between legitimate records of the same entity, noisy or generic addresses (unit-only entries, post-office boxes), or populations with many address collisions in high-density buildings. Establishing whether and exactly when a weak-address weighting is viable requires controlled experiments across data sets with tunable address volatility; the implementation foresees this and \texttt{experiment\_f1\_sweep.py} plus \texttt{weaken\_comparison} make such a study straightforward to run. That investigation is left as future work.
+
+
+\section{Non-Synthetic Replication: NC Voter Data}
+\label{sec:ncvoter-replication}
+To test whether the pipeline behaves on real records rather than synthetic ones, we replicated the evaluation on North Carolina voter-registration data~\cite{ncvoter}. A statewide export was filtered to the fields relevant here --- first and last name, birth year (the export carries no full birth date and no email) --- yielding about 9.2 million records, from which a deterministic uniform sample of 5{,}000 was used. Because the public registration file is already heavily de-duplicated and contains no labelled duplicate pairs, authentic duplicate registrations are unavailable. We therefore apply a synthetic mutation model to the real records, analogous to the synthetic Canadian data, to create realistic noisy duplicates: names receive one-character typos, addresses are altered or omitted, and birth years occasionally shift by one. This yields genuine record linkage with noise on a real-world schema: positive queries are mutated duplicates whose clean base record is in the index and must be linked across the noise, and negative queries are mutated versions of held-out records that have no correct match in the index.
+
+Using the same Splink configuration as the synthetic experiments (default $m/u$, top-20 blocking, $\tau=0.85$; the email comparison is omitted because the data carries no email), FAISS recovered the clean base record for a mutated duplicate with $82.6\%$, $85.6\%$, and $88.0\%$ recall at $k=5,10,20$. Mutated-duplicate resolution produced TP $=1{,}284$, FN $=216$, FP $=0$, TN $=1{,}500$, an F1 of $92.2\%$ (recall $85.6\%$, precision $100\%$). The false negatives align closely with the $\approx 12\%$ of mutations whose base record fell outside the top 20, so on this data the blocking stage is the binding constraint. The threshold/address-weight sweep again reproduced the synthetic finding: the full-strength address comparison at $\tau=0.85$ reached F1 $92.2\%$, while weakening the address comparison to 0.8 fell to $89.4\%$.
+
+Because $k=20$ still missed a nontrivial fraction of mutated candidates, we expanded the blocking size to $k=50$ and $k=100$ and measured both linkage quality and its cost, as summarised in Table~\ref{tab:ncvoter-k}. Larger $k$ raises blocked-base recovery from $88.0\%$ ($k=20$) to $90.9\%$ ($k=50$) and $92.6\%$ ($k=100$), and end-to-end recall from $85.6\%$ to $87.5\%$ and $88.4\%$. The gains are monotonic but strongly diminishing (only $+28$ and then $+14$ true positives), while precision stays $\approx 100\%$ (exactly one false positive at $k=100$), confirming the linkage model is robust to candidate inflation on this schema. Crucially, the recall gains come from the blocking stage rather than better linkage: even at $k=100$ the end-to-end recall ($88.4\%$) remains well below the blocking recall ($92.6\%$), so the Splink stage --- which discards a retrieved base below the threshold --- is still the binding constraint, exactly as in the F1-budget analysis. The measured time impact on the Splink stage is modest: batched Splink scoring took $1.0$\,s at $k=20$, $1.5$\,s at $k=50$, and $2.4$\,s at $k=100$ (about a $2.4\times$ rise) as the candidate set grows roughly fivefold, while FAISS blocking time stayed near $50$\,s.
+
+\begin{table*}[t]
+\centering
+\caption{Effect of blocking size on mutated NC-voter linkage (3{,}000 positives, 1{,}500 negatives, $\tau=0.85$). Larger $k$ recovers more mutated duplicates, but gains are diminishing and the Splink stage remains the binding constraint; Splink scoring time grows with the candidate set while blocking time stays effectively constant.}
+\label{tab:ncvoter-k}
+\begin{tabular}{lccccc}
+\toprule
+$k$ & Blocking recall & End-to-end recall & Precision & F1 & Splink scoring time \\
+\midrule
+20 & 88.0\% & 85.6\% & 100.0\% & 92.2\% & 1.0\,s \\
+50 & 90.9\% & 87.5\% & 100.0\% & 93.3\% & 1.5\,s \\
+100 & 92.6\% & 88.4\% & 99.9\% & 93.8\% & 2.4\,s \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+These figures are more informative than exact self-resolution but remain bounded by the source. First, the registration file is still well de-duplicated, so every positive is a synthetic mutation of an otherwise distinct base record rather than a genuine duplicate registration; the mutation model proxies noisy duplicate intake (typos, address churn, missing fields) but cannot reproduce real voter turnover or duplicate-file scenarios. Second, the export contains only a birth year and no email, so the date-of-birth and email comparisons --- two identity signals in the synthetic experiments --- are only weakly tested: date-of-birth errors are not properly exercised, and email is absent entirely. The replication therefore confirms the pipeline on a real schema with injected noise while leaving authentic duplicate, full-DOB, and email scenarios to the data sets discussed in Section~\ref{sec:further-research}.
+
+\section{Further Research}
+\label{sec:further-research}
+\subsection{Alternative embedding engines}
+The current MiniLM encoder is a useful baseline, but it is not specialized for entity resolution or structured rows. Candidate alternatives include:
+\begin{itemize}[leftmargin=*]
+  \item larger sentence-transformer models for stronger semantic representations;
+  \item multilingual encoders for names and addresses across language communities;
+  \item character n-gram or TF--IDF vectors for typo-sensitive retrieval;
+  \item domain-adapted contrastive encoders trained on positive and hard-negative person pairs;
+  \item graph-based universal tabular embeddings such as those proposed by Franz et al.~\cite{franz2025}; and
+  \item hybrid retrieval that combines dense similarity with lexical or field-specific indexes.
+\end{itemize}
+
+The comparison should measure not only final linkage quality but also whether the embedding preserves the true match in the top 20. A particularly promising approach is multi-view retrieval: learn separate views for identity fields, contact fields, and address fields, then combine their scores before Splink. This could reduce the tendency of a long address to dominate a short but highly identifying date of birth.
+
+These directions are nevertheless worth tempering against the measured F1 budget. On this data set the default top-20 blocking recall is already $99.84\%$ (rising to $99.95\%$ with the compact serialization), which caps end-to-end recall. Because the measured end-to-end recall ($99.43\%$) sits well below that ceiling, the recall that a better blocker could add is at most $0.16\%$ (default serialization), and even a perfect blocker would raise the F1 ceiling from $99.66\%$ to $99.74\%$ --- a gain of only about $0.08\%$. In other words, alternative embeddings and multi-view retrieval are unlikely to move F1 materially while top-$k$ blocking recall is already near-saturated. Their value would instead emerge in regimes where blocking recall is the binding constraint: much larger and noisier populations, or retrieval configurations that no longer hold near-perfect recall at a small $k$. Absent such a regime, the higher-impact research target remains the Splink linkage stage, which currently gives up about $0.41\%$ of recall between blocking and the final decision and is where the precision-recall trade-off can actually be tuned (for example through the threshold and $m/u$ calibration experiments above).
+
+\subsection{Replication on non-synthetic data}
+The central experiments in this paper are measured on synthetically generated Canadian person records (Faker with a custom Canadian address provider). Synthetic data is valuable because it supplies controlled missingness, exact ground truth, and repeatable duplicate rates, but it embeds assumptions about name distributions, address formats and volatility, email conventions, and how errors arise between records of the same entity. The replication on the North Carolina voter data (Section~\ref{sec:ncvoter-replication}) is a first step toward real data, but, as noted there, it is a near-best-case scenario that does not exercise cross-record duplicates, naming variation, or birth-date errors. Whether the findings hold more broadly with real data is therefore still an open empirical question, and the experiments should be replicated on non-synthetic, labelled record-linkage data. The replication should run the identical pipeline and protocols --- same top-$k$ FAISS blocking, same comparisons and decision machinery, the confusion-matrix three-query protocol, and the trained/untrained/supervised $m/u$, threshold, and address-weight sweeps --- and compare the resulting confusion matrices, F1, and the conclusions drawn from them.
+
+The natural test beds are public benchmark record-linkage data sets with known ground truth. These include the Cora citation data~\cite{mccallum2000}, the FEBRL restaurant data~\cite{christen2004}, and the product and citation pairs from the Abt--Buy, Amazon--Google, and DBLP--ACM entity-resolution benchmarks~\cite{kopcke2010,mudgal2018}, together with analogous entity data. Where a data set lacks the fields used here (date of birth, address, email), the comparison should be restricted to the fields it does provide, or the pipeline should be adapted to the available schema while keeping the methodology fixed. While the benchmark data sets above provide authentic duplicate pairs with ground truth, public registration data such as the North Carolina voter file is a useful but limited test bed: it is heavily de-duplicated by the source and typically lacks a full date of birth, so it contains no authentic duplicate registrations and cannot exercise birth-date errors. The mutation-model replication in Section~\ref{sec:ncvoter-replication} supplies a noisy-duplicate proxy on a real schema, but authentic duplicates and full-DOB comparisons still require the labelled benchmark or corporate data discussed below.
+
+Such replication serves several specific purposes. First, it tests whether the address field is as informative as the synthetic data suggests: public and production datasets expose real address volatility and generic or unit-only addresses, so the finding that weakening the address comparison did not help may not transfer. Second, real data can reveal whether retraining $m/u$ on the collection itself behaves like the lab setting, where the untrained default outperformed the trained variants, or whether genuinely noisy real duplicates make calibration beneficial. Third, the recall distributions and blocking ceiling measured at $k=20$ in Section~\ref{sec:further-research} may differ when names collide at realistic rates, changing where the F1 budget lies between the blocking and linkage stages. Finally, replication must handle missing values, inconsistent postal/date formats, and multilingual names, which the synthetic generator controls but real data exposes. Privacy considerations apply because person records are personally identifying; labels and ground truth should be obtained from datasets that are published for research or from de-identified data with controlled access. The goal is not to certify a specific score but to confirm which qualitative conclusions --- which levers move F1 and which do not --- survive contact with real data.
+
+Beyond public benchmarks, real-world performance is best assessed on corporate data: production master records that an organisation genuinely needs to de-duplicate or match, such as customer, patient, employee, or product records, ideally with a human-validated sample of true duplicates. Public data sets are usually small, masked, or already de-duplicated, whereas corporate data carries the actual error profile the deployment will face --- real naming conventions, address churn, partial or corrupted fields, and the true duplicate rate of the workload. That allows the pipeline to be calibrated and its F1 reported against the workload it will actually serve, which is the strongest test of real-world performance. The constraints are access and privacy: matching personnel must have legitimate authority, data transfers need privacy controls, ground-truth labelling should be reviewed for accuracy, and only the minimum necessary evidence should be logged. A mid-size corporate master (tens of thousands to a few million records) is typically large enough to expose distributional differences that the small synthetic and public sets miss while remaining small enough to run the experiments directly. Such partnerships make it possible to validate both the quantitative results and the qualitative conclusions about which levers, such as the decision threshold, matter most in practice.
+
+\subsection{Calibration and deployment}
+Future work should estimate Splink parameters from labelled operational samples, quantify probability calibration, and introduce drift monitoring for names, domains, postal formats, and address conventions. Privacy-preserving evaluation is also important: synthetic data is useful for development, but production validation must control access to personally identifying information and log only the minimum necessary evidence.
+
+\section{Conclusion}
+The implemented architecture combines a fast vector retrieval layer with an interpretable probabilistic linkage layer. FAISS narrows a 50,000-record population to 20 candidates, while Splink compares identity, contact, and address fields under a configurable decision threshold. Persisting the index and metadata makes the workflow operationally reusable. The most important next steps are to train and calibrate Splink parameters on labelled pairs and benchmark alternative row and tabular embedding engines using blocking recall as a first-class metric.
+
+The measured experiments also isolate which control levers move the F1 across the validation population and which do not. Three levers had a clear effect. The decision threshold $\tau$ is the cheapest and most effective precision lever: because recall already sat near its ceiling, raising $\tau$ from 0.85 to 0.95 on the confusion-matrix population lifted F1 from 99.53\% to 99.63\% (precision 99.62\% to 99.96\%, specificity 99.24\% to 99.92\%) at a small recall cost. The row serialization strategy also matters: the compact representation raised top-20 blocking recall to 99.95\% and F1 to 99.77\%, confirming that retrieval recall is a first-order lever for end-to-end F1. So is the blocking size $k$, which sets an upper bound on end-to-end recall; the default $k=20$ already achieves 99.84\% blocking recall, so increasing $k$ buys only a marginal recall gain while adding retrieval cost. Two levers did not help on this data set. Weakening the address comparison (scaling its agreement probabilities down by factors 0.6--0.95) never improved F1, topping out near 98.5\% rather than the 99.63\% reached at full address strength, because address agreement is genuinely informative for the close same-entity queries here. Likewise, retraining $m/u$ on the synthetic population --- whether supervised or by expectation maximisation --- over-matched and lowered F1 relative to the untrained default: calibration only helps when it is driven by labelled, operationally representative pairs, which the synthetic reference does not contain.
+
+\begin{appendices}
+\section{Deriving the Decision Threshold $\tau$}
+\label{app:derive-tau}
+The decision threshold $\tau$ should be treated as a statistical boundary rather than an arbitrary heuristic. The standard algorithms for deriving it are grouped here by whether labelled ground truth is available.
+
+\subsection{With labelled ground truth (supervised derivation)}
+If a labelled validation set of true matches and non-matches exists, classical optimisation applies.
+
+\paragraph{Expected-cost minimisation.} If a false positive carries a business cost $C_{FP}$ and a false negative a cost $C_{FN}$, decision theory states that the expected loss is minimised by declaring a pair a match exactly when its posterior match probability satisfies $P(M\mid \gamma)\ge \tau^*$, with
+\[
+\tau^* \;=\; \frac{C_{FP}}{C_{FP}+C_{FN}}\;.
+\]
+For example, if merging two distinct accounts ($C_{FP}$) is twenty times more costly than failing to link two records of the same person ($C_{FN}$), then $\tau^* = 20/(20+1) \approx 0.95$. This is the decision-theoretic framing that Fellegi and Sunter used to define optimal two-threshold linkage rules under cost~\cite{fellegi1969,winkler1993}.
+
+\paragraph{F1 maximisation.} Alternatively one maximises the empirical F1 score by sweeping candidate thresholds:
+\[
+\tau^* \;=\; \operatorname*{arg\,max}_{\tau\in[0.5,0.999]}\ \frac{2\cdot \mathrm{Precision}(\tau)\cdot \mathrm{Recall}(\tau)}
+{\mathrm{Precision}(\tau)+\mathrm{Recall}(\tau)}\;.
+\]
+Precision-recall trade-offs and threshold selection are standard practice for skewed classification~\cite{davis2006,christen2012}. The threshold and address-weight sweeps in this paper (Table~\ref{tab:f1-threshold} and the NC-voter experiments) instantiate this supervised rule on a labelled validation set.
+
+\subsection{Without labelled ground truth (unsupervised derivation)}
+When labels are absent, empirical precision and recall cannot be measured directly, and the boundary must be inferred from the data.
+
+\paragraph{Expected-F1 maximisation.} If the match probabilities $p_j=P(M\mid\gamma_j)$ estimated by the fitted model (e.g., by expectation maximisation) are well calibrated, the expected counts at any threshold $\tau$ can be computed without labels. With $D_\tau=\{j: p_j\ge \tau\}$ the pairs classified as matches, the expected true positives, false positives, and false negatives are
+\[
+\begin{aligned}
+E[TP(\tau)]&=\sum_{j\in D_\tau}p_j,\\
+E[FP(\tau)]&=\sum_{j\in D_\tau}(1-p_j),\\
+E[FN(\tau)]&=\sum_{j\notin D_\tau}p_j,
+\end{aligned}
+\]
+so the expected F1 reduces to
+\[
+E[F_1(\tau)]=\frac{2\,S_\tau}{|D_\tau|+N},
+\]
+where $S_\tau=\sum_{j\in D_\tau}p_j$ is the expected number of true positives and $N=\sum_{j}p_j$ the total expected number of matches.
+where $\sum_j p_j$ is the total expected number of matches in the candidate-pair set $S$. One then selects $\tau^*=\operatorname{arg\,max}_\tau E[F_1(\tau)]$ over a dense grid. This is a direct use of the calibrated posterior probabilities produced by the mixture/EM fitting of the Fellegi--Sunter model~\cite{mclachlan2000,christen2012}; it approximates the cost-based rule when the two error types are weighted equally.
+
+\paragraph{Gaussian-mixture valley detection.} The Fellegi--Sunter weights $w_j=\log_2 R(\gamma_j)$ are typically bimodal: a large peak of low-weight non-matches and a smaller high-weight match peak. Fitting a two-component Gaussian mixture~\cite{mclachlan2000} to the weights yields densities $f_U(w)$ and $f_M(w)$ for the non-match and match components; the threshold is placed at the intersection
+\[
+p\, f_M(w^*)=(1-p)\, f_U(w^*),
+\]
+with $p$ the prior match probability, and the weight $w^*$ converted back to a probability via the Bayes relation $\tau^*=\bigl(1+\frac{1-p}{p}\,2^{-w^*}\bigr)^{-1}$. This places the boundary at the statistical ``valley'' separating the two populations; frequency-based and decision-rule refinements of the Fellegi--Sunter weights also assume such well-separated weight distributions~\cite{winkler2000}.
+
+\paragraph{Graph-transitivity consistency.} Linkage is expected to be transitive (if $A$ matches $B$ and $B$ matches $C$, then $A$ matches $C$). For a candidate $\tau$, build a graph with an edge between records $i,j$ when $p_{ij}\ge \tau$, count transitivity violations (e.g., $A$ connected to $B$ and $B$ to $C$ but $A$ not to $C$), and select the $\tau$ that minimises violations while maximising cluster cohesion, for example the silhouette score of the resulting connected components. Record-linkage clustering under transitive closure is standard in the field~\cite{christen2012}.
+
+\section{Tuning the Match Prior $\lambda$}
+\label{app:tune-prior}
+The calibration-paradox analysis (Section~\ref{sec:calibration-paradox}) showed that retraining $m/u$ produced worse results than leaving them untrained, and decomposed the effect into prior coupling and a genuine $m/u$ residual. The dominant, addressable part is the prior: EM's free estimate of the match prior $\lambda$ (here $0.0072$ versus the default $0.0001$) inflated the match probabilities and produced gross over-matching. This appendix outlines an algorithm that tunes the prior and the decision threshold together, which is the fix the paradox calls for. Let $\lambda=\mathit{probability\_two\_random\_records\_match}$ and $\tau$ be the decision threshold.
+
+\paragraph{Step 0 (baseline).} Set $\lambda_0 = 0.0001$ (the Splink default).
+
+\paragraph{Step 1 (estimate a principled prior; do not use EM's free prior).}
+\begin{itemize}
+  \item \emph{With labels:} $\lambda_\mathrm{est}=\tfrac{\text{proportion of candidate pairs that are true matches}}{\text{blocking recall}}$, i.e.\ the base match rate in random-record-pair space rather than within the blocked candidate set.
+  \item \emph{Without labels:} use Splink's estimator {\footnotesize\texttt{estimate\_probability\_two\_random\_records\_match}}, called with the blocking rules and a \texttt{recall}; it divides the expected matches by the blocking coverage. If no defensible match-rate assumption exists, keep $\lambda_0 = 0.0001$.
+\end{itemize}
+
+\paragraph{Step 2 (fit $m/u$ with the prior pinned).} Run Splink EM with \texttt{fix\_probability\_two\_random\_}\allowbreak\texttt{records\_match = True} so that EM estimates $m/u$ only, or keep the untrained defaults. This is the key divergence from the paradox setup: $m/u$ may change while $\lambda$ stays anchored.
+
+\paragraph{Step 3 (choose $(\lambda,\tau)$ jointly on validation).} Grid over $\lambda\in\{\lambda_0,\lambda_\mathrm{est}\}\times 10^{-k}$ and $\tau\in[0.5,\,0.999]$; for each cell score all pairs and evaluate the objective. \emph{With labels:} decision cost $C_{FP}\cdot FP + C_{FN}\cdot FN$ (or F1), selecting the minimiser/argmax. \emph{Without labels:} the expected-F1 or expected-cost from the calibrated posteriors, or the GMM-valley threshold, as defined in Appendix~\ref{app:derive-tau}.
+
+\paragraph{Step 4 (coherence guard).} Reject solutions whose \emph{mean posterior probability of non-match pairs} is high (EM's was about 0.53); this is the diagnostic that separates prior coupling from a genuine $m/u$ residual. Prefer a smaller $\lambda$, and verify that false positives and false negatives move monotonically with $\tau$ around the chosen $\lambda$.
+
+\paragraph{Step 5 (freeze and report).} Lock $(\lambda^*,\tau^*)$ on validation and measure once on a held-out test set, reporting $\lambda$, $\tau$, F1, and the false-positive/false-negative/cost outcome.
+
+Why this addresses the paradox: (i)~$\lambda$ is anchored --- the default or the blocking-adjusted estimate --- instead of letting EM inflate it to $0.0072$, which recovered EM's F1 from about 0.86 to 0.95--0.97 in our data; (ii)~$\lambda$ and $\tau$ are tuned together, matching the coherent-bundle rule that no single element is changed in isolation; (iii)~the score-shift guard distinguishes prior coupling from a real model-fitting problem before the numbers are trusted. Scope note: the blocking-adjusted step is Splink-native; the joint grid and guard are the contribution here. This appendix addresses the \emph{prior}; the remaining genuine residual (trained $m/u$ slightly below the defaults, $\le 0.974$ versus $0.997$) is a model-fitting question not solved by prior tuning.
+
+\end{appendices}
+
+\section*{Use of Artificial Intelligence}
+During the preparation of this work the author used an AI coding and writing assistant --- the DeepSeek V4 Flash 0731 large language model accessed through an interactive coding agent --- to assist with drafting and editing the manuscript, authoring and debugging the code that implements and evaluates the pipeline, and running the experiments and automation that produced the reported numbers. The tool was not listed as an author, as it cannot take responsibility for the work. All numerical results reported in this paper were obtained by executing the repository code and were independently re-checked for accuracy. Every claim, table, figure, result, and conclusion was thoroughly reviewed and verified by the author, who takes full responsibility for the content of this document, including any errors or omissions that remain.
+
+\begin{thebibliography}{99}
+\bibitem{fellegi1969}
+Ivan P. Fellegi and Alan B. Sunter.
+\newblock A theory for record linkage.
+\newblock Journal of the American Statistical Association, 64(328):1183--1210, 1969.
+\newblock \url{https://doi.org/10.1080/01621459.1969.10501049}.
+
+\bibitem{linacre2022}
+Robin Linacre, Sam Lindsay, Theodore Manassis, Zoe Slade, Tom Hepworth, Ross Kennedy, and Andrew Bond.
+\newblock Splink: Free software for probabilistic record linkage at scale.
+\newblock International Journal of Population Data Science, 7(3), 2022.
+\newblock \url{https://doi.org/10.23889/ijpds.v7i3.1794}.
+\newblock Software repository: \url{https://github.com/moj-analytical-services/splink}.
+
+\bibitem{wang2024}
+Tianyi Wang, Hongyu Lin, Xu Han, Xu Chen, Bo Cao, and Liang Sun.
+\newblock Towards universal dense blocking for entity resolution.
+\newblock 2024.
+\newblock Code repository: \url{https://github.com/tshu-w/uniblocker}.
+
+\bibitem{zeakis2023}
+Alexandros Zeakis, George Papadakis, Dimitrios Skoutas, and Manolis Koubarakis.
+\newblock Pre-trained embeddings for entity resolution: An experimental analysis.
+\newblock Proceedings of the VLDB Endowment, 16(9):2225--2238, 2023.
+\newblock \url{https://doi.org/10.14778/3598581.3598594}.
+
+\bibitem{ebreheem2018}
+Muhammad Ebraheem, Saravanan Thirumuruganathan, Shafiq Joty, Mourad Ouzzani, and Nan Tang.
+\newblock Distributed representations of tuples for entity resolution.
+\newblock Proceedings of the VLDB Endowment, 11(11):1454--1467, 2018.
+\newblock \url{https://doi.org/10.14778/3236187.3236198}.
+
+\bibitem{strojny2026}
+Tymoteusz Strojny and Maciej Ber\k{e}sewicz.
+\newblock BlockingPy: Approximate nearest neighbours for blocking of records for entity resolution.
+\newblock SoftwareX, 34:102583, 2026.
+\newblock \url{https://doi.org/10.1016/j.softx.2026.102583}.
+\newblock Software repository: \url{https://github.com/ncn-foreigners/BlockingPy}.
+
+\bibitem{franz2025}
+Astrid Franz, Frederik Hoppe, Marianne Michaelis, and Udo G\"obel.
+\newblock Universal embeddings of tabular data.
+\newblock arXiv:2507.05904v1, 2025.
+\newblock \url{https://arxiv.org/abs/2507.05904v1}.
+
+\bibitem{vogel2026}
+Liane Vogel, Kavitha Srinivas, Niharika D'Souza, Sola Shirai, Oktie Hassanzadeh, and Horst Samulowitz.
+\newblock Towards universal tabular embeddings: A benchmark across data tasks.
+\newblock arXiv:2604.21696v1, 2026.
+\newblock \url{https://arxiv.org/abs/2604.21696v1}.
+
+\bibitem{johnson2019}
+Jeff Johnson, Matthijs Douze, and Herv\'e J\'egou.
+\newblock Billion-scale similarity search with GPUs.
+\newblock IEEE Transactions on Big Data, 7(3):535--547, 2019.
+\newblock \url{https://doi.org/10.1109/TBDATA.2019.2921572}.
+\newblock Preprint: \url{https://arxiv.org/abs/1702.08734}.
+
+\bibitem{kopcke2010}
+Hanna K\"opcke, Andreas Thor, and Erhard Rahm.
+\newblock Evaluation of entity resolution approaches on real-world match problems.
+\newblock Proceedings of the VLDB Endowment, 3(1--2):484--493, 2010.
+\newblock \url{https://doi.org/10.14778/1920841.1920904}.
+\newblock Data sets (Abt--Buy, Amazon--Google, DBLP--ACM, North Carolina Voters, Cora): \url{https://dbs.uni-leipzig.de/research/projects/benchmark-datasets-for-entity-resolution/}.
+
+\bibitem{mccallum2000}
+Andrew McCallum, Kamal Nigam, and Lyle H. Ungar.
+\newblock Efficient clustering of high-dimensional data sets with application to reference matching.
+\newblock In Proceedings of the Sixth ACM SIGKDD International Conference on Knowledge Discovery and Data Mining (KDD), pages 169--178, 2000.
+\newblock \url{https://doi.org/10.1145/347090.347123}.
+\newblock Data set (Cora): \url{https://www.openicpsr.org/openicpsr/project/100859/version/V1/view} and \url{https://hpi.de/naumann/projects/repeatability/datasets/cora-dataset.html}.
+
+\bibitem{christen2004}
+Peter Christen, Tim Churches, and Markus Hegland.
+\newblock Febrl -- A parallel open source data linkage system.
+\newblock In Proceedings of the Eighth Pacific-Asia Conference on Knowledge Discovery and Data Mining (PAKDD), volume 3056 of Lecture Notes in Artificial Intelligence, pages 638--647, 2004.
+\newblock FEBRL data sets: \url{https://www.kaggle.com/datasets/adrianevensen/restaurants-entity-resolution} and \url{https://www.cecs.anu.edu.au/~Peter.Christen/Febrl.html}.
+
+\bibitem{mudgal2018}
+Sidharth Mudgal, Han Li, Theodoros Rekatsinas, AnHai Doan, Youngchoon Park, Ganesh Krishnan, Rohit Deep, Esteban Arcaute, and Vijay Raghavendra.
+\newblock Deep learning for entity matching: A design space exploration.
+\newblock In Proceedings of the 2018 International Conference on Management of Data (SIGMOD), pages 19--34, 2018.
+\newblock \url{https://doi.org/10.1145/3183713.3196926}.
+
+\bibitem{ncvoter}
+North Carolina State Board of Elections.
+\newblock Voter registration data (public data download).
+\newblock \url{https://www.ncsbe.gov/results-data/voter-registration-data}.
+
+\bibitem{winkler1993}
+William E. Winkler.
+\newblock Improved decision rules in the Fellegi--Sunter model of record linkage.
+\newblock In Proceedings of the Section on Survey Research Methods, American Statistical Association, pages 274--279, 1993.
+
+\bibitem{winkler2000}
+William E. Winkler.
+\newblock Frequency-based matching in the Fellegi--Sunter model of record linkage.
+\newblock Statistical Research Division, U.S. Bureau of the Census, Research Report Series RR2000/06, 2000.
+\newblock \url{https://www.census.gov/library/working-papers/2000/adrm/rr2000-06.html}.
+
+\bibitem{davis2006}
+Jesse Davis and Mark Goadrich.
+\newblock The relationship between precision-recall and ROC curves.
+\newblock In Proceedings of the 23rd International Conference on Machine Learning (ICML), pages 233--240, 2006.
+\newblock \url{https://doi.org/10.1145/1143844.1143874}.
+
+\bibitem{christen2012}
+Peter Christen.
+\newblock Data Matching: Concepts and Techniques for Record Linkage, Entity Resolution, and Duplicate Detection.
+\newblock Springer, Data-Centric Systems and Applications, 2012.
+\newblock \url{https://doi.org/10.1007/978-3-642-31164-2}.
+
+\bibitem{mclachlan2000}
+Geoffrey McLachlan and David Peel.
+\newblock Finite Mixture Models.
+\newblock John Wiley \& Sons, Wiley Series in Probability and Statistics, 2000.
+\end{thebibliography}
+
+\end{document}
