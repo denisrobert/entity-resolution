@@ -88,8 +88,8 @@ Query ──► [embed] ──► [FAISS top-k]
 
 # What it delivers
 
-- **99.5% F1** on the synthetic test corpus (15,000 labelled queries).
-- **~7 ms per query** — sub-millisecond blocking, probabilistic verdict on top.
+- **99.6% F1** on the synthetic test corpus (15,000 labelled queries).
+- **~8 ms per query** — sub-millisecond blocking, probabilistic verdict on top.
 - **Persisted and reusable**: the index reloads without re-embedding the population.
 - **Defensible numbers**: every result reproduces by re-running the code.
 
@@ -144,7 +144,7 @@ Around **7–14 M records** (or when you need replicated, multi-region durabilit
 - Sponsor a short **proof-on-real-data** phase: a representative, labelled sample of the population we must link (with access/privacy).
 - We then commit to an F1 on *that* data, not the synthetic one.
 
-**Value in one line:** near-perfect, explainable identity resolution at ~7 ms, with a priceable path to scale.
+**Value in one line:** near-perfect, explainable identity resolution at ~8 ms, with a priceable path to scale.
 
 ---
 
@@ -171,8 +171,8 @@ Query ──► MiniLM embed ──► FAISS top-k ──► Splink ──► p(
 
 **Blocking recall is the ceiling; Splink is where F1 is won or lost.**
 
-- Top-20 blocking recall: **99.84%** (default), **99.95%** (compact serialization).
-- End-to-end recall: **99.43%** → the ~0.4% gap is lost in *linkage*, not blocking.
+- Top-20 blocking recall: **99.91%** (default), **99.95%** (compact serialization).
+- End-to-end recall: **99.57%** → the ~0.3% gap is lost in *linkage*, not blocking.
 - A "perfect" blocker buys only **~0.08% more F1** (99.66 → 99.74% ceiling).
 
 > Design implication: improving the embedding/blocking engine is **not** the lever today; linkage configuration is.
@@ -184,10 +184,10 @@ Query ──► MiniLM embed ──► FAISS top-k ──► Splink ──► p(
 | Lever | Effect | Verdict |
 |---|---|---|
 | **Threshold τ** | 0.85→0.95 lifts F1 99.53→99.63% | Yes — cheap precision knob |
-| **Serialization** | compact: recall 99.95%, F1 99.77% | Yes — small but real |
+| **Serialization** | compact: recall 99.95%, F1 99.74% | Yes — small but real |
 | **Blocking size k** | 20→100: +recall, 2.4× Splink time | Diminishing returns |
 | **Weaken address** | never beat full-strength | No (this data) |
-| **Retrain m/u** | untrained F1 0.997 vs trained ≤0.974 | Keep defaults |
+| **Retrain m/u** | untrained F1 98.1% vs supervised 94.4% | Keep defaults |
 
 ---
 
@@ -210,7 +210,7 @@ Decision-theoretic setting: `τ* = C_FP / (C_FP + C_FN)`.
 Retraining the match model (`m/u`) made results **worse**, not better.
 
 1. **Prior coupling (dominant):** EM's fitted prior (0.0072 vs 0.0001) shifts all scores up → mass false positives. Pinning the prior raises EM's F1 from ~0.86 to ~0.95–0.97.
-2. **A genuine residual:** even with the prior pinned, trained `m/u` stay below defaults (≤0.974 vs 0.997) by over-weighting partial matches.
+2. **A genuine residual:** even with the prior pinned, trained `m/u` stay below defaults (supervised 94.4% vs untrained 98.1%; EM optimum 95.5%) by over-weighting partial matches.
 
 > **Rule:** the default config is a coherent bundle (weights + prior + `τ`). Change any part and re-validate **all three** on held-out data.
 
@@ -261,9 +261,9 @@ Store     : add / update / delete / save / load (no re-embed on load)
 
 # Scorecard to remember
 
-- Confusion matrix (5k refs / 15k queries): **F1 99.45%**, recall 99.43%, precision 99.48%.
-- Blocking recall: **99.84%** @k=20 (99.95% compact).
-- **7.25 ms/query** (embed + block + batched Splink).
+- Confusion matrix (5k refs / 15k queries): **F1 99.57%**, recall 99.57%, precision 99.56%.
+- Blocking recall: **99.91%** @k=20 (99.95% compact).
+- **8.42 ms/query** (embed + block + batched Splink).
 - NC-voter (real, mutated): **F1 92–94%**; blocking is the binding constraint.
 
 > Baseline engineering numbers — config, hardware, and data shape all move them.
