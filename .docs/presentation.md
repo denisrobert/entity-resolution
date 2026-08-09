@@ -95,6 +95,27 @@ Query ──► [embed] ──► [FAISS top-k]
 
 ---
 
+# Set the risk dial, not a magic number
+
+Splink returns a **probability**; a pair is called a match when that probability
+is at or above a threshold **`τ`**. One number encodes the business trade-off.
+
+- **Raise `τ`** → fewer false positives (fewer *wrong* links) at slightly more false negatives.
+- **Lower `τ`** → catch more true matches, at more false positives.
+
+The cost-based rule:
+
+```
+τ* = C_FP / (C_FP + C_FN)
+```
+
+If a **false link** (FP) is 20× more costly than a **missed link** (FN), then
+`τ* = 20/21 ≈ 0.95` — the model is tuned to the cost of each mistake.
+
+> One parameter lets a risk-averse line (fraud/AML) and a recall-first line (marketing) share the same model, each tuned to its own economics.
+
+---
+
 # Cost and scale
 
 - The 50,000-record index is **~87 MB** today.
@@ -167,6 +188,20 @@ Query ──► MiniLM embed ──► FAISS top-k ──► Splink ──► p(
 | **Blocking size k** | 20→100: +recall, 2.4× Splink time | Diminishing returns |
 | **Weaken address** | never beat full-strength | No (this data) |
 | **Retrain m/u** | untrained F1 0.997 vs trained ≤0.974 | Keep defaults |
+
+---
+
+# `τ` is the cost dial (engineering view)
+
+Splink's decision rule: classify as *match* when `P(M|γ) ≥ τ` (range ~[0.5, 0.999]).
+
+- **Raise `τ`** → fewer false positives, at more false negatives.
+- **Lower `τ`** → more true matches, at more false positives.
+
+Decision-theoretic setting: `τ* = C_FP / (C_FP + C_FN)`.
+
+- Measured: `τ` 0.85 → 0.95 lifted F1 99.53% → 99.63% (precision 99.62→99.96%, FP 38→4); recall slipped only 99.44→99.30%.
+- With recall headroom, raising `τ` is the cheapest precision lever — the mechanism to encode FP/FN business costs. (Methods: whitepaper **Appendix — Deriving τ**.)
 
 ---
 
@@ -259,6 +294,7 @@ For **your** data: population-based scripts accept `--input-records FILE`.
 - **Address weakening didn't help** here — test, don't assume.
 - **Real data needs a mutation/duplicate model** to score (`scripts/ncvoter/ncvoter_util.py`).
 - NC voter has **no full DOB and no email** — those comparisons are weak there.
+- **`τ` encodes business cost.** `τ* = C_FP/(C_FP+C_FN)`; the experiments expose this via `--threshold` / `--tau` and the F1 sweep. Raise `τ` for a precision-first (fewer wrong links) posture, lower it for recall-first. See the **Appendix — Deriving τ** for the cost/F1/GMM/transitivity methods.
 
 ---
 
