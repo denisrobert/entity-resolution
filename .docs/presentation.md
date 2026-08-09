@@ -12,6 +12,7 @@ size: 16:9
   section {
     padding: 1.3em 2em;
     box-sizing: border-box;
+    background: #FEFBF3 !important;
   }
   h1 { font-size: 1.7em; margin: 0 0 .3em 0; }
   h2 { font-size: 1.1em; margin: 0 0 .3em 0; color: #444; }
@@ -43,7 +44,7 @@ size: 16:9
 </style>
 
 <!--
-Note (presenter): One deck, three audience-tuned parts. Part 1 Executive Summary (why),
+Note (presenter): One deck, three audience-tuned parts. Part 1 C-suite (why),
 Part 2 Engineering leadership (architecture & design), Part 3 Line engineers
 (orientation; these teammates read the paper after the talk).
 -->
@@ -59,7 +60,7 @@ Denis Robert
 
 | Part | Audience | Focus | After the talk |
 |---|---|---|---|
-| **1** | Executive Summary | Value, risk, cost | Decision / review |
+| **1** | C-suite | Value, risk, cost | Decision / review |
 | **2** | Engineering leadership | Architecture, design, roadmap | Carry it forward |
 | **3** | Line engineers | Orientation + map to the paper | **Read the paper** |
 
