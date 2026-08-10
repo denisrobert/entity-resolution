@@ -1,0 +1,411 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!black,
+  citecolor=blue!50!black,
+  urlcolor=blue!50!black,
+  pdftitle={The Calibration Paradox in Fellegi-Sunter Processes},
+  pdfauthor={Denis Robert},
+}
+
+\title{The Calibration Paradox in Fellegi-Sunter Processes}
+\author{Denis Robert\\\small \textit{Independent Researcher}}
+\date{}
+
+\newcommand{\dd}{\,\mathrm{d}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Probabilistic record linkage is built on the Fellegi--Sunter model, in which a decision
+depends on three coupled quantities: the per-field match and non-match probabilities
+$m,u$, the prior match probability $\lambda$, and a decision threshold $\tau$. In a
+two-stage entity-resolution pipeline, retraining $m/u$ from data --- whether by
+supervised calibration or expectation--maximisation --- repeatedly produced \emph{worse}
+results at a fixed $\tau$ than leaving the parameters at their untrained defaults. We call
+this the calibration paradox: improving the fidelity of the evidence model degrades the
+measured operational outcome. We show that the mechanism is not a flaw in training but a
+coordination failure. Writing the decision rule in log-odds separates the evidence weights
+$w=\log_2(m/u)$ from a prior bias $b=\log_2\bigl(\lambda/(1-\lambda)\bigr)$; the effective
+match-weight threshold is $w_\tau^*=\log_2\bigl(\tau/(1-\tau)\bigr)-b$. Retraining changes
+$w$, while a freely fitted prior changes $b$, so a fixed $\tau$ selects a different
+operating point in every configuration. We derive the paradox under this decomposition,
+distinguish prior coupling from a genuine $m/u$ residual, and give a tandem
+$(\lambda,\tau)$ calibration procedure that recovers most of the loss. Empirical evidence
+from a 100,000-record duplicate-bearing benchmark and a joint $(\lambda,\tau)$ surface
+illustrates both the failure and its repair.
+\end{abstract}
+
+\section{Introduction}
+Entity resolution seeks to determine whether two records refer to the same real-world
+entity. The dominant computational recipe first retrieves a small set of candidate records
+(blocking) and then decides for each candidate pair by probabilistic linkage
+\cite{fellegi1969,christen2012}. The probabilistic stage computes a match probability from
+the evidence of agreement across fields and classifies a pair as a match when that
+probability reaches a threshold.
+
+In building and validating a two-stage pipeline \cite{pipeline}, we observed an unexpectedly robust
+phenomenon we call the \emph{calibration paradox}: re-estimating the model's match and
+non-match probabilities $m$ and $u$ from the data --- which should \emph{improve}
+calibration --- consistently \emph{worsened} the reported outcome at a fixed decision
+threshold $\tau$, sometimes dramatically. Unsupervised expectation--maximisation (EM)
+degraded an F1 of roughly $0.98$ to below $0.9$ on some configurations, and supervised
+calibration consistently trailed the untrained defaults, even after tuning $\tau$.
+
+This seems paradoxical: training the parameters on data is the standard remedy for poor
+record-linkage performance, and the literature reports that appropriately estimated $m/u$
+and priors improve linkage \cite{winkler1993,winkler2000}. The resolution, we argue, is
+that the decision problem is not governed by $m/u$ alone. It is governed by a \emph{bundle}
+of three coupled quantities --- the evidence weights derived from $m/u$, the match prior
+$\lambda$, and the decision threshold $\tau$ --- and these are not interchangeable. A
+practitioner who retrains $m/u$ and leaves $\tau$ fixed, or who lets the same fitting
+procedure also estimate $\lambda$ freely, has not improved the decision; it has chosen a
+different operating point, usually a worse one.
+
+The contribution of this paper is a clean theoretical account of the paradox and a practical
+repair. We formalise the Fellegi--Sunter decision rule in log-odds (Section~2), which
+decomposes the posterior into an evidence term (from $m/u$) and a bias term (from
+$\lambda$), with $\tau$ selecting a weight threshold. We then derive the paradox as a
+coordination failure of this decomposition and separate its two mechanisms: \emph{prior}
+coupling and a \emph{genuine residual} from over-weighted partial-similarity levels
+(Section~3). We give a tandem $(\lambda,\tau)$ calibration procedure (Section~4) and
+demonstrate it empirically on a large duplicate-bearing benchmark and a joint
+$(\lambda,\tau)$ surface (Section~5). Section~6 relates the findings to the literature and
+Section~7 concludes.
+
+\section{Background: the Fellegi--Sunter model and its three parameters}
+\label{sec:fs}
+Consider a candidate pair of records and a comparison vector $\gamma$ describing whether
+each field agrees (exactly or to a graded degree). The Fellegi--Sunter model
+\cite{fellegi1969} posits two latent classes: the pair is either a true match $M$ or a
+non-match $U$. Let
+\begin{equation}
+m(\gamma)=P(\gamma\mid M),\qquad u(\gamma)=P(\gamma\mid U).
+\end{equation}
+Under conditional independence across fields, $m(\gamma)$ and $u(\gamma)$ factor into
+per-field, per-level probabilities, so the log-likelihood-ratio (in bits) is additive:
+\begin{equation}
+w(\gamma)\;=\;\log_2\frac{m(\gamma)}{u(\gamma)}\;=\;\sum_k\,w_k(\gamma_k),
+\qquad w_k=\log_2\frac{m_k}{u_k}.
+\end{equation}
+The prior probability that an arbitrary pair matches is
+\begin{equation}
+\lambda\;=\;P(M).
+\end{equation}
+By Bayes' theorem the posterior probability that the pair is a match is
+\begin{equation}
+P(M\mid\gamma)\;=\;\frac{\lambda\,m(\gamma)}
+{\lambda\,m(\gamma)+(1-\lambda)\,u(\gamma)}.
+\label{eq:posterior}
+\end{equation}
+
+A practitioner declares the pair a match when the posterior reaches a threshold:
+\begin{equation}
+\text{decision}(\gamma)\;=\;\begin{cases}\text{match} & P(M\mid\gamma)\ge \tau,\\
+\text{non-match} & \text{otherwise.}\end{cases}
+\label{eq:decision}
+\end{equation}
+
+The three quantities in \eqref{eq:decision} and \eqref{eq:posterior} play different roles:
+\begin{description}
+\item[$m,u$] describe the \emph{evidence}: how discriminating agreement or disagreement on
+each field is. They enter only through the weight $w$.
+\item[$\lambda$] describes the \emph{prior base rate}: how many of the pairs examined are
+expected to be true matches. It is a global bias applied to every pair.
+\item[$\tau$] describes the \emph{target}: the posterior confidence at which we are willing
+to declare a match; equivalently it encodes the relative cost of a false positive versus a
+false negative \cite{winkler1993}.
+\end{description}
+
+\subsection{Log-odds decomposition}
+It is convenient to work in log-odds (base 2). For any probability $p$, write
+$\mathrm{logit}_2(p)=\log_2\frac{p}{1-p}$. Taking log-odds of \eqref{eq:posterior},
+\begin{equation}
+\mathrm{logit}_2\bigl(P(M\mid\gamma)\bigr)
+\;=\;w(\gamma)\;+\;\underbrace{\log_2\frac{\lambda}{1-\lambda}}_{b}\,,
+\label{eq:logodds}
+\end{equation}
+where we have defined the \emph{prior bias}
+\begin{equation}
+b\;=\;\log_2\frac{\lambda}{1-\lambda}.
+\end{equation}
+Thus the posterior log-odds is the evidence weight $w(\gamma)$ plus a constant prior bias
+$b$ that is identical for every pair.
+
+Writing the decision threshold in the same units, $t=\mathrm{logit}_2(\tau)$, the decision
+rule \eqref{eq:decision} becomes
+\begin{equation}
+\text{match iff}\quad w(\gamma)\;\ge\;t-b\;=\;\log_2\frac{\tau}{1-\tau}
+-\log_2\frac{\lambda}{1-\lambda}\;\;=:\;\;w_\tau^*(\lambda).
+\label{eq:threshold}
+\end{equation}
+
+Equation \eqref{eq:threshold} is the key object of this paper. It shows that a fixed
+posterior threshold $\tau$ does \emph{not} correspond to a fixed evidence threshold: the
+effective match-weight threshold $w_\tau^*$ is a function of the prior $\lambda$. Raising
+$\lambda$ increases $b$, lowers $w_\tau^*$, and therefore admits weight values that were
+previously below threshold; lowering $\lambda$ has the opposite effect.
+
+\section{The calibration paradox: theoretical derivation}
+\label{sec:paradox}
+
+\subsection{Statement}
+Let $\theta=(m,u,\lambda,\tau)$ be a configuration of the model. For a set of candidate
+pairs, denote the confusion matrix under $\theta$ and its consequent
+$\mathrm{F1}(\theta)$, or more generally any loss $\mathcal{L}(\theta)$. The calibration
+paradox is the observation that a configuration $\theta'$ whose \emph{evidence parameters}
+$(m',u')$ are better fitted to the data than $(m,u)$ (in the sense of higher likelihood, or
+trained on labelled duplicates) frequently satisfies
+\begin{equation}
+\mathcal{L}(\theta')\ >\ \mathcal{L}(\theta),
+\end{equation}
+i.e.\ the ``better-calibrated'' evidence \emph{degrades} the decision outcome when the
+threshold is kept fixed. In our pipeline the paradox is sharpest when training also
+refits the prior, so that $\lambda$ moves as well.
+
+\subsection{Mechanism 1: prior coupling}
+Suppose retraining leaves the evidence weights unchanged but shifts the prior from
+$\lambda$ to $\lambda'$. By \eqref{eq:logodds}, every pair's posterior log-odds changes by
+\begin{equation}
+\Delta b\;=\;\log_2\frac{\lambda'/(1-\lambda')}{\lambda/(1-\lambda)},
+\end{equation}
+and, by \eqref{eq:threshold}, the effective weight threshold moves by
+$\Delta w_\tau^*=-\Delta b$. Concretely, starting from the default
+$\lambda=10^{-4}$ ($b\approx-13.3$ hits) an EM fit that raises $\lambda$ to
+$7.2\times10^{-3}$ ($b\approx-7.1$ bits) reduces the effective threshold by
+$\approx 6.2$ bits. Every candidate pair whose weight lies within $6.2$ bits below the old
+boundary now crosses it. Non-match pairs are typically far more numerous and concentrated
+near the boundary (they include partial agreement), so the effect is a disproportionate
+inflow of false positives: specificity collapses while recall is barely affected.
+
+The prior is therefore not \emph{merely} a base rate; it is a global shift of the whole
+posterior distribution. Because the default $\lambda$ and the default $\tau$ were chosen to
+be mutually consistent, leaving $\tau$ fixed while $\lambda$ drifts selects a different,
+usually worse, region of the precision--recall curve. We label this \emph{prior coupling}:
+the prior and the threshold must move together.
+
+\subsection{Mechanism 2: the evidence residual}
+Even with the prior frozen ($b'=b$), retraining $m/u$ can perturb the distribution of
+weights. Supervised calibration on labelled duplicates, or EM on a population that contains
+such duplicates, tends to assign higher $m$ to the \emph{partial-similarity} levels
+(e.g.\ an exact first-name match with a small edit on the last name, or a near-matching
+address). These partial levels are exactly the ones that many \emph{non-match} pairs also
+occupy, so a higher $m$ there raises $w_k$ for those levels. Non-match pairs therefore move
+\emph{right} in the weight distribution, increasing the density of non-matches near the
+decision boundary. For a fixed threshold $\tau$ this lowers precision and specificity
+(extra false positives), even though the evidence model is arguably ``more accurate.''
+
+We call this the \emph{genuine residual}: it survives prior anchoring, and in our data it
+keeps even the jointly re-optimised trained model slightly below the untrained defaults.
+It is a substantive statement about which levels should be rewarded, not a numerical
+artefact.
+
+\subsection{The coalesence: fixed $\tau$ is not a fixed operating point}
+Combining both mechanisms and expanding the log-odds for a pair $p$,
+\begin{equation}
+\Delta\,\mathrm{logit}_2\bigl(P(M\mid\gamma_p)\bigr)
+\;=\;\bigl(w'(\gamma_p)-w(\gamma_p)\bigr)\;+\;(b'-b).
+\label{eq:delta}
+\end{equation}
+A pair crosses the threshold in configuration $\theta'$ but not in $\theta$ whenever
+$\Delta\,\mathrm{logit}_2(P(M\mid\gamma_p))\ge
+\mathrm{logit}_2(\tau)-\mathrm{logit}_2(P(M\mid\gamma_p))$. Because the evidence shift
+$w'-w$ is concentrated where the non-match density is largest, and the bias shift $b'-b$
+moves the whole mass, the set of newly-admitted pairs is overwhelmingly false positives.
+The ``calibration paradox'' is thus a \emph{coordination} failure: $(m,u,\lambda,\tau)$ are
+not four free dials but one coupled decision rule, and turning one dial without the others
+moves the operating point to an inferior location.
+
+\section{Joint $(\lambda,\tau)$ calibration}
+\label{sec:alg}
+The theory of Section~\ref{sec:paradox} immediately suggests the repair: never change the
+evidence $m/u$ without re-anchoring the prior $\lambda$ and re-selecting the threshold
+$\tau$ together, and validate the combination on held-out data. We formalise this as a
+tandem procedure.
+
+\begin{enumerate}
+\item[\textbf{Step 0.}] Baseline prior $\lambda_0=10^{-4}$ (a sensible default given a
+sparse duplicate base rate).
+\item[\textbf{Step 1.}] Estimate a \emph{principled} prior rather than a free one. With
+labels, $\lambda=\tfrac{\text{labelled match rate}}{\text{blocking recall}}$, the base rate
+in random-pair space. Without labels, use a blocking-adjusted estimator
+\cite{winkler2000} that divides an assumed expected-match count by the blocking coverage;
+if no defensible rate exists, keep $\lambda_0$.
+\item[\textbf{Step 2.}] Fit $m/u$ with the prior \emph{fixed} (e.g.\ EM with
+${\lambda}$ held at the Step~1 value, or supervised calibration), so that training affects
+only the evidence weights.
+\item[\textbf{Step 3.}] On a validation set, jointly select
+$(\lambda,\tau)\in\{\lambda_0,\lambda_\mathrm{est}\}\times 10^{-k}\times[0.5,0.999]$
+optimising the objective: F1, or a decision cost $C_{FP}\mathrm{FP}+C_{FN}\mathrm{FN}$, or
+the expected-F1 derived from calibrated posteriors.
+\item[\textbf{Step 4.}] Coherence guard: reject solutions whose mean posterior probability
+of \emph{non-match} pairs is large (in our data, EM's reached $\approx 0.55$). This
+diagnostic separates prior coupling (fixable by lowering $\lambda$) from the genuine
+$m/u$ residual (requires changing the comparison model).
+\item[\textbf{Step 5.}] Freeze $(\lambda^*,\tau^*)$ on validation and evaluate once on a
+held-out test set.
+\end{enumerate}
+
+\section{Empirical demonstration}
+\label{sec:emp}
+
+\subsection{Setup}
+We used the two-stage pipeline from the companion entity-resolution paper
+\cite{pipeline}: records are embedded with a
+sentence-transformer model, blocked by cosine nearest-neighbour search, and linked with a
+Fellegi--Sunter scorer (Splink) using Jaro--Winkler comparisons for names and address, a
+date-of-birth comparison, and an email comparison. All experiments were run across a
+100{,}000-record base population with a 3\% duplicate-bearing augmentation, producing
+6{,}000 labelled queries (positives are near-duplicate variants, negatives are held-out
+records).
+
+Three parameter configurations are compared: (i) untrained defaults, with $\lambda=10^{-4}$;
+(ii) supervised calibration of $m/u$ from the labelled duplicate pairs, $\lambda=10^{-4}$;
+(iii) EM with a freely estimated prior (which produced $\lambda\approx7.2\times10^{-3}$),
+and an ablation of (iii) with $\lambda$ reset to $10^{-4}$. Table~\ref{tab:benchmark}
+reports the outcome at the fixed decision threshold $\tau=0.85$.
+
+\begin{table}[h]
+\centering
+\caption{Duplicate-bearing benchmark (100{,}000 base records, 6{,}000 queries,
+$\tau=0.85$). The trained configurations degrade F1 at the fixed threshold; the EM model
+degraded most, and its prior only explains part of the loss.}
+\label{tab:benchmark}
+\begin{tabular}{lrrrrr}
+\toprule
+Configuration & Precision & Recall & Specificity & F1 & $\lambda$\\
+\midrule
+Untrained defaults & 90.1\% & 98.1\% & 89.2\% & 93.9\% & $10^{-4}$\\
+Supervised ($m/u$, $\lambda$ fixed) & 75.1\% & 98.5\% & 67.3\% & 85.2\% & $10^{-4}$\\
+EM (free prior) & 56.9\% & 98.3\% & 25.4\% & 72.1\% & $7.2\times10^{-3}$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The free-prior EM configuration is the clearest quantitative instance of the paradox: the
+same model that recovered a fraction of the unweighted prior's recall errors collapsed
+precision and specificity. In an ablation on the same synthetic duplicate-bearing population
+we reset the EM prior to $10^{-4}$ and re-tuned $\tau$; EM's F1 recovered from $0.826$ to
+$0.968$, and the mean posterior probability of non-match pairs fell from $0.549$ to
+$0.328$. This is consistent with Mechanism~1 (prior coupling) being the dominant term:
+holding $\lambda$ at the default removes most of the apparent failure.
+
+\subsection{Joint $(\lambda,\tau)$ surface}
+To show that the paradox is an operating-point effect and not a property of any single
+threshold, we swept the prior and the threshold jointly for the untrained and EM models
+(Table~\ref{tab:surface}). The untrained defaults retain F1 above $0.97$ across the whole
+region; the EM model only reaches comparable F1 near low $\lambda$ and high $\tau$, and even
+its joint optimum ($0.955$) stays below the untrained optimum ($0.997$). This is exactly the
+prediction of Section~\ref{sec:paradox}: prior coupling is removed by sweeping, but the
+genuine $m/u$ residual remains.
+
+\begin{table}[h]
+\centering
+\caption{Joint F1 over $(\lambda,\tau)$ for untrained and EM configurations on the
+duplicate-bearing population. Entries are F1 (percent).}
+\label{tab:surface}
+\begin{tabular}{lccccc}
+\toprule
+ & \multicolumn{2}{c}{Untrained} & \multicolumn{2}{c}{EM} & \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+$\lambda$ & $\tau=0.85$ & $\tau=0.95$ & $\tau=0.85$ & $\tau=0.95$ &\\
+\midrule
+$10^{-4}$ & 98.4 & 99.7 & 93.3 & 94.2 &\\
+$10^{-3}$ & 97.1 & 97.1 & 81.7 & 84.7 &\\
+$10^{-2}$ & 95.8 & 96.4 & 81.0 & 81.4 &\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Related work}
+The Fellegi--Sunter model \cite{fellegi1969} already framed linkage as a decision problem
+with error-rate targets, and Winkler's line of work formalised optimal decision rules and
+frequency-based parameter estimation \cite{winkler1993,winkler2000}. Christen's monograph
+\cite{christen2012} surveys pragmatic threshold and calibration practice. The
+precision--recall and threshold-selection literature \cite{davis2006} treats the operating
+point as a tunable trade-off but, as far as we know, does not make explicit that $m/u$,
+$\lambda$, and $\tau$ form a single coupled decision rule whose components cannot be
+changed independently. The contribution here is that explicit log-odds decomposition
+(\eqref{eq:logodds}--\eqref{eq:threshold}), the identification of prior coupling as the
+dominant mechanism, and the tandem calibration procedure.
+
+\section{Discussion and conclusion}
+The calibration paradox is the statement that training the evidence parameters $m/u$ can
+worsen a decision that already includes a prior $\lambda$ and a threshold $\tau$. The
+log-odds decomposition shows why: the posterior log-odds is the sum of the evidence weight
+$w$ and a prior bias $b=\log_2\frac{\lambda}{1-\lambda}$, and the decision compares this to
+$t=\log_2\frac{\tau}{1-\tau}$. Retraining $m/u$ moves the evidence distribution; a freely
+estimated prior moves the bias; a fixed $\tau$ holds the target fixed. Changing any one
+without the other two relocates the operating point.
+
+Two distinct mechanisms drive the observed drop. \emph{Prior coupling} is a global bias
+shift: an EM prior inflated from $10^{-4}$ to $7.2\times10^{-3}$ lowers the effective weight
+threshold by about $6$ bits and admits a flood of false positives; re-anchoring the prior
+recovers most of the loss. \emph{The genuine residual} is a shift of the non-match weight
+distribution caused by over-weighting partial-similarity levels, which survives prior
+anchoring and keeps jointly re-optimised trained models slightly below the defaults on our
+data.
+
+The practical message is methodological: in Fellegi--Sunter process, the triple
+$(m/u,\lambda,\tau)$ is a \emph{coherent bundle}. Calibration is only meaningful when the
+evidence, the prior bias, and the decision threshold are estimated and selected together,
+and then evaluated on held-out data. Retraining $m/u$ while leaving $\lambda$ and $\tau$
+unchanged is not a safe optimisation; it is a hidden change of operating point, and---as we
+observe---usually a worse one.
+
+\begin{thebibliography}{9}
+\bibitem{fellegi1969}
+Ivan P. Fellegi and Alan B. Sunter.
+\newblock A theory for record linkage.
+\newblock Journal of the American Statistical Association, 64(328):1183--1210, 1969.
+
+\bibitem{winkler1993}
+William E. Winkler.
+\newblock Improved decision rules in the Fellegi--Sunter model of record linkage.
+\newblock In Proceedings of the Section on Survey Research Methods, American Statistical Association, pages 274--279, 1993.
+
+\bibitem{winkler2000}
+William E. Winkler.
+\newblock Frequency-based matching in the Fellegi--Sunter model of record linkage.
+\newblock Statistical Research Division, U.S. Bureau of the Census, Research Report Series RR2000/06, 2000.
+
+\bibitem{christen2012}
+Peter Christen.
+\newblock Data Matching: Concepts and Techniques for Record Linkage, Entity Resolution, and Duplicate Detection.
+\newblock Springer, 2012.
+
+\bibitem{davis2006}
+Jesse Davis and Mark Goadrich.
+\newblock The relationship between precision-recall and ROC curves.
+\newblock In Proceedings of the 23rd International Conference on Machine Learning, pages 233--240, 2006.
+
+\bibitem{mclachlan2000}
+Geoffrey McLachlan and David Peel.
+\newblock Finite Mixture Models.
+\newblock John Wiley \& Sons, 2000.
+
+\bibitem{pipeline}
+Denis Robert.
+\newblock A two-stage entity resolution pipeline with FAISS blocking and Splink matching.
+\newblock Technical report, Independent Researcher, 2026.
+\end{thebibliography}
+
+\section*{Use of Artificial Intelligence}
+During the preparation of this work the author used an AI coding and writing assistant (the
+DeepSeek V4 Flash 0731 large language model) to assist with drafting and editing the
+manuscript and preparing the experiments. The tool was not listed as an author. The
+theoretical derivation and all reported results were reviewed and verified by the author,
+who takes full responsibility for the content.
+
+\end{document}
