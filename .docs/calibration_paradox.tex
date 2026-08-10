@@ -31,20 +31,23 @@
 Probabilistic record linkage is built on the Fellegi--Sunter model, in which a decision
 depends on three coupled quantities: the per-field match and non-match probabilities
 $m,u$, the prior match probability $\lambda$, and a decision threshold $\tau$. In a
-two-stage entity-resolution pipeline, retraining $m/u$ from data --- whether by
-supervised calibration or expectation--maximisation --- repeatedly produced \emph{worse}
-results at a fixed $\tau$ than leaving the parameters at their untrained defaults. We call
-this the calibration paradox: improving the fidelity of the evidence model degrades the
-measured operational outcome. We show that the mechanism is not a flaw in training but a
-coordination failure. Writing the decision rule in log-odds separates the evidence weights
-$w=\log_2(m/u)$ from a prior bias $b=\log_2\bigl(\lambda/(1-\lambda)\bigr)$; the effective
-match-weight threshold is $w_\tau^*=\log_2\bigl(\tau/(1-\tau)\bigr)-b$. Retraining changes
-$w$, while a freely fitted prior changes $b$, so a fixed $\tau$ selects a different
-operating point in every configuration. We derive the paradox under this decomposition,
-distinguish prior coupling from a genuine $m/u$ residual, and give a tandem
-$(\lambda,\tau)$ calibration procedure that recovers most of the loss. Empirical evidence
-from a 100,000-record duplicate-bearing benchmark and a joint $(\lambda,\tau)$ surface
-illustrates both the failure and its repair.
+two-stage entity-resolution pipeline, re-estimating these quantities from data ---
+especially expectation--maximisation (EM) with a freely fitted prior --- repeatedly produced
+\emph{worse} results at a fixed $\tau$ than leaving the parameters at their untrained
+defaults, while supervised calibration could either help or hurt depending on the data.
+We call this the calibration paradox: improving the fidelity of the evidence model can
+degrade the measured operational outcome. We show that the mechanism is not a flaw in
+training but a coordination failure. Writing the decision rule in log-odds separates the
+evidence weights $w=\log_2(m/u)$ from a prior bias $b=\log_2\bigl(\lambda/(1-\lambda)\bigr)$;
+the effective match-weight threshold is
+$w_\tau^*=\log_2\bigl(\tau/(1-\tau)\bigr)-b$. Retraining changes $w$, while a freely fitted
+prior changes $b$, so a fixed $\tau$ selects a different operating point in every
+configuration. We derive the paradox under this decomposition, distinguish prior coupling
+from a genuine $m/u$ residual, and give a tandem $(\lambda,\tau)$ calibration procedure,
+together with an analysis of how threshold choice is sensitive to prior misspecification.
+Empirical evidence from a 100,000-record duplicate-bearing benchmark, a joint
+$(\lambda,\tau)$ surface, a real-schema NC-voter replication, and a smoothing
+regularisation study illustrates both the failure and its repair.
 \end{abstract}
 
 \section{Introduction}
@@ -58,10 +61,14 @@ probability reaches a threshold.
 In building and validating a two-stage pipeline \cite{pipeline}, we observed an unexpectedly robust
 phenomenon we call the \emph{calibration paradox}: re-estimating the model's match and
 non-match probabilities $m$ and $u$ from the data --- which should \emph{improve}
-calibration --- consistently \emph{worsened} the reported outcome at a fixed decision
-threshold $\tau$, sometimes dramatically. Unsupervised expectation--maximisation (EM)
-degraded an F1 of roughly $0.98$ to below $0.9$ on some configurations, and supervised
-calibration consistently trailed the untrained defaults, even after tuning $\tau$.
+calibration --- can \emph{worsen} the reported outcome at a fixed decision threshold $\tau$.
+The effect is sharpest and most robust for unsupervised learning (EM) with a freely
+re-estimated prior $\lambda$: on some configurations EM degraded an F1 of roughly $0.98$ to
+below $0.9$. On a synthetic duplicate-bearing benchmark, supervised calibration also trailed
+the untrained defaults at a fixed $\tau$; on harder real-schema data, however, supervised
+calibration can \emph{help} (Section~\ref{sec:real}). The paradox is therefore not ``always
+keep the defaults,'' but that calibration and the decision rule are coupled and must be
+reconciled together.
 
 This seems paradoxical: training the parameters on data is the standard remedy for poor
 record-linkage performance, and the literature reports that appropriately estimated $m/u$
@@ -328,6 +335,125 @@ $10^{-2}$ & 95.8 & 96.4 & 81.0 & 81.4 &\\
 \end{tabular}
 \end{table}
 
+\subsection{Real-data validation on NC-voter}
+\label{sec:real}
+To test whether the paradox is an artefact of the synthetic generator, we replicated the
+comparison on the North Carolina voter-registration file: a public, externally
+pre-deduplicated dataset with no full birth date or email. Because authentic duplicate pairs
+are unavailable, the evaluation mirrors the pipeline paper's protocol: positives are
+mutated duplicates of records held in the index and negatives are mutated held-out records,
+scored at a fixed $\tau=0.85$ (Table~\ref{tab:real}).
+
+\begin{table}[h]
+\centering
+\caption{Mutated NC-voter resolution at fixed $\tau=0.85$ (3{,}000 in-index, 1{,}500
+positive, 1{,}500 negative queries). Date-of-birth and email comparisons are unavailable.}
+\label{tab:real}
+\begin{tabular}{lcccc}
+\toprule
+Configuration & Precision & Recall & Specificity & F1 \\
+\midrule
+Untrained defaults & 100.0\% & 85.6\% & 100.0\% & 92.2\% \\
+Supervised $m/u$ & 99.9\% & 89.3\% & 99.9\% & 94.3\% \\
+EM (free prior) & 73.7\% & 52.9\% & 81.1\% & 61.6\% \\
+EM, prior reset to $10^{-4}$ & 100.0\% & 24.3\% & 100.0\% & 39.1\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two findings qualify the synthetic result. First, on this harder real schema supervised
+calibration does \emph{help}: it raises recall (85.6\% to 89.3\%) at virtually no cost to
+precision (100.0\% to 99.9\%). The ``untrained defaults win'' claim in the synthetic
+benchmark is therefore not universal; where partial agreement is genuinely informative,
+trained $m/u$ can be better. Second, the \emph{unsupervised} (EM) result remains
+catastrophic --- F1 collapses from 92.2\% to 61.6\% --- and, notably, resetting the EM prior
+to $10^{-4}$ makes it \emph{worse} (39.1\%) by crushing recall. On this data EM's fitted
+$m/u$ are themselves unreliable, so prior anchoring alone cannot repair them. The robust,
+general conclusion is that freely fitting EM parameters is dangerous without joint
+calibration, whereas supervised calibration transfers to a real schema and can be
+beneficial; the two are not interchangeable remedies.
+
+\subsection{Smoothing and regularisation}
+\label{sec:smoothing}
+A natural question is whether the genuine residual stems from noisy per-level probability
+estimates, which regularisation could fix. If level $k$ of a comparison has $n_k$ observed
+occurrences among a total of $N$ training pairs over $K$ levels, the empirical
+$m$-probability is $\hat m_k=n_k/N$. Laplace (additive) smoothing, equivalently a Dirichlet
+prior with concentration $\alpha$, replaces it by
+\begin{equation}
+\hat m_k^{(\alpha)}=\frac{n_k+\alpha}{N+K\alpha},
+\end{equation}
+which pulls the estimate toward the uniform value $1/K$ and removes zero counts. Because the
+residual mechanism of Section~\ref{sec:paradox} is that trained models over-weight
+partial-similarity levels, and those levels are precisely the ones where $n_k$ is large, one
+might expect larger $\alpha$ to reduce the residual.
+
+Table~\ref{tab:smooth} tests this on the supervised calibration of the 50{,}000-reference
+benchmark at fixed $\tau$. Increasing $\alpha$ from 0.5 to 50 barely moves the supervised
+F1 (94.4\% to 93.6\%), leaving a persistent gap of roughly four points below the untrained
+defaults ($\approx98\%$). The residual is therefore not an artefact of level-count variance
+or zero counts; it reflects a structural modelling choice --- the trained model rewards
+partial-similarity agreement more than the default weight scheme does --- and smoothing the
+level probabilities toward uniform does not reverse that choice. We therefore recommend
+Laplace/Dirichlet smoothing as a variance remedy (and use it in our supervised estimator by
+default), but stress that it does not, by itself, close the paradox; the repair remains the
+joint $(\lambda,\tau)$ calibration of Section~\ref{sec:alg}.
+
+\begin{table}[h]
+\centering
+\caption{Supervised calibration of the synthetic benchmark at fixed $\tau=0.85$ under
+Laplace smoothing $\alpha$. The untrained defaults give F1 $\approx98\%$ throughout.}
+\label{tab:smooth}
+\begin{tabular}{lccc}
+\toprule
+Smoothing $\alpha$ & 0.5 & 5 & 50 \\
+\midrule
+Supervised F1 & 94.4\% & 93.8\% & 93.6\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Sensitivity of the threshold to prior misspecification}
+\label{sec:sensitivity}
+Equation \eqref{eq:threshold} makes the coupling explicit:
+$w_\tau^*=t-b$, with $t=\log_2\frac{\tau}{1-\tau}$ and $b=\log_2\frac{\lambda}{1-\lambda}$.
+If the true prior is $\lambda$ but the pipeline uses a misspecified $\tilde\lambda=c\lambda$,
+the bias changes by
+\begin{equation}
+\Delta b=\log_2\frac{\tilde\lambda/(1-\tilde\lambda)}{\lambda/(1-\lambda)}
+\;\approx\;\log_2 c\qquad(\lambda\ll 1).
+\end{equation}
+To preserve the same effective threshold, $\tau$ must be adjusted by the same number of
+bits: a factor $c$ in the prior requires an offset of $\approx\log_2 c$ in
+$\mathrm{logit}_2(\tau)$. In fully unsupervised settings $\lambda$ cannot be estimated
+reliably, so this relation bounds how much the operating point can move for a given prior
+error.
+
+Table~\ref{tab:sens} quantifies the consequence: the best F1 attainable after re-optimising
+$\tau$ at each prior. The untrained model is stable (best F1 $0.98$--$1.00$) across two
+orders of magnitude in $\lambda$; the EM model is highly sensitive, its attainable F1
+falling from $0.96$ at $\lambda=10^{-5}$ to $0.81$ at $\lambda=10^{-2}$. Our guidance for the
+unsupervised setting is therefore: (i)~prefer the default or blocking-adjusted prior rather
+than a free EM estimate; (ii)~select $\tau$ on a validation split over a grid of candidate
+$\lambda$; and (iii)~report the range of F1 across that grid as an explicit sensitivity
+bound. A wide range (as for EM) is a warning that the configuration is unsafe without
+labelled data.
+
+\begin{table}[h]
+\centering
+\caption{Best F1 attainable after re-optimising $\tau$ at each assumed prior, on the
+duplicate-bearing population. The optimal $\tau$ for every EM row is $0.98$.}
+\label{tab:sens}
+\begin{tabular}{lccc}
+\toprule
+Assumed $\lambda$ & $10^{-5}$ & $10^{-3}$ & $10^{-2}$ \\
+\midrule
+Untrained, best F1 & 0.99 & 0.99 & 0.98 \\
+EM, best F1 & 0.96 & 0.91 & 0.81 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \section{Related work}
 The Fellegi--Sunter model \cite{fellegi1969} already framed linkage as a decision problem
 with error-rate targets, and Winkler's line of work formalised optimal decision rules and
@@ -352,17 +478,23 @@ without the other two relocates the operating point.
 Two distinct mechanisms drive the observed drop. \emph{Prior coupling} is a global bias
 shift: an EM prior inflated from $10^{-4}$ to $7.2\times10^{-3}$ lowers the effective weight
 threshold by about $6$ bits and admits a flood of false positives; re-anchoring the prior
-recovers most of the loss. \emph{The genuine residual} is a shift of the non-match weight
-distribution caused by over-weighting partial-similarity levels, which survives prior
-anchoring and keeps jointly re-optimised trained models slightly below the defaults on our
-data.
+recovers most of the loss on the synthetic benchmark. \emph{The genuine residual} is a shift
+of the non-match weight distribution caused by over-weighting partial-similarity levels,
+which survives prior anchoring and keeps jointly re-optimised trained models slightly below
+the defaults on the synthetic data. Real-data replication (Section~\ref{sec:real}) refines
+this: supervised calibration can improve outcomes on harder schemas (it lifted NC-voter F1
+from 92.2\% to 94.3\% at fixed $\tau$), whereas freely fitted EM remains catastrophically
+miscalibrated. Smoothing the level probabilities (Section~\ref{sec:smoothing}) is a
+valuable variance remedy but does not, by itself, close the residual; and the threshold is
+explicitly sensitive to prior misspecification (Section~\ref{sec:sensitivity}), so a wide
+F1 range across candidate priors is a warning sign in unsupervised settings.
 
-The practical message is methodological: in Fellegi--Sunter process, the triple
+The practical message is methodological: in a Fellegi--Sunter process, the triple
 $(m/u,\lambda,\tau)$ is a \emph{coherent bundle}. Calibration is only meaningful when the
 evidence, the prior bias, and the decision threshold are estimated and selected together,
 and then evaluated on held-out data. Retraining $m/u$ while leaving $\lambda$ and $\tau$
-unchanged is not a safe optimisation; it is a hidden change of operating point, and---as we
-observe---usually a worse one.
+unchanged is not a safe optimisation; it is a hidden change of operating point, and---for
+unsupervised calibration especially---usually a worse one.
 
 \begin{thebibliography}{9}
 \bibitem{fellegi1969}
@@ -406,6 +538,6 @@ During the preparation of this work the author used an AI coding and writing ass
 DeepSeek V4 Flash 0731 large language model) to assist with drafting and editing the
 manuscript and preparing the experiments. The tool was not listed as an author. The
 theoretical derivation and all reported results were reviewed and verified by the author,
-who takes full responsibility for the content.
+who takes full responsibility for the content, including any remaining errors and/or omissions.
 
 \end{document}

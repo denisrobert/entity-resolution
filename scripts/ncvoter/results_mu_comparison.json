@@ -1,0 +1,74 @@
+{
+  "parameters": {
+    "records_in_index": 3000,
+    "positive_queries": 1500,
+    "negative_queries": 1500,
+    "k": 20,
+    "threshold": 0.85,
+    "smoothing": 0.5,
+    "em_prior_fitted": 0.02307499325171883,
+    "data": "ncvoter (real) + synthetic mutations"
+  },
+  "variants": {
+    "untrained": {
+      "confusion_matrix": {
+        "TP": 1284,
+        "FN": 216,
+        "FP": 0,
+        "TN": 1500
+      },
+      "metrics": {
+        "accuracy": 0.928,
+        "precision": 1.0,
+        "recall": 0.856,
+        "specificity": 1.0,
+        "f1": 0.9224137931034483
+      }
+    },
+    "supervised": {
+      "confusion_matrix": {
+        "TP": 1340,
+        "FN": 160,
+        "FP": 2,
+        "TN": 1498
+      },
+      "metrics": {
+        "accuracy": 0.946,
+        "precision": 0.9985096870342772,
+        "recall": 0.8933333333333333,
+        "specificity": 0.9986666666666667,
+        "f1": 0.9429978888106967
+      }
+    },
+    "em": {
+      "confusion_matrix": {
+        "TP": 794,
+        "FN": 706,
+        "FP": 283,
+        "TN": 1217
+      },
+      "metrics": {
+        "accuracy": 0.6703333333333333,
+        "precision": 0.7372330547818013,
+        "recall": 0.5293333333333333,
+        "specificity": 0.8113333333333334,
+        "f1": 0.616220411331005
+      }
+    },
+    "em_prior0001": {
+      "confusion_matrix": {
+        "TP": 365,
+        "FN": 1135,
+        "FP": 0,
+        "TN": 1500
+      },
+      "metrics": {
+        "accuracy": 0.6216666666666667,
+        "precision": 1.0,
+        "recall": 0.24333333333333335,
+        "specificity": 1.0,
+        "f1": 0.3914209115281501
+      }
+    }
+  }
+}
