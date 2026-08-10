@@ -344,6 +344,25 @@ are unavailable, the evaluation mirrors the pipeline paper's protocol: positives
 mutated duplicates of records held in the index and negatives are mutated held-out records,
 scored at a fixed $\tau=0.85$ (Table~\ref{tab:real}).
 
+The jitter model applied to these real records uses fixed, reproducible parameters
+(seed $7$): each first and last name receives a one-character typo with probability $0.55$
+independently; an address, when present, is altered (house-number change or removal of the
+trailing city/state/zip) with probability $0.55$ and dropped entirely with probability
+$0.20$; and the birth year shifts by $\pm1$ with probability $0.10$. All other fields are
+left unchanged. These values are the default mutation rates of the companion repository's
+member generator, so the NC-voter table above is exactly reproducible.
+
+A caveat frames how far this validates the paradox on real data. The jitter model injects
+\emph{independent, algorithmically driven} noise into otherwise real records: it captures the
+field-level dependencies and value distributions of a genuine voter file, but the errors are
+uncorrelated across fields and over time. Organic duplicate records --- for example a person
+who re-registers after moving or changing name across annual voter-file snapshots --- exhibit
+\emph{temporally correlated} changes that a per-field perturbation cannot reproduce. A
+stronger validation would link rows of the same person across \emph{multiple years} of the
+historical file, where the ``noise'' is real re-registration behaviour rather than a model.
+That historical multi-year replication is a concrete next step; the present single-year
+results should be read as "real schema, synthetic errors," not as organic overflow.
+
 \begin{table}[h]
 \centering
 \caption{Mutated NC-voter resolution at fixed $\tau=0.85$ (3{,}000 in-index, 1{,}500
@@ -398,6 +417,22 @@ level probabilities toward uniform does not reverse that choice. We therefore re
 Laplace/Dirichlet smoothing as a variance remedy (and use it in our supervised estimator by
 default), but stress that it does not, by itself, close the paradox; the repair remains the
 joint $(\lambda,\tau)$ calibration of Section~\ref{sec:alg}.
+
+It is natural to ask whether a \emph{non-symmetric} Dirichlet prior --- different
+concentrations on the match and non-match probabilities, $\alpha_m\neq\alpha_u$ --- offers
+additional protection against the evidence residual. Algebraically it can: the decision
+depends only on the per-level ratio $m_k/u_k$ (via $w_k=\log_2(m_k/u_k)$), so shrinking
+$m$ and $u$ toward different targets changes the effective weights. In particular, raising
+the concentration on the \emph{mismatch} (else) level of $m$ more than that of $u$ dampens
+the learned $m$ of the partial-similarity levels, which is precisely the mechanism behind the
+residual of Section~\ref{sec:paradox}. However, two cautions apply from our experiments.
+First, symmetric smoothing already spans $\alpha\in\{0.5,5,50\}$ with negligible effect on
+F1, so any asymmetry would have to act strongly on the \emph{relative} shape of $m$ versus
+$u$ to matter, not merely on the overall concentration. Second, because $w_k$ depends only
+on the ratio, an asymmetric prior is operationally equivalent to a particular re-weighting of
+the comparison levels, and must be re-validated together with $\lambda$ and $\tau$ (the
+coherent-bundle rule). We therefore treat $\alpha_m\neq\alpha_u$ as an additional, principled
+but data-dependent lever rather than a default remedy.
 
 \begin{table}[h]
 \centering
