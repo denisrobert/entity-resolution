@@ -124,6 +124,9 @@ A practitioner declares the pair a match when the posterior reaches a threshold:
 \label{eq:decision}
 \end{equation}
 
+How $m$, $u$, and $\lambda$ are estimated --- supervised from labelled pairs or by
+expectation--maximisation when no labels exist --- is deferred to Appendix~\ref{app:estimation}.
+
 The three quantities in \eqref{eq:decision} and \eqref{eq:posterior} play different roles:
 \begin{description}
 \item[$m,u$] describe the \emph{evidence}: how discriminating agreement or disagreement on
@@ -567,6 +570,67 @@ Denis Robert.
 \newblock A two-stage entity resolution pipeline with FAISS blocking and Splink matching.
 \newblock Technical report, Independent Researcher, 2026.
 \end{thebibliography}
+
+\appendix
+
+\section{Estimation of $m$, $u$, and $\lambda$}
+\label{app:estimation}
+This appendix details how the three quantities of the decision rule
+\eqref{eq:decision} are obtained, when labelled pairs are available and when they are not.
+
+\subsection{Labeled estimation}
+Suppose a set of labelled candidate pairs is split into true matches ($M$-pairs) and
+non-matches ($U$-pairs). For a field with $K$ comparison levels, let $n_{k}^{M}$ and
+$n_{k}^{U}$ count the pairs observed at level $k$, and let $N_M=\sum_k n_k^M$ and
+$N_U=\sum_k n_k^U$. Under conditional independence the level probabilities are the
+relative frequencies
+\begin{equation}
+\hat m_k=\frac{n_k^{M}}{N_M},\qquad \hat u_k=\frac{n_k^{U}}{N_U}.
+\end{equation}
+With Laplace (Dirichlet) smoothing of concentration $\alpha$ (Section~\ref{sec:smoothing}),
+\begin{equation}
+\hat m_k=\frac{n_k^{M}+\alpha}{N_M+K\alpha},\qquad
+\hat u_k=\frac{n_k^{U}+\alpha}{N_U+K\alpha}.
+\end{equation}
+Non-symmetric versions use $\alpha_m$ and $\alpha_u$, respectively. The labelled sample also
+yields a prior estimate $\hat\lambda=N_M/(N_M+N_U)$ from the match rate among candidate
+pairs; this is the rate \emph{within the blocked candidate set} and, for a prior over
+random pairs, must be corrected by dividing by the blocking recall
+\cite{winkler2000}.
+
+\subsection{Expectation-maximisation (unlabeled) estimation}
+When no labels exist, the true match status of each candidate pair is a latent variable
+$z_i\in\{M,U\}$. The EM algorithm iterates:
+\begin{enumerate}
+\item[\textbf{E-step.}] Using current estimates $(\hat m,\hat u,\hat\lambda)$, compute the
+posterior probability that pair $i$ is a match from \eqref{eq:posterior}, equivalently from
+the log-odds decomposition \eqref{eq:logodds}.
+\item[\textbf{M-step.}] Re-estimate the level probabilities as \emph{expected} relative
+frequencies,
+\begin{equation}
+\hat m_k=\frac{\sum_{i}\mathbb E[ \mathbf 1_{\{z_i=M\}}]\mathbf 1_{\{k_i=k\}}}{N_M'},
+\end{equation}
+with $N_M'=\sum_i \mathbb E[\mathbf 1_{\{z_i=M\}}]$ a weighted total, and similarly for
+$u_k$; and update the prior as
+\begin{equation}
+\hat\lambda=\frac{1}{n}\sum_i\mathbb E[\mathbf 1_{\{z_i=M\}}],
+\end{equation}
+the expected match proportion among the $n$ candidate pairs. The cycle is repeated to a
+fixed point.
+\end{enumerate}
+
+Three remarks connect this to the paradox. First, the free estimate in the M-step reflects
+the \emph{blocked candidate} mix, not the random-pair base rate: candidate sets are drawn
+from records that already resemble each other, so $\hat\lambda$ drifts upward --- this is the
+source of the prior coupling of Section~\ref{sec:paradox}. Dividing by blocking recall, or
+holding $\lambda$ fixed at a prior estimate, corrects it. Second, only the ratios $m_k/u_k$
+enter the decision, and EM additionally fixes the overall scale relative to $\lambda$; both
+the scale and $\lambda$ jointly set the operating point, so neither can be changed
+independently of $\tau$. Third, richer estimators --- frequency-based refinement of $m/u$
+\cite{winkler2000}, or regularised and Bayesian variants of EM \cite{mclachlan2000} ---
+modify the M-step but leave the coupling of Section~\ref{sec:paradox} intact. The tandem
+calibration of Section~\ref{sec:alg} is the layer that reconciles whatever estimator is used
+with a chosen $\tau$.
 
 \section*{Use of Artificial Intelligence}
 During the preparation of this work the author used an AI coding and writing assistant (the
