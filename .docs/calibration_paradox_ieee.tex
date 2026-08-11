@@ -1,8 +1,6 @@
-\documentclass[11pt]{article}
+\documentclass[conference]{IEEEtran}
 
-\usepackage[margin=1in]{geometry}
 \usepackage[T1]{fontenc}
-\usepackage{lmodern}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{booktabs}
@@ -20,8 +18,7 @@
 }
 
 \title{The Calibration Paradox in Fellegi-Sunter Processes}
-\author{Denis Robert\\\small \textit{Independent Researcher}}
-\date{}
+\author{\IEEEauthorblockN{Denis Robert}\IEEEauthorblockA{\textit{Independent Researcher}}}
 
 \newcommand{\dd}{\,\mathrm{d}}
 
@@ -157,8 +154,10 @@ $b$ that is identical for every pair.
 Writing the decision threshold in the same units, $t=\mathrm{logit}_2(\tau)$, the decision
 rule \eqref{eq:decision} becomes
 \begin{equation}
-\text{match iff}\quad w(\gamma)\;\ge\;t-b\;=\;\log_2\frac{\tau}{1-\tau}
--\log_2\frac{\lambda}{1-\lambda}\;\;=:\;\;w_\tau^*(\lambda).
+\begin{split}
+\text{match iff}\quad w(\gamma)\;\ge\;t-b &=\; \log_2\frac{\tau}{1-\tau}-\log_2\frac{\lambda}{1-\lambda}\\
+&=:\; w_\tau^*(\lambda).
+\end{split}
 \label{eq:threshold}
 \end{equation}
 
@@ -292,7 +291,7 @@ Three parameter configurations are compared: (i) untrained defaults, with $\lamb
 and an ablation of (iii) with $\lambda$ reset to $10^{-4}$. Table~\ref{tab:benchmark}
 reports the outcome at the fixed decision threshold $\tau=0.85$.
 
-\begin{table}[h]
+\begin{table*}[t]
 \centering
 \caption{Duplicate-bearing benchmark (100{,}000 base records, 6{,}000 queries,
 $\tau=0.85$). The trained configurations degrade F1 at the fixed threshold; the EM model
@@ -307,7 +306,7 @@ Supervised ($m/u$, $\lambda$ fixed) & 75.1\% & 98.5\% & 67.3\% & 85.2\% & $10^{-
 EM (free prior) & 56.9\% & 98.3\% & 25.4\% & 72.1\% & $7.2\times10^{-3}$\\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 The free-prior EM configuration is the clearest quantitative instance of the paradox: the
 same model that recovered a fraction of the unweighted prior's recall errors collapsed
@@ -326,7 +325,7 @@ its joint optimum ($0.955$) stays below the untrained optimum ($0.997$). This is
 prediction of Section~\ref{sec:paradox}: prior coupling is removed by sweeping, but the
 genuine $m/u$ residual remains.
 
-\begin{table}[h]
+\begin{table*}[t]
 \centering
 \caption{Joint F1 over $(\lambda,\tau)$ for untrained and EM configurations on the
 duplicate-bearing population. Entries are F1 (percent).}
@@ -342,7 +341,7 @@ $10^{-3}$ & 97.1 & 97.1 & 81.7 & 84.7 &\\
 $10^{-2}$ & 95.8 & 96.4 & 81.0 & 81.4 &\\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 \subsection{Real-data validation on NC-voter}
 \label{sec:real}
@@ -398,7 +397,7 @@ which is the essence of Mechanism~2.
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=0.86\textwidth]{figures/paradox_mech1.png}
+\includegraphics[width=\columnwidth]{figures/paradox_mech1.png}
 \caption{Mechanism 1 (prior coupling) on NC-voter in posterior log-odds. The decision
 threshold is fixed at $t=\log_2\frac{\tau}{1-\tau}=2.50$ bits; the EM-estimated prior
 $\lambda\approx0.023$ shifts the non-match distribution up by $\Delta b\approx7.9$ bits
@@ -409,7 +408,7 @@ Prior coupling is secondary here to the Mechanism 2 recall collapse.}
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=0.86\textwidth]{figures/paradox_mech2.png}
+\includegraphics[width=\columnwidth]{figures/paradox_mech2.png}
 \caption{Mechanism 2 (evidence shift) on NC-voter, $\lambda$ fixed at $10^{-4}$. Top panel:
 untrained $m/u$ (match in green, non-match in grey); bottom panel: EM $m/u$ (match in blue,
 non-match in orange). The EM-fitted weights move the match distribution sharply left
@@ -434,7 +433,7 @@ $(m/u,\lambda,\tau)$, and the same tandem calibration repair (Section~\ref{sec:a
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=0.86\textwidth]{figures/paradox_mech1_synth.png}
+\includegraphics[width=\columnwidth]{figures/paradox_mech1_synth.png}
 \caption{Mechanism 1 on the synthetic duplicate-bearing benchmark (posterior log-odds).
 Threshold fixed at $t=2.50$ bits; EM's fitted prior $\lambda\approx0.0069$ shifts the
 non-match distribution up by $\Delta b\approx6.1$ bits, admitting about 11 non-match pairs
@@ -444,7 +443,7 @@ in the shaded band.}
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=0.86\textwidth]{figures/paradox_mech2_synth.png}
+\includegraphics[width=\columnwidth]{figures/paradox_mech2_synth.png}
 \caption{Mechanism 2 on the synthetic duplicate-bearing benchmark (top: untrained $m/u$;
 bottom: EM $m/u$). The EM weights \emph{raise} match weights (median $17\to24$) and
 \emph{lower} non-match weights ($-25\to-38$), widening the gap rather than collapsing it, so
@@ -452,7 +451,7 @@ Mechanism~2 is not the dominant failure on this data set.}
 \label{fig:mech2-synth}
 \end{figure}
 
-\begin{table}[h]
+\begin{table*}[t]
 \centering
 \caption{Mutated NC-voter resolution at fixed $\tau=0.85$ (3{,}000 in-index, 1{,}500
 positive, 1{,}500 negative queries). Date-of-birth and email comparisons are unavailable.}
@@ -467,7 +466,7 @@ EM (free prior) & 73.7\% & 52.9\% & 81.1\% & 61.6\% \\
 EM, prior reset to $10^{-4}$ & 100.0\% & 24.3\% & 100.0\% & 39.1\% \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 Two findings qualify the synthetic result. First, on this harder real schema supervised
 calibration does \emph{help}: it raises recall (85.6\% to 89.3\%) at virtually no cost to
@@ -661,7 +660,7 @@ Denis Robert.
 \newblock Technical report, Independent Researcher, 2026.
 \end{thebibliography}
 
-\appendix
+\begin{appendices}
 
 \section{Estimation of $m$, $u$, and $\lambda$}
 \label{app:estimation}
@@ -721,6 +720,8 @@ independently of $\tau$. Third, richer estimators --- frequency-based refinement
 modify the M-step but leave the coupling of Section~\ref{sec:paradox} intact. The tandem
 calibration of Section~\ref{sec:alg} is the layer that reconciles whatever estimator is used
 with a chosen $\tau$.
+
+\end{appendices}
 
 \section*{Use of Artificial Intelligence}
 During the preparation of this work the author used an AI coding and writing assistant (the

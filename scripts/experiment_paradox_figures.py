@@ -126,32 +126,44 @@ def run_weights(query_records, candidate_records, settings, base_pos_by_qid):
     return np.asarray(match_w), np.asarray(nonmatch_w)
 
 
-def wstar(tau, lam):
+def bias(lam):
     import math
-    return math.log2(tau / (1 - tau)) - math.log2(lam / (1 - lam))
+    return math.log2(lam / (1 - lam))
 
 
-def plot_mech1(match_w, nonmatch_w, w0, w1, lam0, lam1, admitted, out):
+def logit2(p):
+    import math
+    return math.log2(p / (1 - p))
+
+
+def plot_mech1(match_w, nonmatch_w, t, delta_b, lam0, lam1, admitted, out):
     fig, ax = plt.subplots(figsize=(7.2, 4.0))
-    ax.hist(nonmatch_w, bins=80, range=(-40, 30), density=True, alpha=0.55, color="#c0392b",
-            label="non-match pairs")
-    ax.hist(match_w, bins=80, range=(-40, 30), density=True, alpha=0.6, color="#27ae60",
-            label="match pairs")
+    allw = np.concatenate([match_w, nonmatch_w, nonmatch_w + delta_b])
+    xmin, xmax = float(allw.min()), float(allw.max())
+    ax.hist(nonmatch_w, bins=80, range=(xmin, xmax), density=True, alpha=0.5,
+            color="#7f8c8d", label="non-match (default $\\lambda$)")
+    ax.hist(match_w, bins=80, range=(xmin, xmax), density=True, alpha=0.6,
+            color="#27ae60", label="match pairs")
+    ax.hist(nonmatch_w + delta_b, bins=80, range=(xmin, xmax), density=True, alpha=0.5,
+            color="#e67e22", label="non-match (inflated $\\lambda$, +$\\Delta b$)")
     ytop = ax.get_ylim()[1]
-    ax.axvline(w0, color="k", ls="--", lw=1.5, label=f"$w_\\tau^*$ (default $\\lambda$)")
-    ax.axvline(w1, color="k", ls=":", lw=1.5, label=f"$w_\\tau^*$ (EM prior)")
-    if w1 < w0:
-        ax.axvspan(w1, w0, color="0.5", alpha=0.18)
-        ax.annotate(f"non-match mass is below both\nthresholds: admits {admitted:,} false positives\n(prior coupling benign when separated)",
-                    xy=(min(w0, w1) + 0.4, ytop * 0.9), fontsize=8)
-    ax.set_xlabel("match weight $w=\\log_2(m/u)$ (bits)")
+    ax.axvline(t, color="k", ls="--", lw=1.5, label="fixed threshold $t$")
+    if delta_b > 0:
+        ax.axvspan(t - delta_b, t, color="0.5", alpha=0.18)
+        ax.annotate(
+            f"inflated $\\lambda$ shifts non-matches up by\n"
+            f"$\\Delta b\\approx{delta_b:.1f}$ bits; admits {admitted:,} above $t$",
+            xy=(xmin + 0.02 * (xmax - xmin), ytop * 0.97), ha="left", va="top", fontsize=8,
+            bbox=dict(facecolor="white", alpha=0.85, edgecolor="none", pad=2),
+        )
+    ax.set_xlabel("match weight (posterior log-odds, bits)")
     ax.set_ylabel("density")
     ax.set_title(f"Mechanism 1 — prior coupling ($\\lambda$: {lam0:.0e} $\\rightarrow$ {lam1:.2f})")
-    ax.legend(fontsize=8)
+    ax.legend(fontsize=8, loc="upper right")
     fig.tight_layout(); fig.savefig(out, dpi=DPI, bbox_inches="tight"); plt.close(fig)
 
 
-def plot_mech2(match_unt, match_em, nonmatch_unt, nonmatch_em, w0, out):
+def plot_mech2(match_unt, match_em, nonmatch_unt, nonmatch_em, t, out):
     allw = np.concatenate([match_unt, match_em, nonmatch_unt, nonmatch_em])
     xmin, xmax = float(allw.min()), float(allw.max())
     fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(7.2, 5.2))
@@ -159,7 +171,7 @@ def plot_mech2(match_unt, match_em, nonmatch_unt, nonmatch_em, w0, out):
              color="#7f8c8d", label="non-match")
     ax1.hist(match_unt, bins=80, range=(xmin, xmax), density=True, alpha=0.6,
              color="#27ae60", label="match")
-    ax1.axvline(w0, color="k", ls="--", lw=1.4)
+    ax1.axvline(t, color="k", ls="--", lw=1.4)
     ax1.set_ylabel("density (untrained $m/u$)")
     ax1.legend(fontsize=8, loc="upper right")
 
@@ -167,9 +179,9 @@ def plot_mech2(match_unt, match_em, nonmatch_unt, nonmatch_em, w0, out):
              color="#e67e22", label="non-match")
     ax2.hist(match_em, bins=80, range=(xmin, xmax), density=True, alpha=0.6,
              color="#2980b9", label="match")
-    ax2.axvline(w0, color="k", ls="--", lw=1.4)
+    ax2.axvline(t, color="k", ls="--", lw=1.4)
     ax2.set_ylabel("density (EM $m/u$)")
-    ax2.set_xlabel("match weight $w=\\log_2(m/u)$ (bits)")
+    ax2.set_xlabel("match weight (posterior log-odds, bits)")
     ax2.legend(fontsize=8, loc="upper right")
 
     ax1.set_title("Mechanism 2 — evidence shift/$\\lambda$ fixed", fontsize=11)
@@ -210,16 +222,16 @@ def run(args):
     match_unt, nonmatch_unt = run_weights(qr, cr, untrained, base_pos_by_qid)
     match_em, nonmatch_em = run_weights(qr, cr, em_0001, base_pos_by_qid)
 
-    w0 = wstar(args.threshold, args.prior_default)
+    t = logit2(args.threshold)
     lam1 = args.prior_inflated if args.prior_inflated is not None else em_trained["probability_two_random_records_match"]
-    w1 = wstar(args.threshold, lam1)
-    admitted = int(((nonmatch_unt > w1) & (nonmatch_unt <= w0)).sum())
+    delta_b = bias(lam1) - bias(args.prior_default)
+    admitted = int(((nonmatch_unt >= t - delta_b) & (nonmatch_unt < t)).sum()) if delta_b > 0 else 0
     out = Path(args.out_dir); out.mkdir(parents=True, exist_ok=True)
     suffix = "" if args.dataset == "ncvoter" else "_synth"
     f1 = out / f"paradox_mech1{suffix}.png"
     f2 = out / f"paradox_mech2{suffix}.png"
-    plot_mech1(match_unt, nonmatch_unt, w0, w1, args.prior_default, lam1, admitted, f1)
-    plot_mech2(match_unt, match_em, nonmatch_unt, nonmatch_em, w0, f2)
+    plot_mech1(match_unt, nonmatch_unt, t, delta_b, args.prior_default, lam1, admitted, f1)
+    plot_mech2(match_unt, match_em, nonmatch_unt, nonmatch_em, t, f2)
 
     def _sum(ws, name):
         return {"name": name, "mean": round(float(np.mean(ws)), 1),
@@ -230,8 +242,7 @@ def run(args):
     summary = {
         "dataset": args.dataset, "tau": args.threshold, "prior_default": args.prior_default,
         "prior_em_fitted": em_trained.get("probability_two_random_records_match"),
-        "w0_bits": round(w0, 2), "w1_bits": round(w1, 2),
-        "delta_bits": round(w1 - w0, 2),
+        "t_bits": round(t, 2), "delta_b_bits": round(delta_b, 2),
         "admitted_nonmatches_in_band": admitted,
         "weight_distributions": {
             "match_untrained": _sum(match_unt, "match_untrained"),
