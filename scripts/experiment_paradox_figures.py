@@ -45,6 +45,7 @@ import pandas as pd  # noqa: E402
 import splink  # noqa: E402
 
 import ncvoter_util  # noqa: E402
+import metrics  # noqa: E402
 from common import build_batch, to_link_settings  # noqa: E402
 from entity_pipeline import (  # noqa: E402
     Blocker,
@@ -112,6 +113,7 @@ def run_weights(query_records, candidate_records, settings, base_pos_by_qid):
     )
     preds = linker.inference.predict(threshold_match_probability=0.0).as_pandas_dataframe()
     match_w, nonmatch_w = [], []
+    y, p = [], []
     for _, row in preds.iterrows():
         right = str(row["unique_id_r"])
         left = str(row["unique_id_l"])
@@ -122,8 +124,11 @@ def run_weights(query_records, candidate_records, settings, base_pos_by_qid):
             pos = int(m.group(1))
         is_match = (base is not None) and (pos in base)
         w = float(row["match_weight"])
+        prob = float(row["match_probability"])
         (match_w if is_match else nonmatch_w).append(w)
-    return np.asarray(match_w), np.asarray(nonmatch_w)
+        y.append(1.0 if is_match else 0.0)
+        p.append(prob)
+    return np.asarray(y), np.asarray(p), np.asarray(match_w), np.asarray(nonmatch_w)
 
 
 def bias(lam):
@@ -219,8 +224,8 @@ def run(args):
     em_0001 = dict(em)
     em_0001["probability_two_random_records_match"] = 1e-4
 
-    match_unt, nonmatch_unt = run_weights(qr, cr, untrained, base_pos_by_qid)
-    match_em, nonmatch_em = run_weights(qr, cr, em_0001, base_pos_by_qid)
+    y_unt, p_unt, match_unt, nonmatch_unt = run_weights(qr, cr, untrained, base_pos_by_qid)
+    y_em, p_em, match_em, nonmatch_em = run_weights(qr, cr, em_0001, base_pos_by_qid)
 
     t = logit2(args.threshold)
     lam1 = args.prior_inflated if args.prior_inflated is not None else em_trained["probability_two_random_records_match"]
@@ -249,6 +254,10 @@ def run(args):
             "match_em": _sum(match_em, "match_em"),
             "nonmatch_untrained": _sum(nonmatch_unt, "nonmatch_untrained"),
             "nonmatch_em": _sum(nonmatch_em, "nonmatch_em"),
+        },
+        "metrics": {
+            "untrained": metrics.summarize(y_unt, p_unt, args.threshold),
+            "em": metrics.summarize(y_em, p_em, args.threshold),
         },
         "n_match_pairs": len(match_unt), "n_nonmatch_untrained": len(nonmatch_unt),
         "n_nonmatch_em": len(nonmatch_em),

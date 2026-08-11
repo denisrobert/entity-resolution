@@ -584,6 +584,50 @@ EM, best F1 & 0.96 & 0.91 & 0.81 \\
 \end{tabular}
 \end{table}
 
+\subsection{Additional metrics: calibration, discrimination, and cost}
+\label{sec:metrics}
+F1 at a single threshold does not separate ranking discrimination from probabilistic
+calibration, nor does it reflect asymmetric false-positive/false-negative costs. We therefore
+report three further quantities, evaluated pairwise over the blocked candidate pairs (which
+is consistent with these metrics, and complements the query-level confusion matrices above):
+the \emph{Brier score} (mean squared error of the match probability
+$\frac1n\sum_i(p_i-y_i)^2$), the \emph{Average Precision} (area under the precision--recall
+curve, a threshold-free measure of how well matches are ranked above non-matches), and the
+\emph{expected decision cost} at the unit-cost-optimal threshold
+$\tau^*=C_{FP}/(C_{FP}+C_{FN})$, together with pairwise F1 (Table~\ref{tab:metrics}).
+Lower Brier and cost are better; higher Average Precision is better.
+
+\begin{table}[h]
+\centering
+\caption{Pairwise evaluation metrics (untrained vs.\ EM) on both data sets. Brier and
+expected cost: lower is better; Average Precision: higher is better.}
+\label{tab:metrics}
+\begin{tabular}{lcccc}
+\toprule
+ & \multicolumn{2}{c}{NC-voter} & \multicolumn{2}{c}{Synthetic} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+Metric & Untrained & EM & Untrained & EM \\
+\midrule
+Brier & 0.0009 & 0.0157 & 0.0254 & 0.0511 \\
+Average Precision & 0.997 & 0.440 & 0.367 & 0.487 \\
+F1 (pairwise) & 0.978 & 0.428 & 0.634 & 0.540 \\
+Expected cost & 0.0009 & 0.0163 & 0.0250 & 0.0367 \\
+$\tau^*$ (unit cost) & 0.81 & 0.07 & 0.93 & 1.00 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+On the NC-voter file the EM fit is worse on every quantity --- calibration (Brier
+$0.0009\to0.0157$), discrimination (Average Precision $0.997\to0.440$), pairwise F1, and
+expected cost --- consistent with the Mechanism~2 evidence collapse. On the synthetic
+benchmark the picture is the precise mirror that exposes the paradox: EM \emph{improves}
+ranking discrimination (Average Precision $0.367\to0.487$) while it \emph{worsens}
+calibration (Brier $0.0254\to0.0511$) and, at the fixed $\tau$, pairwise F1
+($0.634\to0.540$) and expected cost ($0.0250\to0.0367$, with the unit-cost-optimal threshold
+moving from $0.93$ to $1.00$). Training can therefore sharpen how well the score ranks
+matches above non-matches while still degrading the calibrated, operational outcome --- the
+calibration paradox quantified with a metric that separates ranking from calibration.
+
 \section{Related work}
 The Fellegi--Sunter model \cite{fellegi1969} already framed linkage as a decision problem
 with error-rate targets, and Winkler's line of work formalised optimal decision rules and
