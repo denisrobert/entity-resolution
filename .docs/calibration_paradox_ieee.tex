@@ -283,7 +283,9 @@ Fellegi--Sunter scorer (Splink) using Jaro--Winkler comparisons for names and ad
 date-of-birth comparison, and an email comparison. All experiments were run across a
 100{,}000-record base population with a 3\% duplicate-bearing augmentation, producing
 6{,}000 labelled queries (positives are near-duplicate variants, negatives are held-out
-records).
+records). Training and weight computation are performed over the \emph{blocked} candidate
+pairs (the top--$k$ cosine neighbours), so all fitted $m/u$, $\lambda$, and the reported
+weight distributions are candidate-space quantities (Appendix~\ref{app:estimation}).
 
 Three parameter configurations are compared: (i) untrained defaults, with $\lambda=10^{-4}$;
 (ii) supervised calibration of $m/u$ from the labelled duplicate pairs, $\lambda=10^{-4}$;
@@ -707,6 +709,15 @@ $u_k$; and update the prior as
 the expected match proportion among the $n$ candidate pairs. The cycle is repeated to a
 fixed point.
 \end{enumerate}
+
+Note that in this pipeline EM is run on the comparison vectors of the \emph{blocked
+candidate pairs} --- the top-$k$ nearest neighbours of each record --- not on all possible
+pairs. The algorithm treats these pairs as given, so the fitted $u$ and $\lambda$ are
+\emph{candidate-space} quantities: the non-match component is dominated by near-collisions
+that resemble true matches, which is precisely why the fitted classes overlap and reproduce a
+narrow gap. This is a property of the input candidate set, not of the EM update itself; when
+a random-pair prior is required, the blocking-adjusted prior of Section~\ref{sec:alg}
+converts $\lambda$ accordingly.
 
 Three remarks connect this to the paradox. First, the free estimate in the M-step reflects
 the \emph{blocked candidate} mix, not the random-pair base rate: candidate sets are drawn
