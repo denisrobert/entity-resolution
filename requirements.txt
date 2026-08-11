@@ -12,6 +12,9 @@ splink>=4.0.0
 faker>=24.0.0
 pandas>=2.0.0
 
+# Graphics
+matplotlib>=3.11.1
+
 # Utilities
 tqdm>=4.66.0
 python-dotenv>=1.0.0

@@ -6,6 +6,7 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{booktabs}
+\usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{xcolor}
 
@@ -206,15 +207,20 @@ usually worse, region of the precision--recall curve. We label this \emph{prior 
 the prior and the threshold must move together.
 
 \subsection{Mechanism 2: the evidence residual}
-Even with the prior frozen ($b'=b$), retraining $m/u$ can perturb the distribution of
-weights. Supervised calibration on labelled duplicates, or EM on a population that contains
-such duplicates, tends to assign higher $m$ to the \emph{partial-similarity} levels
-(e.g.\ an exact first-name match with a small edit on the last name, or a near-matching
-address). These partial levels are exactly the ones that many \emph{non-match} pairs also
-occupy, so a higher $m$ there raises $w_k$ for those levels. Non-match pairs therefore move
-\emph{right} in the weight distribution, increasing the density of non-matches near the
-decision boundary. For a fixed threshold $\tau$ this lowers precision and specificity
-(extra false positives), even though the evidence model is arguably ``more accurate.''
+Even with the prior frozen ($b'=b$), retraining $m/u$ can reduce the separability of the
+match and non-match weight distributions. The mechanism is a change in which levels are
+rewarded. Supervised calibration on labelled duplicates, or EM on a population that contains
+such duplicates, re-fits the level probabilities; the outcome is a redistribution of the
+weights $w_k$ that moves the match and non-match populations \emph{toward} each other. Two
+symptoms arise. On the synthetic benchmark the trained model assigns higher $m$ to the
+\emph{partial-similarity} levels (e.g.\ an exact first-name match with a small edit on the
+last name, or a near-matching address), which many non-match pairs also occupy, so the
+non-match distribution moves \emph{right}. On the real NC-voter file the dominant symptom is
+the opposite sign: EM under-weights true-match agreement, so the match distribution moves
+\emph{left} and collapses toward the non-match mass. In either case the refitted $m/u$ narrow
+the separating gap, increasing the density of non-match (or near-boundary) weight that a
+threshold at~$w_\tau^*$ cannot separate. The sign of the shift is therefore data-dependent;
+the invariant is the loss of separability.
 
 We call this the \emph{genuine residual}: it survives prior anchoring, and in our data it
 keeps even the jointly re-optimised trained model slightly below the untrained defaults.
@@ -365,6 +371,84 @@ stronger validation would link rows of the same person across \emph{multiple yea
 historical file, where the ``noise'' is real re-registration behaviour rather than a model.
 That historical multi-year replication is a concrete next step; the present single-year
 results should be read as "real schema, synthetic errors," not as organic overflow.
+
+Figure~\ref{fig:mech1} (top) depicts Mechanism~1 on these data: with the evidence $m/u$
+(weights) held fixed at the untrained values, using the prior that EM estimates on the data
+($\lambda\approx0.023$) instead of the default $10^{-4}$ lowers the effective threshold by
+about $7.9$ bits (from $w_\tau^*=15.8$ to $7.9$ bits). Crucially, on this real file the
+non-match weight distribution is far below both thresholds (its upper tail is $\approx
+-18$ bits), while match pairs lie at $\approx +3$ to $+20$ bits. The shaded band between the
+two thresholds therefore admits essentially \emph{no} non-matches: prior coupling is benign
+here precisely because the weight distributions are well separated. This is informative in
+itself: the prior-coupling failure of Section~\ref{sec:paradox} manifests only when match
+and non-match weights overlap near the decision boundary --- as they do in the synthetic
+duplicate-bearing benchmark (Section~\ref{sec:emp}) where re-anchoring the prior recovered a
+large part of EM's lost F1. Figure~\ref{fig:mech2} (bottom) depicts Mechanism~2 on these data: with the prior fixed,
+the EM-fitted $m/u$ collapse the true-match distribution sharply to the left (median
+$12.7\to-8$ bits) while the non-match distribution moves only modestly ($-28\to-24$ bits),
+narrowing the gap between the two populations. The dominant direction on this schema is
+match weights being scored \emph{downward}, not upward: EM under-weights true-match
+agreement, so real matches fall toward non-match territory and recall collapses ($0.856$
+to $0.529$), with additional precision loss. The observed direction of the shift is
+data-dependent --- on the synthetic benchmark the residual manifested as
+over-weighted partial-similarity levels; on the real file the symptom is the opposite sign,
+true matches being awarded too little weight --- but in both cases the refitted $m/u$ reduce
+separability, which is the essence of Mechanism~2.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.86\textwidth]{figures/paradox_mech1.png}
+\caption{Mechanism 1 (prior coupling) on NC-voter: fixed $m/u$; using the EM-estimated prior
+$\lambda\approx0.023$ shifts $w_\tau^*$ from $15.8$ to $7.9$ bits. The non-match weight mass
+lies below both thresholds (upper tail $\approx-18$ bits), so the shaded band admits no
+non-matches: prior coupling is benign when the weight distributions are separated.}
+\label{fig:mech1}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.86\textwidth]{figures/paradox_mech2.png}
+\caption{Mechanism 2 (evidence shift) on NC-voter, $\lambda$ fixed at $10^{-4}$. Top panel:
+untrained $m/u$ (match in green, non-match in grey); bottom panel: EM $m/u$ (match in blue,
+non-match in orange). The EM-fitted weights move the match distribution sharply left
+(median $12.7\to-8$ bits) while the non-match distribution moves only slightly right
+($-28\to-24$), closing the separating gap; recall collapses as true matches are scored
+toward non-match territory. Dashed line: $w_\tau^*$.}
+\label{fig:mech2}
+\end{figure}
+
+For comparison, Figures~\ref{fig:mech1-synth} and~\ref{fig:mech2-synth} repeat the two
+mechanisms on the synthetic duplicate-bearing benchmark of Section~\ref{sec:emp}, where the
+paradox is measured. The EM-fitted prior is smaller there ($\lambda\approx0.0069$), moving
+$w_\tau^*$ from $15.8$ to $9.7$ bits, and only a handful of non-matches ($\approx10$) lie in
+the shifted band. More tellingly, the EM $m/u$ \emph{increase} the match weights (median
+$17\to25$ bits) and \emph{decrease} the non-match weights ($-25\to-27$), i.e.\ they \emph{widen}
+the separating gap in weight space rather than collapse it. The synthetic degradation is thus
+driven by Mechanism~1 (prior coupling) --- consistent with re-anchoring the prior recovering
+most of EM's lost F1 --- rather than by a weight collapse. This contrast is the central
+takeaway of the section: the \emph{dominant mechanism is data-dependent} (prior coupling on
+the synthetic benchmark, evidence shift on NC-voter), yet in both cases the failure is a
+mismatch among the bundle $(m/u,\lambda,\tau)$, and the same tandem calibration repair
+(Section~\ref{sec:alg}) applies.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.86\textwidth]{figures/paradox_mech1_synth.png}
+\caption{Mechanism 1 on the synthetic duplicate-bearing benchmark (fixed $m/u$). Using EM's
+fitted prior $\lambda\approx0.0069$ shifts $w_\tau^*$ from $15.8$ to $9.7$ bits; only about
+10 non-matches lie in the shaded band.}
+\label{fig:mech1-synth}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.86\textwidth]{figures/paradox_mech2_synth.png}
+\caption{Mechanism 2 on the synthetic duplicate-bearing benchmark, $\lambda$ fixed (top:
+untrained $m/u$; bottom: EM $m/u$). The EM weights \emph{raise} match weights and
+\emph{lower} non-match weights, widening the gap --- so Mechanism~2 is not the dominant
+failure on this data set; prior coupling is.}
+\label{fig:mech2-synth}
+\end{figure}
 
 \begin{table}[h]
 \centering
