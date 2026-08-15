@@ -332,6 +332,37 @@ a changed address does not pull a true duplicate out of the canopy. The concrete
 data-dependent and should be evaluated with the same cheap-phase-recall protocol used here,
 on the actual address distribution of the deployment.
 
+\subsection{Field-position sensitivity of the embedding}
+A related question is whether the \emph{ordering} of fields inside the serialized row affects
+the embedding's canopy behaviour --- that is, whether fields earlier in the string carry more
+weight than later ones. We probed this with a dedicated script,
+\texttt{experiment\_field\_ordering.py}, using three measurements.
+
+First, a \emph{positional gradient}: a fixed-content probe sentence plus a single unique
+marker token moved to each position was embedded and compared with a no-marker baseline. The
+cosine distance of the marker is strongly front-loaded --- $0.083$ at position~0 versus roughly
+$0.012$ mid-string --- then plateaus, with only a small rise at the final position. Earlier
+fields are therefore more weighty, but the effect is confined to the first couple of tokens
+rather than increasing monotonically across the whole string. This is consistent with the
+mean-pooled, positionally-embedded architecture of all-MiniLM-L6-v2.
+
+Second, a \emph{permutation-invariance} index: for records with all five fields present, the
+mean pairwise cosine across ~24 field orderings of the same record is $0.973$. Reordering thus
+moves the embedding by roughly $2.7\%$ --- a real but modest perturbation, smaller than the
+token-level gradient, because whole labeled fields saturate attention less than isolated
+tokens.
+
+Third, the \emph{canopy impact}: re-embedding the reference population under several orderings
+and clustering each with the same canopy parameters ($C=128$, $m=2$) changes cheap-phase recall
+of the varied twins in a measurable but bounded way. Leading with the long, discriminative
+\emph{address} field recovered the most twins ($0.978$, 88/90) at the \emph{lowest} candidate
+budget; the default order recovered $0.944$ (85/90); and \emph{identity-first} recovered the
+fewest ($0.922$, 83/90). Field ordering is therefore a small, mostly free lever on cheap-phase
+recall --- but this result is data-dependent, here favouring the field that is most informative
+on this population, and it sits within the embedding-recoverability ceiling discussed above.
+As with any embedding choice, the winning order should be selected on deployment data with the
+same cheap-phase-recall protocol, not assumed generally.
+
 \subsection{Calibration caveat from the companion work}
 The companion Calibration Paradox paper~\cite{paradox} shows that refitting Fellegi--Sunter
 parameters on resemblance-selected candidate pairs inflates the fitted prior: candidate sets
