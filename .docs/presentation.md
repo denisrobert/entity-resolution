@@ -225,6 +225,8 @@ Retraining the match model (`m/u`) made results **worse**, not better.
 1. **Prior coupling (dominant):** EM's fitted prior (0.0072 vs 0.0001) shifts all scores up → mass false positives. Pinning the prior raises EM's F1 from ~0.86 to ~0.95–0.97.
 2. **A genuine residual:** even with the prior pinned, trained `m/u` stay below defaults (supervised 94.4% vs untrained 98.1%; EM optimum 95.5%) by over-weighting partial matches.
 
+> EM training generates candidate pairs by exact-equality blocking on two keys: `first_name` and `date_of_birth` (`block_on("first_name")`, `block_on("date_of_birth")`).
+
 > **Rule:** the default config is a coherent bundle (weights + prior + `τ`). Change any part and re-validate **all three** on held-out data.
 
 The fix is a recipe, not a guess: **anchor the prior** (default or blocking-adjusted), fit `m/u` with the prior pinned, then **tune `τ` jointly**, with a score-shift guard. Full algorithm: **Appendix — Tuning the Match Prior**.

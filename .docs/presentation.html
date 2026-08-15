@@ -251,6 +251,9 @@ is at or above a threshold <strong><code>τ</code></strong>. One number encodes 
 <li><strong>A genuine residual:</strong> even with the prior pinned, trained <code>m/u</code> stay below defaults (supervised 94.4% vs untrained 98.1%; EM optimum 95.5%) by over-weighting partial matches.</li>
 </ol>
 <blockquote>
+<p>EM training generates candidate pairs by exact-equality blocking on two keys: <code>first_name</code> and <code>date_of_birth</code> (<code>block_on(&quot;first_name&quot;)</code>, <code>block_on(&quot;date_of_birth&quot;)</code>).</p>
+</blockquote>
+<blockquote>
 <p><strong>Rule:</strong> the default config is a coherent bundle (weights + prior + <code>τ</code>). Change any part and re-validate <strong>all three</strong> on held-out data.</p>
 </blockquote>
 <p>The fix is a recipe, not a guess: <strong>anchor the prior</strong> (default or blocking-adjusted), fit <code>m/u</code> with the prior pinned, then <strong>tune <code>τ</code> jointly</strong>, with a score-shift guard. Full algorithm: <strong>Appendix — Tuning the Match Prior</strong>.</p>
