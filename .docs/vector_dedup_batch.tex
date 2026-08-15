@@ -332,6 +332,82 @@ a changed address does not pull a true duplicate out of the canopy. The concrete
 data-dependent and should be evaluated with the same cheap-phase-recall protocol used here,
 on the actual address distribution of the deployment.
 
+\subsection{Address fluidity over time}
+A further, distinct reason the address is a fragile blocking signal is that it is \emph{time
+limited}: unlike a date of birth, which is invariant, the address changes with the entity's
+movement, and it does so in an uncontrolled way. The informativeness of the address therefore
+depends on the age gap between the two records, not only on how it was written. Within a short
+window (two records created close together at the same address, e.g.\ under the typical
+residency period of roughly a decade) the address is stable and highly informative. Once
+records are separated by more than that window --- the same entity who has since \emph{moved} ---
+the address no longer agrees, and blocking on it becomes actively harmful: the address equality
+that would bind two stable-at-a-standstill records is absent, and a true duplicate with a
+changed address may fall out of a small $k$. Email is more stable than the address across time,
+and names change only in controlled ways (nicknames, abbreviations, marriage), so date of birth
+and normalized name remain the reliable invariant keys across long gaps.
+
+We measure this with a dedicated script, \texttt{experiment\_temporal\_gap.py}, which creates
+duplicate pairs at a controlled age gap: for a ``short'' gap the duplicate keeps the same
+address (stable), and for a ``long'' gap (beyond the residency window) the duplicate has
+integrally \emph{moved} to a different address while retaining name, date of birth, and email.
+Table~\ref{tab:temporal-recall} reports top-$k$ recall (MiniLM, 6{,}000-record base, 180
+pairs). In the short gap the ``full`` and ``identity`` views already reach $1.0$ at $k{=}1$;
+in the long gap the \emph{contact} (address + email) view collapses to $0.22$ while the
+\emph{identity} view (first, last, date of birth) stays at $1.0$.
+
+The \emph{gap-weighted} view shows the recommended resolution. Instead of a hard
+recent/beyond-residency cutoff, it ages the address \emph{continuously}: the identity and
+address vectors are each embedded and searched, and the candidate re-ranking is
+\begin{equation}
+\text{combined} = s_{\text{identity}} + w(\Delta t)\,s_{\text{address}},\qquad
+w(\Delta t)=e^{-\Delta t/T},
+\label{eq:gapweight}
+\end{equation}
+where $\Delta t$ is the age gap between the two records and $T$ the residency timescale
+(here 10 years). The identity score always counts at full weight; the address score is
+down-weighted exponentially as records age apart, so an old address cannot drag a true
+long-gap duplicate below top-$k$ while it still boosts recent pairs. This is a smooth
+generalisation of the binary rule, and the address weight is applied at \emph{score-fusion
+time} (after retrieval, where the pair-wise gap is known) rather than baked into a single
+precomputed vector. In the long gap the gap-weighted view recovers to $1.0$ by $k{=}5$ and
+to $0.99$ already at $k{=}1$ (Table~\ref{tab:temporal-recall}), matching the robust
+all-identity result while still exploiting the address for recent records. The cost is a
+small $k{=}1$ penalty in the short gap ($0.91$ versus the ``full`` view's $1.00$), because
+at $k{=}1$ the fused ranking can surface a single address-similar but identity-different
+record ahead of the true mate; by $k{\gtrsim}5$ the penalty disappears and recall is $1.0$.
+For the working $k$ range (10--20) the gap-weighted view is therefore uniformly the best
+choice among the single-vector alternatives.
+
+\begin{table}[h]
+\centering
+\caption{Top-$k$ blocking recall of true duplicates by record age gap (MiniLM; $T{=}10$yr).}
+\label{tab:temporal-recall}
+\begin{tabular}{lccc}
+\toprule
+view & short-gap $k{=}1$ & long-gap $k{=}1$ & long-gap $k{=}5$ \\
+\midrule
+full         & 1.00 & 0.95 & 0.99 \\
+identity     & 1.00 & 1.00 & 1.00 \\
+contact      & 0.89 & 0.22 & 0.23 \\
+gap-weighted & 0.91 & 0.99 & 1.00 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two implications follow. First, the address is made a \emph{decaying}, not a constant,
+retrieval signal: weighting it by $e^{-\Delta t/T}$ in a multi-index fusion preserves its
+value for recent records while guarding against the long-gap failure mode that a constant
+address weight introduces. Second, the same age-gap decay should apply in the Fellegi--Sunter
+stage --- the address comparison weighted strongly within the residency window and
+exponentially down-weighted beyond it --- rather than a single address comparison applied to
+all pairs. This mirrors the whitepaper's finding that address is informative, with the
+important timescale caveat that it is informative \emph{conditionally}, on records being
+temporally near each other; the decay rate $T$ must be set from the deployment's observed
+residency distribution rather than assumed. On the co-temporal synthetic population of
+Section~\ref{sec:emp} (all records sharing one generation date) the temporal caveat is
+invisible, so the measured address sensitivity there should be read as the same-window case,
+not the general one.
+
 \subsection{Field-position sensitivity of the embedding}
 A related question is whether the \emph{ordering} of fields inside the serialized row affects
 the embedding's canopy behaviour --- that is, whether fields earlier in the string carry more

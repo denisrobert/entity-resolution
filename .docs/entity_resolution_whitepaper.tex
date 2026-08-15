@@ -131,6 +131,18 @@ Given a query record $q$, the online process embeds the same textual representat
 \]
 which is cosine similarity in the range $[-1,1]$. This stage is optimized for recall: the true match must be included in the candidate set for the second stage to recover it. FAISS~\cite{johnson2019} provides this nearest-neighbour search.
 
+\subsection{Temporal-aware blocking for records with known capture dates}
+The blocking score above weights every retrieved reference equally. When reference records carry a known capture (creation) date, this should be exploited at blocking time, because the \emph{relevance of each field to the match decision decays with the age gap} between two records. The address is the clearest case: it is stable within a short window (two records captured near each other at the same address) but becomes actively misleading once records are more than roughly the typical residency period apart, when the same entity has since \emph{moved}. Names change only in controlled ways (nicknames, abbreviations, marriage) and date of birth is invariant, so these form the reliable long-gap anchors.
+
+For a query $q$ and reference $r$, let $\Delta t_{q,r}$ be their capture-date gap and $T$ the residency timescale of the deployment. The recommendation for a multi-index blocker is to age each field's retrieval score continuously rather than apply a single fixed weight:
+\begin{equation}
+ s_{\mathrm{block}}(q,r) = s_{\mathrm{identity}}(q,r) + e^{-\Delta t_{q,r}/T}\,s_{\mathrm{address}}(q,r),
+\label{eq:gapblock}
+\end{equation}
+where $s_{\mathrm{identity}}$ is the retrieval score on the invariant fields (first, last, date of birth) and $s_{\mathrm{address}}$ the score on the address view. The identity score always counts at full weight; the address score is exponentially down-weighted as records age apart. Because $\Delta t_{q,r}$ is a pair-wise quantity, the weight is applied at \emph{score-fusion time} (after retrieving each view) rather than baked into a precomputed vector.
+
+Measured on the synthetic population with a controlled age gap (6{,}000-record index, 180 duplicate pairs, $T{=}10$ years), this resolves the temporal failure mode: in the long-gap case the address-only ``contact'' view collapses to $0.22$ recall at $k{=}1$, while the gap-weighted score recovers $0.99$ at $k{=}1$ and $1.0$ by $k{=}5$ --- comparable to relying on invariant identity alone, and far above the unweighted single view. In the short-gap case it also reaches $1.0$ by $k{=}5$, at the cost of a small $k{=}1$ penalty against the address-rich ``full'' view ($0.91$ versus $1.00$), which disappears in the working range ($k \geq 5$). The details and full table appear in the companion paper on batch deduplication~\cite{vectordedupbatch}; for insertion-time blocking with known capture dates the same decay should be used. When capture dates are unavailable, or when the population is effectively co-temporal (all records sharing one generation date, as in the synthetic experiments of Section~\ref{sec:confusion-matrix}), the temporal caveat does not apply and the single-vector ``full'' index suffices. The decay rate $T$ must be set from the deployment's observed residency distribution rather than assumed.
+
 \subsection{Probabilistic linkage}
 The candidate set is passed to Splink as a small deduplication problem containing the query and the retrieved records. Splink implements a scalable form of probabilistic linkage grounded in the Fellegi--Sunter framework~\cite{fellegi1969,linacre2022}. The configured comparisons and their intended evidence priority are listed in Table~\ref{tab:evidence-priority}:
 \begin{table}[h]
@@ -270,6 +282,7 @@ Name perturbation & 99.8\% & 100.0\% & 100.0\% & 100.0\% \\
 Table~\ref{tab:section7-ablations} summarises the blocking-recall ablations. At the default 0.85 threshold, every ablation query was accepted in this synthetic positive-only slice once it reached Splink, so the main observed degradation was retrieval: removing both optional fields reduced top-10 recall to 98.2\%, although all tested ablations reached 100.0\% by top 20. The evaluator also produces ten-bin reliability data and threshold curves; those outputs should be recalculated after Splink is trained on labelled pairs.
 
 \section{Confusion-Matrix Experiment}
+\label{sec:confusion-matrix}
 The implementation includes \texttt{experiment\_confusion\_matrix.py}, which evaluates the current algorithm on $n=5{,}000$ generated reference rows. For every reference person, the test creates three queries: an identical row labelled as the same entity, a close but non-identical row generated with controlled perturbations and labelled as the same entity, and an independently generated unrelated row labelled as a different entity. The latter is not present in the reference index. FAISS retrieves the top 20 candidates for every query, after which Splink applies the same field comparisons and decision threshold used by the resolver. The experiment batches the queries into one Splink link-only inference call for execution efficiency; this changes execution strategy but not the candidate pairs or scoring configuration. The experiment's metaparameters are listed in Table~\ref{tab:confusion-metaparameters}.
 
 \begin{table}[h]
