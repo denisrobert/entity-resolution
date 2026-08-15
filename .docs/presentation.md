@@ -250,7 +250,7 @@ See paper §8.1 and the joint `τ × prior` table.
 
 **Roadmap**
 1. Invest in **linkage calibration** (labelled pairs + joint τ/prior tuning).
-2. Do **not** spend on blocking-engine research at this scale.
+2. Do **not** spend on blocking-engine research at this scale. (Future: canopy/embedding-blocked `m/u` training — §Further Research — but only where blocking recall is the binding constraint.)
 3. Add a **CI gate** locking F1 on a held-out labelled set.
 4. **Gate go/no-go on internal corporate customer data** — the NC-voter run is only a public-data sanity check (pre-deduplicated; no DOB/email), so the production decision uses the org's own labelled data.
 

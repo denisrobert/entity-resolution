@@ -774,7 +774,19 @@ Three remarks connect this to the paradox. First, the free estimate in the M-ste
 the \emph{blocked candidate} mix, not the random-pair base rate: candidate sets are drawn
 from records that already resemble each other, so $\hat\lambda$ drifts upward --- this is the
 source of the prior coupling of Section~\ref{sec:paradox}. Dividing by blocking recall, or
-holding $\lambda$ fixed at a prior estimate, corrects it. Second, only the ratios $m_k/u_k$
+holding $\lambda$ fixed at a prior estimate, corrects it.
+
+Where an embedding-based (canopy-style) blocker supplies the candidate pairs --- such as the
+dense top-$k$ retrieval the companion pipeline uses online \cite{pipeline} --- this bias is
+expected to be \emph{larger} than with fixed-value equality blocking. Embedding
+neighbourhoods are selected by overall resemblance, so the retained candidate pairs are even
+more similar to each other than pairs sharing a name or date of birth, concentrating the
+non-match mass around near-duplicate collisions; a free $\hat\lambda$ can then drift upward
+substantially more than the $7.2\times10^{-3}$ observed here, and the fitted classes overlap
+even more. The mechanism is therefore not an artefact of the particular blocking keys: any
+blocker that concentrates candidates near true matches intensifies prior coupling, so
+canopy-based training must be paired even more strictly with prior anchoring and joint
+$(\lambda,\tau)$ selection. Second, only the ratios $m_k/u_k$
 enter the decision, and EM additionally fixes the overall scale relative to $\lambda$; both
 the scale and $\lambda$ jointly set the operating point, so neither can be changed
 independently of $\tau$. Third, richer estimators --- frequency-based refinement of $m/u$
