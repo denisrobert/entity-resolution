@@ -6,6 +6,37 @@ This bibliography presents key academic papers, tools, and case studies that des
 
 ---
 
+## 0. Time Decay in Fellegi-Sunter Processes
+
+These works establish that comparison evidence decays with the age gap between two records. They are the prior literature against which the paper's pair-conditional / age-gap-decaying weight is positioned.
+
+*   **Li, P., Dong, X. L., Maurino, A., & Srivastava, D. (2011).** *Linking Temporal Records.* PVLDB, 4(11), 956–967.
+    *   **Core Contribution:** Introduced **time-decay** to temporal record linkage: apply a decay to capture the effect of elapsed time on value evolution.
+    *   **Link:** [DOI](https://doi.org/10.14778/3402707.3402733)
+*   **Christen, P., & Gayler, R. W. (2013).** *Adaptive Temporal Entity Resolution on Dynamic Databases.* PAKDD, pages 558–569.
+    *   **Core Contribution:** Made temporal likelihood values adaptive on dynamic databases.
+    *   **Link:** [DOI](https://doi.org/10.1007/978-3-642-37453-1_45)
+*   **Hu, Y., Wang, Q., Vatsalan, D., & Christen, P. (2017).** *Improving Temporal Record Linkage using Regression Classification.* PAKDD, pages 561–573.
+    *   **Core Contribution:** Estimated the decay nonparametrically via regression; reported the resulting temporal models did not improve F1 over a static baseline on US voter data, partly because decay inflated similarity for common names.
+    *   **Link:** [DOI](https://doi.org/10.1007/978-3-319-57529-2_44)
+*   **Li, F., Lee, M. L., Hsu, W., & Tan, W.-C. (2015).** *Linking Temporal Records for Profiling Entities.* SIGMOD, pages 593–605.
+    *   **Core Contribution:** Modeled the probability that an entity transitions to a particular value after some time period, and used it to link temporal records and profile entities over time.
+    *   **Link:** [DOI](https://doi.org/10.1145/2723372.2737789)
+*   **Chiang, Y.-H., Doan, A., & Naughton, J. F. (2014).** *Modeling Entity Evolution for Temporal Record Matching.* SIGMOD, pages 1175–1186.
+    *   **Core Contribution:** Developed the related idea of modeling entity evolution for temporal record matching.
+    *   **Link:** [DOI](https://doi.org/10.1145/2588555.2588560)
+*   **Ranbaduge, T., & Christen, P. (2020).** *A Scalable Privacy-Preserving Framework for Temporal Record Linkage.* KAIS, 62(1), 45–78.
+    *   **Core Contribution:** Extended temporal record linkage to privacy-preserving settings.
+    *   **Link:** [DOI](https://doi.org/10.1007/s10115-019-01370-1)
+*   **Litoux, V., & Ray, C. (2026).** *Temporal Record Linkage Using Time Decay Models Applied to Vessel Data.* IEEE MDM.
+    *   **Core Contribution:** Modeled explicit agreement and "disagreement decay" on time-stamped vessel records.
+    *   **Link:** [DOI](https://doi.org/10.1109/MDM71479.2026.00044)
+*   **Shim, K. B. (2026).** *TimeLink: Time-Aware Record Linkage with Semi-Markov Dynamics.* SSRN Preprint 6468518.
+    *   **Core Contribution:** Replaces static $m_k$ with a time-dependent $m_k(\Delta t)$ from a semi-Markov generative model; keeps $u_k$ time-independent; reports static Fellegi-Sunter collapses on decade-long gaps.
+    *   **Link:** [DOI](https://doi.org/10.2139/ssrn.6468518)
+
+---
+
 ## 1. Foundational Probabilistic Linkage & Splink
 
 These works form the basis of the second phase of the pipeline, providing the mathematical framework for calculating match weights and probabilities.

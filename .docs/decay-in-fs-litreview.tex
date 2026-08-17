@@ -1,0 +1,472 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{parskip}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!black,
+  citecolor=blue!50!black,
+  urlcolor=blue!50!black,
+  pdftitle={Time Decay in Fellegi--Sunter Record Linkage: A Literature Survey},
+  pdfauthor={Denis Robert},
+}
+
+\title{Time Decay in Fellegi--Sunter Record Linkage:\\A Literature Survey}
+\author{Denis Robert}
+\date{August 2026}
+
+\emergencystretch=2em
+\newcommand{\dt}{\Delta t}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This survey reviews the documented line of work that treats comparison evidence in
+probabilistic (Fellegi--Sunter) record linkage as \emph{decaying} with the gap between two
+records. The static $m/u$ parameters of the classical model have, since 2011, been extended
+with temporal variants in which agreement probabilities, comparison weights, or the final
+similarity score become functions of the elapsed time between record timestamps. We
+summarize the primary points of the founding temporal-linkage papers and of the works closest
+to the present project: Li et al.\ (2011), Christen and Gayler (2013), Chiang et al.\ (2014),
+Li et al.\ (2015), Hu et al.\ (2017), Ranbaduge and Christen (2018/2020), Litoux and Ray
+(2026), and Shim's \emph{TimeLink} (2026). We then present an information-theoretic reading:
+a Fellegi--Sunter weight is a log-likelihood ratio measured in bits, its match-conditional
+expectation is a Kullback--Leibler divergence, and $u$ is tied, in the frequency model, to a
+R\'enyi collision entropy; ``decay of evidence with age'' is therefore the statement that the
+mutual information between a comparison outcome and match status falls to zero over time. The
+survey closes with a gap analysis of what, to our knowledge, remains unpublished.
+\end{abstract}
+
+\section{Where decay can enter Fellegi--Sunter}
+
+A Fellegi--Sunter (FS) linkage scores a candidate pair of records $(a,b)$ by summing, over
+comparison fields $c$ and comparison levels $\ell_c$, the log-likelihood ratio
+\begin{equation}
+  \label{eq:fs}
+  w_c(\ell_c)\;=\;\log_2\frac{P(\ell_c \mid M)}{P(\ell_c \mid U)}
+                \;=\;\log_2\frac{m_c(\ell_c)}{u_c(\ell_c)},
+\end{equation}
+where $M$ is ``same entity,'' $U$ is ``different entity,'' $m_c$ is the probability of
+agreement given a true match, and $u_c$ is the probability of agreement given a non-match
+(the coincidence rate). Posterior mass is monotone in the summed weights~\cite{fellegi1969,winkler1993}. FS assumes
+conditional independence across fields and, crucially for this survey, that $m_c$ and $u_c$
+are \emph{constants}, independent of any covariate of the pair.
+
+The temporal literature inserts ``decay'' at four distinct points:
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Blocking and similarity.} The retrieval score is attenuated by the
+        timestamp gap (Li et al.\ 2011; Litoux and Ray 2026; the present project's
+        multi-view blocker).
+  \item \textbf{Weight exponent.} The per-field contribution $\log(m_c/u_c)$ is multiplied
+        by a decay factor of the gap.
+  \item \textbf{Field probability $m_c$.} The agreement probability itself becomes a
+        function $m_c(\dt)$, converging towards the coincidence baseline as the gap grows;
+        equivalently $P(\gamma_c\mid M,\dt)\to P(\gamma_c\mid U)$. This is where
+        ``decay $m$, keep $u$ fixed'' sits (TimeLink; the present project).
+  \item \textbf{Value transition models.} $m$ and $u$ are replaced by a full distribution
+        over what a value becomes after $\dt$ (Chiang et al.\ 2014; Li et al.\ 2015;
+        TimeLink's semi-Markov models).
+\end{enumerate}
+
+\section{Primary sources, chronologically}
+
+\subsection{Li, Dong, Maurino, Srivastava (2011): first explicit time decay}
+
+Pei Li, Xin Luna Dong, Andrea Maurino, Divesh Srivastava.
+\emph{Linking temporal records}. PVLDB 4(11):956--967, 2011.
+DOI: \url{https://doi.org/10.14778/3402707.3402733}~\cite{li2011}.
+
+This is the paper that defined temporal record linkage: records carry a time-stamp and the
+task is to identify records that describe the same entity over time. Two mechanisms are
+proposed:
+\begin{itemize}[leftmargin=*]
+  \item \emph{Time decay}: ``We apply time decay to capture the effect of elapsed time on
+        value evolution'' --- the first explicit use of the term in the linkage
+        literature.
+  \item \emph{Clustering rather than pairwise decisions}: ``Instead of comparing each pair
+        locally, we propose clustering methods that consider the order of records to make
+        global decisions.''
+\end{itemize}
+Experiments show the algorithms ``significantly outperform traditional record linkage
+techniques on various temporal data sets.'' This paper establishes the vocabulary
+(``time decay'') and the two axes --- per-pair weight decay and global/orderings-aware
+decisions.
+
+\subsection{Christen and Gayler (2013): adaptive temporal entity resolution}
+
+Peter Christen, Ross W.\ Gayler.
+\emph{Adaptive temporal entity resolution on dynamic databases}.
+PAKDD 2013 (LNAI 7819), pages 558--569.
+DOI: \url{https://doi.org/10.1007/978-3-642-37456-2\_47}~\cite{cg2013}.
+
+The first work, to our knowledge, to make the effective $m$-probabilities explicitly
+gap-dependent and updated from data.
+\begin{itemize}[leftmargin=*]
+  \item Streaming setup: query records are matched against a growing database; a matched
+        query is inserted back into the database (online, adaptive).
+  \item For each attribute and time-lag bin the system maintains agree/disagree counts from
+        accepted matches, yielding a data-driven agreement probability
+        $P(A_{\dt}\mid S)$; the disagreement probability for non-matches is
+        frequency-based ($1-P_j(v)$, with $P_j$ the value frequency).
+  \item Each attribute similarity $s_j$ is rescaled by a time-dependent weight: an
+        agreement is down-weighted to the extent that different entities plausibly share
+        the value; a disagreement is down-weighted to the extent that same entities
+        plausibly changed it.
+  \item Models fitted ``adaptively'' (update per insertion) and ``non-adaptively''
+        (frozen training-time counters). On synthetic data with noise the adaptive model
+        wins; on the NC Voter database (about 2.4M records) the \emph{adaptive} variant
+        underperformed its frozen baseline, because with few true matches per query the
+        counters are noisy --- a cautionary result directly relevant to the calibration
+        paradox seen in the white paper.
+\end{itemize}
+
+\subsection{Chiang, Doan, Naughton (2014): entity evolution}
+
+Yue-Hsuan Chiang, AnHai Doan, Jeffrey F.\ Naughton.
+\emph{Modeling entity evolution for temporal record matching}.
+SIGMOD 2014, pages 1175--1186.
+DOI: \url{https://doi.org/10.1145/2588555.2588560}~\cite{cd14}.
+
+The paper recognizes that ``any such method relies at its heart on a model that captures
+information about how the entities evolve''. It proposes:
+\begin{itemize}[leftmargin=*]
+  \item a more detailed model of the \emph{reappearance} probability of an attribute value
+        over time, conditionally dependent on past values, rather than a simple
+        change-or-not decay;
+  \item matching over \emph{sets} of records, not pairs, for robustness;
+  \item experimental evidence of improved accuracy and noise-resistance at minimal
+        overhead.
+\end{itemize}
+This is the paper that turns ``decay'' into ``stochastic value evolution,'' a full
+transition model; TimeLink's semi-Markov formulation is in this lineage.
+
+\subsection{Li, Lee, Hsu, Tan (2015)}
+
+Furong Li, Mong Li Lee, Wynne Hsu, Wang-Chiew Tan.
+\emph{Linking temporal records for profiling entities}.
+SIGMOD 2015, pages 593--605.
+DOI: \url{https://doi.org/10.1145/2723372.2737789}~\cite{ll15}.
+
+The abstract introduces a transition model that ``captures the probability that an entity may
+change to a particular attribute value after some time period'' and combines it with
+\emph{source quality/freshness} metrics: timestamps, the value-transition model, and source
+timeliness are jointly exploited to link temporal records into the correct time period of
+the entity profile. Each source's freshness acts as an additional, source-level
+``$u$ moving with era,'' which connects to the open question in this survey
+(Section~\ref{sec:gap}, item~3).
+
+\subsection{Hu, Wang, Vatsalan, Christen (2017): regression classification}
+
+Yichen Hu, Qing Wang, Dinusha Vatsalan, Peter Christen.
+\emph{Improving temporal record linkage using regression classification}.
+PAKDD 2017 (LNCS 10235), pages 561--573.
+DOI: \url{https://doi.org/10.1007/978-3-319-57454-7\_44}~\cite{hu2017}.
+
+Verified against the accepted text. Key points:
+\begin{itemize}[leftmargin=*]
+  \item The decay probabilities of Li et al.\ are replaced by a \emph{logistic
+        regression} of the (time-gap) disagreement probability $\hat d_{\neq}(A,\dt)$,
+        with support attributes (gender, age) and the gap as features; the regression
+        replaces the (estimated) decay, while agreement decay $d_=$ is retained.
+  \item The weight on attribute $A$ becomes
+        \begin{equation}
+          w_A(s_A,\dt) = 1 - s_A\,d_=(A,\dt) - (1-s_A)\, d_{\neq}(A,\dt),
+          \label{eq:hu}
+        \end{equation}
+        with an \emph{impact-reduction} coefficient $\alpha$ that damps the temporal
+        blow (as $\alpha\to\infty$ the score re-approaches a non-temporal scorer).
+  \item Evaluation on NC Voter subsets (5k--100k): at full strength the pure decayed
+        model is poor; a moderate $\alpha$ and a larger training pool give the temporal
+        signal a small win (``Mixed''). The paper explicitly reports that without the
+        damping the decay models ``degraded'' the linkage quality.
+\end{itemize}
+Relevance to the project: this is the strongest published statement that a decayed $m$ is not
+free; without value-frequency-aware $u$ and a regularized (hard) gap effect it can pass
+below the untrained static baseline on real data --- a result that the project's
+calibration experiments reproduce.
+
+\subsection{Ranbaduge and Christen (2018, 2020): temporal and privacy}
+
+Thilina Ranbaduge and Peter Christen.
+2018: \emph{Privacy-preserving temporal record linkage}. ICDM 2018, pages 377--386.
+DOI: \url{https://doi.org/10.1109/ICDM.2018.00053}~\cite{rc2018}.
+2020: \emph{A scalable privacy-preserving framework for temporal record linkage}.
+Knowledge and Information Systems 62(1):45--78.
+DOI: \url{https://doi.org/10.1007/s10115-019-01370-1}~\cite{rc2020}.
+
+These works operate at the intersection of temporal linkage and privacy-preserving
+record linkage (Bloom filters and homomorphic encryption), and use the same
+phenomenon --- that entity attributes evolve over time --- to adjust an encoded
+similarity, obtaining ``better linkage quality compared to non-temporal PPRL'' on data
+sets of several million records. Their contribution is a protocol that safely uses the
+value-change probability, i.e.\ they make use of a time-conditioned $m/u$ without
+revealing the raw values.
+
+\subsection{Litoux and Ray (2026): two kinds of decay on vessel data}
+
+Victor Litoux, Cyril Ray.
+\emph{Temporal record linkage using time decay models applied to vessel data}.
+IEEE MDM 2026, pages 313--318.
+DOI: \url{https://doi.org/10.1109/MDM71479.2026.00044}~\cite{lr2026}.
+
+An applied paper that explicitly separates \emph{disagreement decay} (the probability that
+an entity's value changes across the gap) from \emph{agreement decay} (the weight given to
+the shared attributes), applied to Automatic Identification System (AIS) vessel
+trajectories: common attributes anchor the linkage and the score is the decayed
+combination of these two effects. This is the closest item to the present project's
+pair-conditional decay framing, though on vessel data rather than person records.
+
+\subsection{Shim (2026): TimeLink}
+
+Kwan Bo Shim.
+\emph{TimeLink: time-aware record linkage with semi-Markov dynamics}.
+SSRN preprint 6468518, 2026.
+DOI: \url{https://doi.org/10.2139/ssrn.6468518}~\cite{shim2026}.
+
+The closest published match of the project's \emph{model}: make $m$ time-dependent, keep
+$u$ static. Details, from the preprint's own text:
+\begin{itemize}[leftmargin=*]
+  \item Field taxonomy: \emph{stable} (DOB, sex; fixed $m$, $u$), \emph{dynamic}
+        (low-cardinality: marital status, ZIP; semi-Markov/CTMC transition matrix), and
+        \emph{semi-stable} (high-cardinality: last name, address; a Weibull survival
+        $S(\dt)$ on the current value).
+  \item The match probability for an attribute is (eq. 8 of the paper)
+        \begin{equation}
+          m^{*}(\dt) = S(\dt)\cdot m_{\mathrm{same}} + [1-S(\dt)]\cdot
+          m_{\mathrm{changed}},\qquad m_{\mathrm{changed}} \approx u_c,
+        \end{equation}
+        which, for $S(\dt)=e^{-\dt/\bar\tau}$, is precisely
+        $m(\dt)=u+(m-u)\,e^{-\dt/\bar\tau}$ --- the form already used in the project's
+        design note.
+  \item The weights are the FS form with the time-dependent $m$:
+        $w_{\mathrm{agree}}=\ln(m(\dt)/u)$ and
+        $w_{\mathrm{disagree}}=\ln\bigl((1-m(\dt))/(1-u)\bigr)$.
+  \item Experiments: NC Voter (10-year gap): TimeLink F1 $0.877$ vs.\ Splink $0.751$;
+        IPUMS historical census (20-year gap): $0.668$ vs.\ $0.146$; a synthetic 10--30
+        year study shows classical FS collapsing to $0.055$ while TimeLink stays above
+        $0.85$.
+\end{itemize}
+Positioning relative to TimeLink: both make $m$ decayable and $u$ static; TimeLink derives
+$m(\dt)$ from generative sojourn-time models and precomputed lookup tables, while the
+present project proposes an additive pair-conditional term on the logged $\log_2(m_c/u_c)$
+stack that composes with any $m/u$ calibration, joined with measured per-field rates on a
+FAISS/Splink pipeline --- a measurement, not just a model.
+
+\section{The entropy reading of decay}
+
+The literature as summarized converges on ``transient fields decay, stable fields do not''
+but leaves the form and the benefit-conditional evidence open. The present section records an
+information-theoretic view that unifies these observations.
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{FS weights are information in bits.} Each contribution in
+        \eqref{eq:fs} is a log-likelihood-ratio: its match-conditional expectation is the
+        Kullback--Leibler divergence
+        \begin{equation}
+          \mathbb{E}\!\left[\log_2 \frac{P(\gamma\mid M)}{P(\gamma\mid U)} \right]
+          \;=\; \sum_\gamma P(\gamma\mid M)\log_2
+            \frac{P(\gamma\mid M)}{P(\gamma\mid U)}
+          \;=\; D_{\mathrm{KL}}(M_c \| U_c)
+          \;\ge\;0,
+        \end{equation}
+        the expected ``surprise'' of seeing the pair (agree vs.\ disagree) in the match vs.\
+        chance case.'' A decayed weight of 0 carries no information: the outcome is
+        equally expected under $M$ and $U$.
+  \item \textbf{$u_c$ is a collision (R\'enyi) entropy.} In a frequency model,
+        $u_c(v) = f_c(v)$, the value frequency. The probability of a random coincidental
+        agreement is the quadratic collision
+        $\sum_v f(v)^2 = \exp(-H_2)$ with $H_2$ the R\'enyi-2 entropy of the value
+        distribution. So ``common value vs.\ rare value'' is exactly a difference of
+        $H_2$: a rare agreement carries more surprise --- $-\log_2 u$ worth --- the
+        entropy content of the field.
+  \item \textbf{Decay erases mutual information.} Under the time-dependent model
+        $P(\cdot\mid M,\dt)\to P(\cdot\mid U)$, the KL diverges to zero and the pointwise
+        weights go to zero; the mutual information
+        $I(\gamma; M \mid \dt)$ between the comparison outcome and the match
+        indicator falls to zero as the gap ages. For the exponential
+        $m(\dt)=u+(m-u)e^{-\dt/T}$, the pointwise weight halves after about $T\ln 2$.
+  \item \textbf{Noise entropy, not loss of the data.} The decay raises the
+        match conditional entropy $H(P(\cdot \mid M,\dt))$ towards
+        $H(P(\cdot \mid U))$: the observed contact fields of a true pair become as
+        uninformative as the fields of an arbitrary pair. Decay therefore is a statement
+        about the \emph{expected entropy of the evidentiary outcome}, not about the
+        information being lost from the data set --- the surname is still itself; it is
+        just no longer evidence.
+\end{itemize}
+
+\noindent Crucially, entropy is concerned with \emph{how much} information, not its
+\emph{direction}; the caveats recorded for the temporal literature above are not
+alternatives to this reading. The entropy framing explains the sign of a known
+phenomenon --- why pairs at long gaps should trust identity anchors and discount transient
+contact fields --- and provides per-field ``half-life'' numbers that are directly
+measurable from a labelled corpus, which is what the measured experiments in the present
+project attempt.
+
+\section{Against the ``ad hoc decay function'' objection}
+
+TimeLink's central methodological complaint about earlier temporal work is that it
+``relies on ad hoc decay functions rather than deriving weights from a coherent
+generative model.'' The entropy reading suggests that the decay is not a free knob to
+be pulled but the \emph{only} information-theoretically justified completion of the
+static FS model once a field's lifetime enters. This section makes that precise.
+
+\paragraph{Step 1: the weight keeps its likelihood-ratio form.}
+A Fellegi--Sunter weight is a Bayes factor, and Bayes factors are not chosen: they are
+determined by the model for the comparison outcome. Adding the capture-date gap $\dt$
+as a covariate does not change the decision rule --- the optimal evidence for deciding
+$M$ versus $U$ given $\gamma$ and $\dt$ is always the ratio
+\begin{equation}
+  w_c(\ell;\dt) \;=\; \log_2\frac{P(\ell \mid M,\dt)}{P(\ell \mid U,\dt)}.
+  \label{eq:llr-time}
+\end{equation}
+There is no alternative weight family: any other scalar evidence leaves
+discrimination bits on the table (Neyman--Pearson optimality). So ``decay'' cannot be
+introduced as a new modeling act; it is forced once the model conditions on $\dt$.
+
+\paragraph{Step 2: decompose into a baseline and a max-entropy survival part.}
+Write the match-conditional agreement probability as
+\begin{equation}
+  m_c(\dt) \;=\; u_c + \bigl(m_c(0)-u_c\bigr)\, S_c(\dt),
+  \label{eq:surv}
+\end{equation}
+where $S_c(\dt)\in[0,1]$, $S_c(0)=1$, is the survival of the field's current value, and
+$m_c(0)$ is its modern agreement probability. The static model is the special case
+$S_c\equiv1$. Which functional form for $S_c$? The information-theoretic default is
+\emph{maximal ignorance}: given only the mean residency $\bar\tau_c$ of a field's value
+and no other structural knowledge, the entropy-maximising distribution for a positive
+survival time is the exponential $S_c(\dt)=e^{-\dt/\bar\tau}$, so that
+\begin{equation}
+  m_c(\dt) \;=\; u_c + (m_c(0)-u_c)\, e^{-\dt/\bar\tau_c},
+  \label{eq:exp-m}
+\end{equation}
+which is \eqref{eq:surv} with the entropy-maximising survival. If the variance (or
+shape) of residency is empirically available, the max-entropy form becomes the Weibull
+$S_c(\dt)=e^{-(\dt/\bar\tau)^k}$--- the two-parameter generalisation that TimeLink
+selects too, on generative grounds rather than entropy grounds. The ``decay rate''
+$\rho_c=1/\bar\tau_c$ is therefore not a knob tuning a weight; it is the parameter of
+the max-entropy survival of the field's residency distribution, estimable from labelled
+history alone.
+
+\paragraph{Step 3: estimation from data, not assumption.}
+Both $m_c(0)$ and $\bar\tau_c$ are estimable (e.g.\ maximum-likelihood on the observed
+gaps of matched pairs: $\bar\tau_c$ is the empirical mean residency of changed values,
+and $m_c(0)$ the same-pair agreement at near-zero gap). The decay is then \emph{not
+assumed to be a specific multiple of the static weight; it is inferred}. The general
+form \eqref{eq:llr-time} specialises, with \eqref{eq:exp-m}, to
+\begin{equation}
+  w_c(\dt) = \log_2\frac{u_c + (m_c(0)-u_c)e^{-\dt/\bar\tau_c}}{u_c},
+  \label{eq:weight-entropy}
+\end{equation}
+and the ``decay multiplier'' $\beta_c(\dt)=\log_2 m_c(\dt)/u_c$ falls from
+$\log_2(m_c(0)/u_c)$ to $0$ at rate $\bar\tau_c^{-1}$, exactly as the observed
+agreement distributions prescribe.
+
+\paragraph{What this says about the TimeLink comparison.}
+TimeLink is right that a survival form and a decay curve must be identified to leave the
+static model. But ``ad hoc'' is not the correct characterisation of the exponential form
+in the present investigation: with only a mean field lifetime available, the
+\emph{maximal-entropy} survival is exponential, and the empirical-fit procedure
+(mean survival time on actual matched pairs) identifies both parameters without
+appeal to a specific functional form. TimeLink and the design of this project differ in
+what they fit (full semi-Markov transition vs.\ per-field exponential periods), but both
+place the decay inside $m$, both learn the parameters from data, and neither requires
+an external knob. Where the present project goes beyond even TimeLink is
+Section~\ref{sec:gap}, item~1: the fitted $\bar\tau_c$ is reported in half-lives, and
+those half-lives predict (and are checked against) the measured $D_{KL}(\dt)$ curves
+of each field.
+
+\paragraph{Caveat: entropy vs.\ decision.}
+Bayes factors that take entropy-compat form must still be used with a decision rule.
+Entropy tells us what the evidence is (bits, sign preserve the log odds); it does not
+select the match prior $\lambda$ or the threshold $\tau$, which remain decision-theoretic
+choices (the costs of FP and FN). Nothing in the max-entropy derivation removes those. If anything,
+it separates them cleanly: the \emph{model} is fixed by max-entropy-evidence, the
+\emph{operating point} by cost.
+
+\section{Gap analysis}
+\label{sec:gap}
+
+To the best of our knowledge:
+\begin{enumerate}
+  \item no published work measures per-field decay rates (half-lives) on a two-stage
+        embedding-then-linkage pipeline and relates them both to blocking recall and to
+        the entropy framing above;
+  \item nobody has formulated the natural blocker consequence --- drop a field from a
+        fused index once it has roughly exhausted its mutual information --- although
+        Litoux and Ray use the idea and TimeLink keeps table lookups separate;
+  \item the ``$u$ static'' assumption of the time-dependent-FS line is not carefully
+        tested against \emph{cohort drift} (the value distribution itself changes over
+        decades, changing $u$), a concern present in Hu et al.\ (2017), in the Li et al.\
+        (2011) frequency-aware rates, and in the present project's design note;
+  \item the practical weak spot remains the NC Voter file, on which temporal models are
+        observed to be fragile (Christen--Gayler 2013; Hu et al.\ 2017) --- exactly where
+        the project's own runs contribute additional evidence.
+\end{enumerate}
+
+\section{Notes on source status}
+
+This survey was compiled from public records (VLDB, ACM, Springer, OpenAlex, and DBLP) and
+from the accepted manuscripts of Christen--Gayler 2013 and Hu et al.\ 2017 where they could
+be read in full. TimeLink (a 2026 SSRN preprint) is cited from its abstract and any
+accessible body text; it was not wholly available to the survey. Where page-level facts could
+not be verified in the primary text (figure numbers in Christen--Gayler 2013), the survey
+says so explicitly. This review is part of the ongoing entity-resolution project, with the
+purpose of positioning the ``measured per-field decay rates'' result.
+
+\begin{thebibliography}{99}
+\bibitem{fellegi1969}
+I.~P.~Fellegi and A.~B.~Sunter. A theory for record linkage.
+\newblock JASA 64(328):1183--1210, 1969.
+
+\bibitem{li2011}
+P.~Li, X.~L.~Dong, A.~Maurino, and D.~Srivastava. Linking temporal records.
+\newblock PVLDB 4(11):956--967, 2011.
+
+\bibitem{cg2013}
+P.~Christen and R.~W.~Gayler. Adaptive temporal entity resolution on dynamic databases.
+\newblock PAKDD 2013, LNAI 7819:558--569.
+
+\bibitem{cd14}
+Y.~Chiang, A.~Doan, and J.~F.~Naughton. Modeling entity evolution for temporal record
+matching. \newblock SIGMOD 2014:1175--1186.
+
+\bibitem{ll15}
+F.~Li, M.~L.~Lee, W.~Hsu, and W.-C.~Tan. Linking temporal records for profiling.
+\newblock SIGMOD 2015:593--605.
+
+\bibitem{hu2017}
+Y.~Hu, Q.~Wang, D.~Vatsalan, and P.~Christen. Improving temporal record linkage using
+regression classification. \newblock PAKDD 2017, LNCS 10235:561--573.
+
+\bibitem{rc2018}
+T.~Ranbaduge and P.~Christen. Privacy-preserving temporal record linkage.
+\newblock ICDM 2018:377--386.
+
+\bibitem{rc2020}
+T.~Ranbaduge and P.~Christen. A scalable privacy-preserving framework for temporal record
+linkage. \newblock KAIS 62(1):45--78, 2020.
+
+\bibitem{lr2026}
+V.~Litoux and C.~Ray. Temporal record linkage using time decay models applied to vessel
+data. \newblock MDM 2026:313--318.
+
+\bibitem{shim2026}
+K.~B.~Shim. TimeLink: time-aware record linkage with semi-Markov dynamics.
+\newblock SSRN preprint 6468518, 2026.
+
+\bibitem{winkler1993}
+W.~E.~Winkler. String comparator metrics and enhanced decision rules in the
+Fellegi--Sunter model of record linkage.
+\newblock Proceedings of the American Statistical Association Section on Survey
+Research, 1993.
+\end{thebibliography}
+
+\end{document}

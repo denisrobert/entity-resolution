@@ -355,6 +355,30 @@ pairs). In the short gap the ``full`` and ``identity`` views already reach $1.0$
 in the long gap the \emph{contact} (address + email) view collapses to $0.22$ while the
 \emph{identity} view (first, last, date of birth) stays at $1.0$.
 
+The same failure mode is confirmed on \emph{real} person data. We used NC voter registration
+snapshots of a single county (Wake) across 2012--2026, joined on the stable \emph{voter id},
+giving the same voter at multiple points in time with real addresses and real capture dates.
+Two complementary studies were run. First, as a \emph{mechanism probe}, a single pair of
+snapshots fourteen years apart split by whether the voter's street changed shows that a changed
+address destroys retrieval: on a balanced 10{,}000-pair sample (MiniLM, recall at $k{=}1$) the
+address-only ``contact'' view recovers $0.97$ of stayed voters but only $0.03$ of moved voters,
+the single-vector ``full'' view drops from $0.998$ (stayed) to $0.83$ (moved), and the
+invariant ``identity'' view stays at $0.92$ among movers. Second, as the \emph{honest, primary}
+methodology, we used \emph{staggered arrival}: for each voter we picked a random historical
+snapshot as their entry row and matched their 2026 row against it, so the reference rows span a
+genuine varied age-gap distribution (two to fourteen years) with no \emph{moved} label used in
+retrieval or selection. On 3{,}000 voters (recall at $k{=}1$): ``full'' $0.985$, ``identity''
+$0.991$, ``contact'' $0.872$, ``gap-weighted'' $0.967$, and a hard ``two-tier'' bucket $0.969$.
+Because these gaps (max 14 yr) all fall \emph{within} the county's fitted residency window
+(below), the address remains mostly informative and ``contact'' is degraded but not collapsed;
+``identity'' is the most robust single view, and the two age-aware methods are near-tied. The
+decay's distinctive payoff sits in the beyond-residency regime, which a single county has too few
+pairs to exercise. The \emph{residency} was estimated by fitting a censored Weibull to
+registration durations in the same snapshots ($\texttt{estimate\_residency.py}$): shape
+$k\approx1.18$ and mean $\bar\tau\approx20.6$ yr (by both MLE and KM-regression), with a median
+of roughly 16 years. Since $k\approx1$, the exponential form $e^{-\Delta t/T}$ with
+$T=\bar\tau\approx20.6$ yr is a close model, replacing the synthetic assumption $T{=}10$.
+
 The \emph{gap-weighted} view shows the recommended resolution. Instead of a hard
 recent/beyond-residency cutoff, it ages the address \emph{continuously}: the identity and
 address vectors are each embedded and searched, and the candidate re-ranking is
@@ -363,20 +387,18 @@ address vectors are each embedded and searched, and the candidate re-ranking is
 w(\Delta t)=e^{-\Delta t/T},
 \label{eq:gapweight}
 \end{equation}
-where $\Delta t$ is the age gap between the two records and $T$ the residency timescale
-(here 10 years). The identity score always counts at full weight; the address score is
-down-weighted exponentially as records age apart, so an old address cannot drag a true
-long-gap duplicate below top-$k$ while it still boosts recent pairs. This is a smooth
-generalisation of the binary rule, and the address weight is applied at \emph{score-fusion
-time} (after retrieval, where the pair-wise gap is known) rather than baked into a single
-precomputed vector. In the long gap the gap-weighted view recovers to $1.0$ by $k{=}5$ and
-to $0.99$ already at $k{=}1$ (Table~\ref{tab:temporal-recall}), matching the robust
-all-identity result while still exploiting the address for recent records. The cost is a
-small $k{=}1$ penalty in the short gap ($0.91$ versus the ``full`` view's $1.00$), because
-at $k{=}1$ the fused ranking can surface a single address-similar but identity-different
-record ahead of the true mate; by $k{\gtrsim}5$ the penalty disappears and recall is $1.0$.
-For the working $k$ range (10--20) the gap-weighted view is therefore uniformly the best
-choice among the single-vector alternatives.
+where $\Delta t$ is the age gap between the two records and $T$ the residency timescale, now
+estimated from the data ($\approx20.6$ yr). The identity score always counts at full weight; the
+address score is down-weighted exponentially as records age apart, so an old address cannot drag a
+true long-gap duplicate below top-$k$ while it still boosts recent pairs. This is a smooth
+generalisation of the binary rule, and the address weight is applied at \emph{score-fusion time}
+(after retrieval, where the pair-wise gap is known) rather than baked into a single precomputed
+vector. In the synthetic long-gap case (Table~\ref{tab:temporal-recall}) the gap-weighted view
+recovers to $1.0$ by $k{=}5$ while still exploiting the address for recent records; on the
+staggered real data (above) it lands between ``full'' and ``identity'' at $k{=}1$, consistent
+with a mostly-informative address within the residency window. The claimed benefit is
+specifically for pairs spanning beyond $\sim T$ years, where a preserved address would otherwise
+mislead.
 
 \begin{table}[h]
 \centering
