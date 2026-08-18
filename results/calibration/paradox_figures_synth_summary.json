@@ -1,0 +1,76 @@
+{
+  "dataset": "synthetic",
+  "tau": 0.85,
+  "prior_default": 0.0001,
+  "prior_em_fitted": 0.007090128861723686,
+  "t_bits": 2.5,
+  "delta_b_bits": 6.16,
+  "admitted_nonmatches_in_band": 16,
+  "weight_distributions": {
+    "match_untrained": {
+      "name": "match_untrained",
+      "mean": 16.0,
+      "median": 17.4,
+      "p25": 10.0,
+      "p75": 21.9
+    },
+    "match_em": {
+      "name": "match_em",
+      "mean": 19.7,
+      "median": 24.3,
+      "p25": 16.5,
+      "p75": 31.3
+    },
+    "nonmatch_untrained": {
+      "name": "nonmatch_untrained",
+      "mean": -24.9,
+      "median": -26.3,
+      "p25": -33.3,
+      "p75": -18.3
+    },
+    "nonmatch_em": {
+      "name": "nonmatch_em",
+      "mean": -65.3,
+      "median": -85.4,
+      "p25": -106.8,
+      "p75": -30.0
+    }
+  },
+  "metrics": {
+    "untrained": {
+      "n_pairs": 6000,
+      "threshold": 0.85,
+      "precision": 0.4716312056737589,
+      "recall": 0.95,
+      "f1": 0.6303317535545023,
+      "f_beta": 0.6303317535545024,
+      "brier": 0.026432252816014495,
+      "log_loss": 0.39680509387426705,
+      "average_precision": 0.365890085969873,
+      "expected_cost": 0.026,
+      "cost_optimal_tau": 0.8056616541353384,
+      "cost_optimal_cost": 0.026
+    },
+    "em": {
+      "n_pairs": 6000,
+      "threshold": 0.85,
+      "precision": 0.4006024096385542,
+      "recall": 0.95,
+      "f1": 0.5635593220338984,
+      "f_beta": 0.5635593220338984,
+      "brier": 0.047888803333170096,
+      "log_loss": 0.5243376537118158,
+      "average_precision": 0.502143482889113,
+      "expected_cost": 0.034333333333333334,
+      "cost_optimal_tau": 0.999,
+      "cost_optimal_cost": 0.025666666666666667
+    }
+  },
+  "n_match_pairs": 140,
+  "n_nonmatch_untrained": 5860,
+  "n_nonmatch_em": 5860,
+  "figures": [
+    "results\\calibration\\figures\\paradox_mech1_synth.png",
+    "results\\calibration\\figures\\paradox_mech2_synth.png"
+  ]
+}

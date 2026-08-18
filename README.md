@@ -188,6 +188,8 @@ entity-resolution/
 │   ├── experiment_f1_sweep.py          # Section 8.3: threshold/address-weight F1 sweep
 │   ├── experiment_mu_tau_interaction.py   # Calibration-paradox decomposition
 │   ├── experiment_mu_prior_tau_surface.py # Joint (tau, prior) F1 surface
+│   ├── experiment_smoothing_sweep.py      # Calibration-paradox smoothing (Table 4)
+│   ├── experiment_paradox_figures.py      # Calibration-paradox mechanism figures/metrics
 │   ├── ncvoter/          # Real-data NC-voter experiments (mutation model)
 │   │   ├── ncvoter_util.py              # person mapping + mutation model
 │   │   ├── prepare_sample.py            # subsample the records CSV
@@ -200,9 +202,11 @@ entity-resolution/
 ├── examples/             # Runnable example projects (search a saved index)
 │   ├── cli_search/       #   Command-line search tool
 │   └── rest_service/     #   FastAPI REST search service
-├── section7_results.json # Latest Section 7 JSON results
-├── section7_metrics.csv  # Latest Section 7 flat metric table
-└── .docs/                # Whitepaper LaTeX source and PDF
+├── results/
+│   ├── erwhitepaper/     # Canonical artifacts for the entity-resolution whitepaper
+│   │   └── ncvoter/      #   NC-voter artifacts
+│   └── calibration/      # Canonical artifacts for the calibration-paradox paper
+└── .docs/                # Paper/whitepaper LaTeX source and PDF
 ```
 
 ## Examples
@@ -243,13 +247,23 @@ export first (see below).
 
 | Paper section | Script | Command |
 |---|---|---|
-| §7 benchmark suite | `scripts/experiment_section7_eval.py` | `python scripts/experiment_section7_eval.py --count 5000 --ablation-count 500 --output section7_results.json --csv-output section7_metrics.csv` |
-| §8 confusion matrix | `scripts/experiment_confusion_matrix.py` | `python scripts/experiment_confusion_matrix.py --count 5000 --output confusion_matrix_results.json` (add `--address-strength 0.8` for the weakened-address run) |
-| §8.1 m/u (supervised/EM vs untrained) | `scripts/experiment_mu_calibration.py` | `python scripts/experiment_mu_calibration.py --index-dir data --query-count 2000 --output mu_calibration_results.json` |
-| §8.2 duplicate-bearing benchmark | `scripts/experiment_duplicate_benchmark.py` | `python scripts/experiment_duplicate_benchmark.py --base-count 100000 --match-rate 0.03 --output training_results.json` |
-| §8.3 threshold/address-weight sweep | `scripts/experiment_f1_sweep.py` | `python scripts/experiment_f1_sweep.py --count 5000 --output f1_sweep_results.json` |
-| Calibration-paradox decomposition | `scripts/experiment_mu_tau_interaction.py` | `python scripts/experiment_mu_tau_interaction.py --base-count 5000 --match-rate 0.03 --output mu_tau_interaction.json` |
-| Joint (τ, prior) F1 surface | `scripts/experiment_mu_prior_tau_surface.py` | `python scripts/experiment_mu_prior_tau_surface.py --base-count 5000 --output mu_prior_tau_surface.json` |
+| §7 benchmark suite | `scripts/experiment_section7_eval.py` | `python scripts/experiment_section7_eval.py --count 5000 --ablation-count 500 --output results/erwhitepaper/section7_results.json --csv-output results/erwhitepaper/section7_metrics.csv` |
+| §8 confusion matrix | `scripts/experiment_confusion_matrix.py` | `python scripts/experiment_confusion_matrix.py --count 5000 --output results/erwhitepaper/confusion_matrix_results.json` (add `--address-strength 0.8` for the weakened-address run) |
+| §8.1 m/u (supervised/EM vs untrained) | `scripts/experiment_mu_calibration.py` | `python scripts/experiment_mu_calibration.py --index-dir data --query-count 2000 --output results/erwhitepaper/mu_calibration_results.json` |
+| §8.2 duplicate-bearing benchmark | `scripts/experiment_duplicate_benchmark.py` | `python scripts/experiment_duplicate_benchmark.py --base-count 100000 --match-rate 0.03 --output results/erwhitepaper/training_results.json` |
+| §8.3 threshold/address-weight sweep | `scripts/experiment_f1_sweep.py` | `python scripts/experiment_f1_sweep.py --count 5000 --address-strengths 0.6 0.7 0.8 0.9 0.95 1.0 --output results/erwhitepaper/f1_sweep_results.json` |
+| Calibration-paradox decomposition | `scripts/experiment_mu_tau_interaction.py` | `python scripts/experiment_mu_tau_interaction.py --base-count 5000 --match-rate 0.03 --output results/calibration/mu_tau_interaction.json` |
+| Joint (τ, prior) F1 surface | `scripts/experiment_mu_prior_tau_surface.py` | `python scripts/experiment_mu_prior_tau_surface.py --base-count 5000 --output results/calibration/mu_prior_tau_surface.json` |
+| Calibration-paradox smoothing (Table 4) | `scripts/experiment_smoothing_sweep.py` | `python scripts/experiment_smoothing_sweep.py --index-dir data --query-count 2000 --output results/calibration/smoothing_sweep.json` |
+| Calibration-paradox mechanism figures/metrics | `scripts/experiment_paradox_figures.py` | `python scripts/experiment_paradox_figures.py --dataset ncvoter --out-dir results/calibration` and `... --dataset synthetic --out-dir results/calibration` |
+
+The entity-resolutions-whitepaper results are persisted under `results/erwhitepaper/`
+(and `results/erwhitepaper/ncvoter/` for the NC-voter runs); every table/figure in
+`.docs/entity_resolution_whitepaper.tex` cites the exact artifact that produced it, and
+`scripts/verify_claims.py` cross-checks each number in the paper against those artifacts
+(regenerate the manifest with `python scripts/verify_claims.py --manifest-out source_papers/claims_manifest.md`).
+The calibration-paradox results are persisted under `results/calibration/` and each
+table/figure in `.docs/calibration_paradox.tex` cites the artifact that produced it.
 
 `experiment_mu_calibration.py` loads the persisted 50,000-record index from
 `--index-dir data`. If that artifact is absent, regenerate it first:
@@ -300,18 +314,21 @@ changes/omissions (55%/20%), and birth-year shifts (~10%). Mutation rates and
 ```bash
 # Blocking recall: does a mutated duplicate recover its clean base at k=5..100?
 python scripts/ncvoter/experiment_blocking_recall.py \
-  --sample datasets/ncvoter/sample_5000.csv --query-count 1000 --k 5 10 20 50 100
+  --sample datasets/ncvoter/sample_5000.csv --query-count 1000 --k 5 10 20 50 100 \
+  --output results/erwhitepaper/ncvoter/results_blocking_recall.json
 
 # Confusion matrix + F1 (re-run with --k 50 / --k 100 for the k-scaling analysis)
 python scripts/ncvoter/experiment_resolution.py \
   --sample datasets/ncvoter/sample_5000.csv \
-  --in-index 3000 --pos-queries 1500 --neg-queries 1500 --k 20 --threshold 0.85
+  --in-index 3000 --pos-queries 1500 --neg-queries 1500 --k 20 --threshold 0.85 \
+  --output results/erwhitepaper/ncvoter/results_resolution.json
 
 # Threshold/address-weight F1 sweep
 python scripts/ncvoter/experiment_f1_sweep.py \
   --sample datasets/ncvoter/sample_5000.csv \
   --in-index 3000 --pos-queries 1500 --neg-queries 1500 \
-  --thresholds 0.85 0.9 0.95 --address-strengths 0.8 1.0
+  --thresholds 0.85 0.9 0.95 --address-strengths 0.8 1.0 \
+  --output results/erwhitepaper/ncvoter/results_f1_sweep.json
 ```
 
 Performance note for reviewers: `--k` grows the candidate set, and the scripts

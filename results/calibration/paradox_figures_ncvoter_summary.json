@@ -1,0 +1,76 @@
+{
+  "dataset": "ncvoter",
+  "tau": 0.85,
+  "prior_default": 0.0001,
+  "prior_em_fitted": 0.02307499325171883,
+  "t_bits": 2.5,
+  "delta_b_bits": 7.88,
+  "admitted_nonmatches_in_band": 612,
+  "weight_distributions": {
+    "match_untrained": {
+      "name": "match_untrained",
+      "mean": 12.3,
+      "median": 12.7,
+      "p25": 9.7,
+      "p75": 17.0
+    },
+    "match_em": {
+      "name": "match_em",
+      "mean": -33.1,
+      "median": -8.0,
+      "p25": -92.3,
+      "p75": 4.7
+    },
+    "nonmatch_untrained": {
+      "name": "nonmatch_untrained",
+      "mean": -26.9,
+      "median": -28.3,
+      "p25": -30.6,
+      "p75": -25.3
+    },
+    "nonmatch_em": {
+      "name": "nonmatch_em",
+      "mean": -19.2,
+      "median": -23.9,
+      "p25": -24.0,
+      "p75": -13.0
+    }
+  },
+  "metrics": {
+    "untrained": {
+      "n_pairs": 60000,
+      "threshold": 0.85,
+      "precision": 1.0,
+      "recall": 0.9574944071588367,
+      "f1": 0.9782857142857143,
+      "f_beta": 0.9782857142857143,
+      "brier": 0.0009044978184777233,
+      "log_loss": 0.00307199373890444,
+      "average_precision": 0.9974276763332812,
+      "expected_cost": 0.00095,
+      "cost_optimal_tau": 0.8056616541353384,
+      "cost_optimal_cost": 0.00095
+    },
+    "em": {
+      "n_pairs": 60000,
+      "threshold": 0.85,
+      "precision": 1.0,
+      "recall": 0.2721849366144668,
+      "f1": 0.42790152403282533,
+      "f_beta": 0.4279015240328253,
+      "brier": 0.01567796158594928,
+      "log_loss": 0.2516503728411817,
+      "average_precision": 0.43997716971261003,
+      "expected_cost": 0.016266666666666665,
+      "cost_optimal_tau": 0.06453132832080201,
+      "cost_optimal_cost": 0.014833333333333334
+    }
+  },
+  "n_match_pairs": 1341,
+  "n_nonmatch_untrained": 58659,
+  "n_nonmatch_em": 58659,
+  "figures": [
+    "results\\calibration\\figures\\paradox_mech1.png",
+    "results\\calibration\\figures\\paradox_mech2.png"
+  ]
+}

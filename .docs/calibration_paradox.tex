@@ -46,9 +46,10 @@ prior changes $b$, so a fixed $\tau$ selects a different operating point in ever
 configuration. We derive the paradox under this decomposition, distinguish prior coupling
 from a genuine $m/u$ residual, and give a tandem $(\lambda,\tau)$ calibration procedure,
 together with an analysis of how threshold choice is sensitive to prior misspecification.
-Empirical evidence from a 100,000-record duplicate-bearing benchmark, a joint
-$(\lambda,\tau)$ surface, a real-schema NC-voter replication, and a smoothing
-regularisation study illustrates both the failure and its repair.
+Empirical evidence from a 5,000-record duplicate-bearing benchmark (plus a
+50,000-record supervised comparison), a joint $(\lambda,\tau)$ surface, a
+real-schema NC-voter replication, and a smoothing regularisation study
+illustrates both the failure and its repair.
 \end{abstract}
 
 \section{Introduction}
@@ -65,11 +66,11 @@ non-match probabilities $m$ and $u$ from the data --- which should \emph{improve
 calibration --- can \emph{worsen} the reported outcome at a fixed decision threshold $\tau$.
 The effect is sharpest and most robust for unsupervised learning (EM) with a freely
 re-estimated prior $\lambda$: on some configurations EM degraded an F1 of roughly $0.98$ to
-below $0.9$. On a synthetic duplicate-bearing benchmark, supervised calibration also trailed
-the untrained defaults at a fixed $\tau$; on harder real-schema data, however, supervised
-calibration can \emph{help} (Section~\ref{sec:real}). The paradox is therefore not ``always
-keep the defaults,'' but that calibration and the decision rule are coupled and must be
-reconciled together.
+below $0.9$. On a synthetic duplicate-bearing benchmark, both supervised calibration and EM,
+at a fixed $\tau$, trailed the untrained defaults; on harder real-schema data, however,
+supervised calibration can \emph{help} (Section~\ref{sec:real}). The paradox is therefore
+not ``always keep the defaults,'' but that calibration and the decision rule are coupled
+and must be reconciled together.
 
 This seems paradoxical: training the parameters on data is the standard remedy for poor
 record-linkage performance, and the literature reports that appropriately estimated $m/u$
@@ -193,8 +194,8 @@ $\lambda$ to $\lambda'$. By \eqref{eq:logodds}, every pair's posterior log-odds 
 \end{equation}
 and, by \eqref{eq:threshold}, the effective weight threshold moves by
 $\Delta w_\tau^*=-\Delta b$. Concretely, starting from the default
-$\lambda=10^{-4}$ ($b\approx-13.3$ hits) an EM fit that raises $\lambda$ to
-$7.2\times10^{-3}$ ($b\approx-7.1$ bits) reduces the effective threshold by
+$\lambda=10^{-4}$ ($b\approx-13.3$ bits) an EM fit that raises $\lambda$ to
+$7.1\times10^{-3}$ ($b\approx-7.1$ bits) reduces the effective threshold by
 $\approx 6.2$ bits. Every candidate pair whose weight lies within $6.2$ bits below the old
 boundary now crosses it. Non-match pairs are typically far more numerous and concentrated
 near the boundary (they include partial agreement), so the effect is a disproportionate
@@ -227,7 +228,24 @@ keeps even the jointly re-optimised trained model slightly below the untrained d
 It is a substantive statement about which levels should be rewarded, not a numerical
 artefact.
 
-\subsection{The coalesence: fixed $\tau$ is not a fixed operating point}
+Two caveats delimit how strongly the residual should be read. First, the supervised
+estimator in the 5{,}000-record benchmark is trained on a \emph{balanced} label mix
+(duplicate pairs versus independent, unrelated people), whereas the operational candidate
+set that precision and specificity are measured against is dominated by embedding
+near-collisions. Part of what looks like a ``residual'' may therefore be a mismatch between
+the label distribution used for training and the candidate distribution encountered at
+scoring, rather than a property of the model class; on the real-schema NC-voter file, where
+partial agreement is genuinely informative, supervised calibration in fact improves F1
+(Section~\ref{sec:real}). Second, the unsupervised EM runs are bounded by a small number of
+iterations (Appendix~\ref{app:estimation}) and can fit unreliable $m/u$ when the training
+candidate space is degenerate, so the EM-specific degradation should be read as
+``freely-fitted, partially-converged EM,'' not as evidence that every training scheme is
+harmful. Both mechanisms push the trained operating point left or right on the
+precision--recall curve; the coordination rule of Section~\ref{sec:alg} reconciles them
+with $\tau$. The residual therefore establishes that the paradox is more than pure prior
+coupling, but its quantitative magnitude is not a universal award to the default weights.
+
+\subsection{The coalescence: fixed $\tau$ is not a fixed operating point}
 Combining both mechanisms and expanding the log-odds for a pair $p$,
 \begin{equation}
 \Delta\,\mathrm{logit}_2\bigl(P(M\mid\gamma_p)\bigr)
@@ -255,8 +273,9 @@ tandem procedure.
 sparse duplicate base rate).
 \item[\textbf{Step 1.}] Estimate a \emph{principled} prior rather than a free one. With
 labels, $\lambda=\tfrac{\text{labelled match rate}}{\text{blocking recall}}$, the base rate
-in random-pair space. Without labels, use a blocking-adjusted estimator
-\cite{winkler2000} that divides an assumed expected-match count by the blocking coverage;
+in random-pair space. Without labels, use a principled prior rather than the free EM estimate: divide an
+assumed expected-match count by the blocking coverage (a blocking-adjusted estimator in the
+spirit of frequency-based matching \cite{winkler2000});
 if no defensible rate exists, keep $\lambda_0$.
 \item[\textbf{Step 2.}] Fit $m/u$ with the prior \emph{fixed} (e.g.\ EM with
 ${\lambda}$ held at the Step~1 value, or supervised calibration), so that training affects
@@ -280,11 +299,32 @@ held-out test set.
 We used the two-stage pipeline from the companion entity-resolution paper
 \cite{pipeline}: records are embedded with a
 sentence-transformer model, blocked by cosine nearest-neighbour search, and linked with a
-Fellegi--Sunter scorer (Splink) using Jaro--Winkler comparisons for names and address, a
-date-of-birth comparison, and an email comparison. All experiments were run across a
-100{,}000-record base population with a 3\% duplicate-bearing augmentation, producing
-6{,}000 labelled queries (positives are near-duplicate variants, negatives are held-out
-records). Training and weight computation are performed over the \emph{blocked} candidate
+Fellegi--Sunter scorer (Splink) \cite{splink} using Jaro--Winkler comparisons for names and address, a
+date-of-birth comparison, and an email comparison. All results below are reproduced from
+the persisted artifacts in \texttt{results/calibration/} of the companion repository; each
+table cites the exact file that produced it.
+
+Three datasets are used, labelled explicitly throughout.
+
+\begin{description}
+\item[5{,}000-record benchmark] A duplicate-bearing synthetic population: 5{,}000 base
+records with a 3\% duplicate-bearing augmentation (150 near-duplicate twins), giving
+5{,}150 reference records and 300 labelled queries (150 positives are near-duplicate
+variants, 150 negatives are held-out records). Source artifact:
+\texttt{results/calibration/mu\_tau\_interaction.json}. This is the dataset behind the
+benchmark table (Table~\ref{tab:benchmark}), the joint $(\lambda,\tau)$ surface
+(Table~\ref{tab:surface}), and the prior-sensitivity analysis
+(Table~\ref{tab:sens}).
+\item[50{,}000-record supervised comparison] The persisted 50{,}000-record FAISS index,
+with supervised $m/u$ calibration from labelled pairs, used for the smoothing study
+(Table~\ref{tab:smooth}). Source artifact:
+\texttt{results/calibration/mu\_calibration\_results.json} and
+\texttt{results/calibration/smoothing\_sweep.json}.
+\item[NC-voter] A real-schema replication (Section~\ref{sec:real}). Source artifact:
+\texttt{results/calibration/ncvoter\_mu\_comparison.json}.
+\end{description}
+
+Training and weight computation are performed over the \emph{blocked} candidate
 pairs. EM training generates those pairs by Splink exact-equality blocking on the
 \texttt{first\_name} and \texttt{date\_of\_birth} keys
 (\texttt{block\_on("first\_name")} and \texttt{block\_on("date\_of\_birth")}), whereas
@@ -295,48 +335,54 @@ component is dominated by near-collisions on the blocking keys
 
 Three parameter configurations are compared: (i) untrained defaults, with $\lambda=10^{-4}$;
 (ii) supervised calibration of $m/u$ from the labelled duplicate pairs, $\lambda=10^{-4}$;
-(iii) EM with a freely estimated prior (which produced $\lambda\approx7.2\times10^{-3}$),
-and an ablation of (iii) with $\lambda$ reset to $10^{-4}$. Table~\ref{tab:benchmark}
-reports the outcome at the fixed decision threshold $\tau=0.85$.
+(iii) EM with a freely estimated prior (which produced $\lambda\approx7.1\times10^{-3}$ on
+the 5{,}000-record benchmark), and an ablation of (iii) with $\lambda$ reset to $10^{-4}$.
+Table~\ref{tab:benchmark}
+reports the outcome at the fixed decision threshold $\tau=0.85$. The pairwise metrics in
+Table~\ref{tab:metrics} are evaluated over the blocked candidate pairs rather than the
+labelled query set, so their F1 magnitudes differ from the query-level tables (many more
+non-match candidate pairs enter the denominator); the text notes this wherever it occurs.
 
 \begin{table}[h]
 \centering
-\caption{Duplicate-bearing benchmark (100{,}000 base records, 6{,}000 queries,
-$\tau=0.85$). The trained configurations degrade F1 at the fixed threshold; the EM model
-degraded most, and its prior only explains part of the loss.}
+\caption{Duplicate-bearing benchmark (5{,}000 base records, 300 queries,
+$\tau=0.85$; artifact \texttt{results/calibration/mu\_tau\_interaction.json}). The trained
+configurations degrade F1 at the fixed threshold; the EM model degraded most.}
 \label{tab:benchmark}
 \begin{tabular}{lrrrrr}
 \toprule
 Configuration & Precision & Recall & Specificity & F1 & $\lambda$\\
 \midrule
-Untrained defaults & 90.1\% & 98.1\% & 89.2\% & 93.9\% & $10^{-4}$\\
-Supervised ($m/u$, $\lambda$ fixed) & 75.1\% & 98.5\% & 67.3\% & 85.2\% & $10^{-4}$\\
-EM (free prior) & 56.9\% & 98.3\% & 25.4\% & 72.1\% & $7.2\times10^{-3}$\\
+Untrained defaults & 98.7\% & 98.0\% & 98.7\% & 98.3\% & $10^{-4}$\\
+Supervised ($m/u$, $\lambda$ fixed) & 87.7\% & 100.0\% & 86.0\% & 93.5\% & $10^{-4}$\\
+EM (free prior) & 69.6\% & 99.3\% & 56.7\% & 81.9\% & $7.1\times10^{-3}$\\
 \bottomrule
 \end{tabular}
 \end{table}
 
 The free-prior EM configuration is the clearest quantitative instance of the paradox: the
-same model that recovered a fraction of the unweighted prior's recall errors collapsed
-precision and specificity. In an ablation on the same synthetic duplicate-bearing population
-we reset the EM prior to $10^{-4}$ and re-tuned $\tau$; EM's F1 recovered from $0.826$ to
-$0.968$, and the mean posterior probability of non-match pairs fell from $0.549$ to
-$0.328$. This is consistent with Mechanism~1 (prior coupling) being the dominant term:
+same model that recovered the untrained prior's recall collapsed precision and specificity
+at the fixed threshold. In an ablation on the same synthetic duplicate-bearing population we
+reset the EM prior to $10^{-4}$ and re-tuned $\tau$; EM's best F1 recovered from $0.828$ to
+$0.955$, and the mean posterior probability of non-match pairs fell from $0.536$ to
+$0.342$. This is consistent with Mechanism~1 (prior coupling) being the dominant term:
 holding $\lambda$ at the default removes most of the apparent failure.
 
 \subsection{Joint $(\lambda,\tau)$ surface}
 To show that the paradox is an operating-point effect and not a property of any single
 threshold, we swept the prior and the threshold jointly for the untrained and EM models
-(Table~\ref{tab:surface}). The untrained defaults retain F1 above $0.97$ across the whole
-region; the EM model only reaches comparable F1 near low $\lambda$ and high $\tau$, and even
-its joint optimum ($0.955$) stays below the untrained optimum ($0.997$). This is exactly the
+(Table~\ref{tab:surface}). The untrained model keeps F1 near or above $0.96$ across the whole region, while the EM
+model only reaches comparable F1 near low $\lambda$ and high $\tau$; even its joint optimum
+($0.955$) stays below the untrained optimum ($0.990$). This is exactly the
 prediction of Section~\ref{sec:paradox}: prior coupling is removed by sweeping, but the
 genuine $m/u$ residual remains.
 
 \begin{table}[h]
 \centering
 \caption{Joint F1 over $(\lambda,\tau)$ for untrained and EM configurations on the
-duplicate-bearing population. Entries are F1 (percent).}
+5{,}000-record duplicate-bearing population. Entries are F1 (percent). Source artifact
+\texttt{results/calibration/mu\_prior\_tau\_surface.json}. At each $\lambda$, the EM row
+holds the fitted EM $m/u$ and sweeps only the prior and threshold.}
 \label{tab:surface}
 \begin{tabular}{lccccc}
 \toprule
@@ -344,9 +390,9 @@ duplicate-bearing population. Entries are F1 (percent).}
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}
 $\lambda$ & $\tau=0.85$ & $\tau=0.95$ & $\tau=0.85$ & $\tau=0.95$ &\\
 \midrule
-$10^{-4}$ & 98.4 & 99.7 & 93.3 & 94.2 &\\
-$10^{-3}$ & 97.1 & 97.1 & 81.7 & 84.7 &\\
-$10^{-2}$ & 95.8 & 96.4 & 81.0 & 81.4 &\\
+$10^{-4}$ & 98.3 & 99.0 & 91.4 & 95.2 &\\
+$10^{-3}$ & 97.1 & 96.4 & 82.3 & 85.1 &\\
+$10^{-2}$ & 96.1 & 97.1 & 81.9 & 82.3 &\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -410,7 +456,8 @@ which is the essence of Mechanism~2.
 threshold is fixed at $t=\log_2\frac{\tau}{1-\tau}=2.50$ bits; the EM-estimated prior
 $\lambda\approx0.023$ shifts the non-match distribution up by $\Delta b\approx7.9$ bits
 (grey to orange), admitting about 612 non-match pairs in the shaded band as false positives.
-Prior coupling is secondary here to the Mechanism 2 recall collapse.}
+Prior coupling is secondary here to the Mechanism 2 recall collapse. (Artifact
+\texttt{results/calibration/paradox\_figures\_ncvoter\_summary.json}.)}
 \label{fig:mech1}
 \end{figure}
 
@@ -422,20 +469,22 @@ untrained $m/u$ (match in green, non-match in grey); bottom panel: EM $m/u$ (mat
 non-match in orange). The EM-fitted weights move the match distribution sharply left
 (median $12.7\to-8$ bits) while the non-match distribution moves only slightly right
 ($-28\to-24$), closing the separating gap; recall collapses as true matches are scored
-toward non-match territory. Dashed line: fixed threshold $t$.}
+toward non-match territory. Dashed line: fixed threshold $t$. (Artifact
+\texttt{results/calibration/paradox\_figures\_ncvoter\_summary.json}.)}
 \label{fig:mech2}
 \end{figure}
 
 For comparison, Figures~\ref{fig:mech1-synth} and~\ref{fig:mech2-synth} repeat the two
 mechanisms on the synthetic duplicate-bearing benchmark of Section~\ref{sec:emp}, where the
-paradox is measured. The EM-fitted prior is smaller there ($\lambda\approx0.0069$), so the
-prior shift is $\Delta b\approx6.1$ bits and it admits only about $11$ non-match pairs in the
+paradox is measured. The EM-fitted prior is smaller there ($\lambda\approx0.0071$), so the
+prior shift is $\Delta b\approx6.2$ bits and it admits only about $16$ non-match pairs in the
 candidate set. The EM $m/u$ there \emph{increase} the match weights (median $17\to24$ bits)
-and \emph{decrease} the non-match weights ($-25\to-38$), i.e.\ they \emph{widen} the
-separating gap rather than collapse it. In this sample, therefore, neither mechanism
-visibly floods the boundary: the EM degradation measured at scale is carried by prior
-coupling admitting partial-collision non-matches at the higher duplicate density of the
-100{,}000-record benchmark, which a 5{,}000-record sample under-represents. The core
+and \emph{decrease} the non-match weights ($-26\to-85$), i.e.\ they \emph{widen} the
+separating gap rather than collapse it. In this small sample, therefore, neither mechanism
+visibly floods the boundary plot; at the larger duplicate densities measured with the
+companion pipeline's 100{,}000-record benchmark \cite{pipeline}, prior coupling dominates the
+reported EM degradation by admitting partial-collision non-matches, a regime a 5{,}000-record
+sample under-represents. The core
 takeaway stands: in both data sets the failure is a mismatch among the bundle
 $(m/u,\lambda,\tau)$, and the same tandem calibration repair (Section~\ref{sec:alg}) applies.
 
@@ -443,9 +492,9 @@ $(m/u,\lambda,\tau)$, and the same tandem calibration repair (Section~\ref{sec:a
 \centering
 \includegraphics[width=0.86\textwidth]{figures/paradox_mech1_synth.png}
 \caption{Mechanism 1 on the synthetic duplicate-bearing benchmark (posterior log-odds).
-Threshold fixed at $t=2.50$ bits; EM's fitted prior $\lambda\approx0.0069$ shifts the
-non-match distribution up by $\Delta b\approx6.1$ bits, admitting about 11 non-match pairs
-in the shaded band.}
+Threshold fixed at $t=2.50$ bits; EM's fitted prior $\lambda\approx0.0071$ shifts the
+non-match distribution up by $\Delta b\approx6.2$ bits, admitting about 16 non-match pairs
+in the shaded band. (Artifact \texttt{results/calibration/paradox\_figures\_synth\_summary.json}.)}
 \label{fig:mech1-synth}
 \end{figure}
 
@@ -454,15 +503,17 @@ in the shaded band.}
 \includegraphics[width=0.86\textwidth]{figures/paradox_mech2_synth.png}
 \caption{Mechanism 2 on the synthetic duplicate-bearing benchmark (top: untrained $m/u$;
 bottom: EM $m/u$). The EM weights \emph{raise} match weights (median $17\to24$) and
-\emph{lower} non-match weights ($-25\to-38$), widening the gap rather than collapsing it, so
-Mechanism~2 is not the dominant failure on this data set.}
+\emph{lower} non-match weights ($-26\to-85$), widening the gap rather than collapsing it, so
+Mechanism~2 is not the dominant failure on this data set. (Artifact
+\texttt{results/calibration/paradox\_figures\_synth\_summary.json}.)}
 \label{fig:mech2-synth}
 \end{figure}
 
 \begin{table}[h]
 \centering
 \caption{Mutated NC-voter resolution at fixed $\tau=0.85$ (3{,}000 in-index, 1{,}500
-positive, 1{,}500 negative queries). Date-of-birth and email comparisons are unavailable.}
+positive, 1{,}500 negative queries). Date-of-birth and email comparisons are unavailable.
+(Artifact \texttt{results/calibration/ncvoter\_mu\_comparison.json}.)}
 \label{tab:real}
 \begin{tabular}{lcccc}
 \toprule
@@ -504,9 +555,10 @@ partial-similarity levels, and those levels are precisely the ones where $n_k$ i
 might expect larger $\alpha$ to reduce the residual.
 
 Table~\ref{tab:smooth} tests this on the supervised calibration of the 50{,}000-reference
-benchmark at fixed $\tau$. Increasing $\alpha$ from 0.5 to 50 barely moves the supervised
-F1 (94.4\% to 93.6\%), leaving a persistent gap of roughly four points below the untrained
-defaults ($\approx98\%$). The residual is therefore not an artefact of level-count variance
+benchmark at fixed $\tau$ (artifact \texttt{results/calibration/smoothing\_sweep.json}).
+Increasing $\alpha$ from 0.5 to 50 barely moves the supervised
+F1 (94.1\% to 93.4\%), leaving a persistent gap of roughly four points below the untrained
+defaults ($\approx98.1\%$). The residual is therefore not an artefact of level-count variance
 or zero counts; it reflects a structural modelling choice --- the trained model rewards
 partial-similarity agreement more than the default weight scheme does --- and smoothing the
 level probabilities toward uniform does not reverse that choice. We therefore recommend
@@ -532,14 +584,15 @@ but data-dependent lever rather than a default remedy.
 
 \begin{table}[h]
 \centering
-\caption{Supervised calibration of the synthetic benchmark at fixed $\tau=0.85$ under
-Laplace smoothing $\alpha$. The untrained defaults give F1 $\approx98\%$ throughout.}
+\caption{Supervised calibration of the 50{,}000-reference benchmark at fixed
+$\tau=0.85$ under Laplace smoothing $\alpha$. The untrained defaults give F1
+$\approx98.1\%$ throughout. (Artifact \texttt{results/calibration/smoothing\_sweep.json}.)}
 \label{tab:smooth}
 \begin{tabular}{lccc}
 \toprule
 Smoothing $\alpha$ & 0.5 & 5 & 50 \\
 \midrule
-Supervised F1 & 94.4\% & 93.8\% & 93.6\% \\
+Supervised F1 & 94.1\% & 93.7\% & 93.4\% \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -565,9 +618,10 @@ reliably, so this relation bounds how much the operating point can move for a gi
 error.
 
 Table~\ref{tab:sens} quantifies the consequence: the best F1 attainable after re-optimising
-$\tau$ at each prior. The untrained model is stable (best F1 $0.98$--$1.00$) across two
+$\tau$ at each prior. The untrained model is stable (best F1 $0.97$--$0.99$) across two
 orders of magnitude in $\lambda$; the EM model is highly sensitive, its attainable F1
-falling from $0.96$ at $\lambda=10^{-5}$ to $0.81$ at $\lambda=10^{-2}$. Our guidance for the
+falling from $0.95$ at $\lambda=10^{-5}$ to $0.82$ at $\lambda=10^{-2}$, with a different
+optimal $\tau$ at each prior. Our guidance for the
 unsupervised setting is therefore: (i)~prefer the default or blocking-adjusted prior rather
 than a free EM estimate; (ii)~select $\tau$ on a validation split over a grid of candidate
 $\lambda$; and (iii)~report the range of F1 across that grid as an explicit sensitivity
@@ -577,14 +631,16 @@ labelled data.
 \begin{table}[h]
 \centering
 \caption{Best F1 attainable after re-optimising $\tau$ at each assumed prior, on the
-duplicate-bearing population. The optimal $\tau$ for every EM row is $0.98$.}
+5{,}000-record duplicate-bearing population (artifact
+\texttt{results/calibration/mu\_prior\_tau\_surface.json}). The optimal $\tau$ for the EM
+rows is $0.90$, $0.98$, and $0.95$ at $\lambda=10^{-5}, 10^{-3}, 10^{-2}$ respectively.}
 \label{tab:sens}
 \begin{tabular}{lccc}
 \toprule
 Assumed $\lambda$ & $10^{-5}$ & $10^{-3}$ & $10^{-2}$ \\
 \midrule
-Untrained, best F1 & 0.99 & 0.99 & 0.98 \\
-EM, best F1 & 0.96 & 0.91 & 0.81 \\
+Untrained, best F1 & 0.99 & 0.98 & 0.97 \\
+EM, best F1 & 0.95 & 0.91 & 0.82 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -595,7 +651,7 @@ F1 at a single threshold does not separate ranking discrimination from probabili
 calibration, nor does it reflect asymmetric false-positive/false-negative costs. We therefore
 report three further quantities, evaluated pairwise over the blocked candidate pairs (which
 is consistent with these metrics, and complements the query-level confusion matrices above):
-the \emph{Brier score} (mean squared error of the match probability
+the \emph{Brier score} \cite{brier} (mean squared error of the match probability
 $\frac1n\sum_i(p_i-y_i)^2$), the \emph{Average Precision} (area under the precision--recall
 curve, a threshold-free measure of how well matches are ranked above non-matches), and the
 \emph{expected decision cost} at the unit-cost-optimal threshold
@@ -605,7 +661,11 @@ Lower Brier and cost are better; higher Average Precision is better.
 \begin{table}[h]
 \centering
 \caption{Pairwise evaluation metrics (untrained vs.\ EM) on both data sets. Brier and
-expected cost: lower is better; Average Precision: higher is better.}
+expected cost: lower is better; Average Precision: higher is better. Evaluated over the
+blocked candidate pairs (60{,}000 on NC-voter, 6{,}000 on the synthetic benchmark), so these
+F1 values use many more non-match pairs than the query-level confusion matrices above.
+(Artifacts \texttt{results/calibration/paradox\_figures\_ncvoter\_summary.json} and
+\texttt{\ldots/paradox\_figures\_synth\_summary.json}.)}
 \label{tab:metrics}
 \begin{tabular}{lcccc}
 \toprule
@@ -613,11 +673,11 @@ expected cost: lower is better; Average Precision: higher is better.}
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}
 Metric & Untrained & EM & Untrained & EM \\
 \midrule
-Brier & 0.0009 & 0.0157 & 0.0254 & 0.0511 \\
-Average Precision & 0.997 & 0.440 & 0.367 & 0.487 \\
-F1 (pairwise) & 0.978 & 0.428 & 0.634 & 0.540 \\
-Expected cost & 0.0009 & 0.0163 & 0.0250 & 0.0367 \\
-$\tau^*$ (unit cost) & 0.81 & 0.07 & 0.93 & 1.00 \\
+Brier & 0.0009 & 0.0157 & 0.0264 & 0.0479 \\
+Average Precision & 0.997 & 0.440 & 0.366 & 0.502 \\
+F1 (pairwise) & 0.978 & 0.428 & 0.630 & 0.564 \\
+Expected cost & 0.0009 & 0.0163 & 0.0260 & 0.0343 \\
+$\tau^*$ (unit cost) & 0.81 & 0.06 & 0.81 & 1.00 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -626,10 +686,10 @@ On the NC-voter file the EM fit is worse on every quantity --- calibration (Brie
 $0.0009\to0.0157$), discrimination (Average Precision $0.997\to0.440$), pairwise F1, and
 expected cost --- consistent with the Mechanism~2 evidence collapse. On the synthetic
 benchmark the picture is the precise mirror that exposes the paradox: EM \emph{improves}
-ranking discrimination (Average Precision $0.367\to0.487$) while it \emph{worsens}
-calibration (Brier $0.0254\to0.0511$) and, at the fixed $\tau$, pairwise F1
-($0.634\to0.540$) and expected cost ($0.0250\to0.0367$, with the unit-cost-optimal threshold
-moving from $0.93$ to $1.00$). Training can therefore sharpen how well the score ranks
+ranking discrimination (Average Precision $0.366\to0.502$) while it \emph{worsens}
+calibration (Brier $0.0264\to0.0479$) and, at the fixed $\tau$, pairwise F1
+($0.630\to0.564$) and expected cost ($0.0260\to0.0343$, with the unit-cost-optimal threshold
+moving from $0.81$ to $1.00$). Training can therefore sharpen how well the score ranks
 matches above non-matches while still degrading the calibrated, operational outcome --- the
 calibration paradox quantified with a metric that separates ranking from calibration.
 
@@ -638,12 +698,17 @@ The Fellegi--Sunter model \cite{fellegi1969} already framed linkage as a decisio
 with error-rate targets, and Winkler's line of work formalised optimal decision rules and
 frequency-based parameter estimation \cite{winkler1993,winkler2000}. Christen's monograph
 \cite{christen2012} surveys pragmatic threshold and calibration practice. The
+log-odds decomposition of a decision threshold is a standard device in probabilistic
+linkage: the posterior is a sum of an evidence weight and a prior term, so a threshold on
+the probability corresponds to a threshold on the weight given the prior. The
 precision--recall and threshold-selection literature \cite{davis2006} treats the operating
-point as a tunable trade-off but, as far as we know, does not make explicit that $m/u$,
-$\lambda$, and $\tau$ form a single coupled decision rule whose components cannot be
-changed independently. The contribution here is that explicit log-odds decomposition
+point as a tunable trade-off. What we emphasise here is the consequence for
+\emph{calibration in practice}: refitting $m/u$ while leaving a fixed $\tau$ (and without
+anchoring $\lambda$) is a hidden change of operating point, and the repair is to select
+$\lambda$ and $\tau$ together. The contribution is therefore the explicit coordination rule
 (\eqref{eq:logodds}--\eqref{eq:threshold}), the identification of prior coupling as the
-dominant mechanism, and the tandem calibration procedure.
+dominant mechanism in our pipeline, and the tandem calibration procedure, rather than the
+log-odds decomposition itself.
 
 \section{Discussion and conclusion}
 The calibration paradox is the statement that training the evidence parameters $m/u$ can
@@ -655,12 +720,15 @@ estimated prior moves the bias; a fixed $\tau$ holds the target fixed. Changing 
 without the other two relocates the operating point.
 
 Two distinct mechanisms drive the observed drop. \emph{Prior coupling} is a global bias
-shift: an EM prior inflated from $10^{-4}$ to $7.2\times10^{-3}$ lowers the effective weight
+shift: an EM prior inflated from $10^{-4}$ to $7.1\times10^{-3}$ lowers the effective weight
 threshold by about $6$ bits and admits a flood of false positives; re-anchoring the prior
 recovers most of the loss on the synthetic benchmark. \emph{The genuine residual} is a shift
 of the non-match weight distribution caused by over-weighting partial-similarity levels,
 which survives prior anchoring and keeps jointly re-optimised trained models slightly below
-the defaults on the synthetic data. Real-data replication (Section~\ref{sec:real}) refines
+the defaults on the synthetic data; Section~\ref{sec:paradox}'s caveats apply --- the
+supervised label mix and bounded em iteration budget are part of its magnitude, so it
+establishes that the paradox is more than pure prior coupling rather than a universal award
+to the default weights. Real-data replication (Section~\ref{sec:real}) refines
 this: supervised calibration can improve outcomes on harder schemas (it lifted NC-voter F1
 from 92.2\% to 94.3\% at fixed $\tau$), whereas freely fitted EM remains catastrophically
 miscalibrated. Smoothing the level probabilities (Section~\ref{sec:smoothing}) is a
@@ -680,6 +748,7 @@ unsupervised calibration especially---usually a worse one.
 Ivan P. Fellegi and Alan B. Sunter.
 \newblock A theory for record linkage.
 \newblock Journal of the American Statistical Association, 64(328):1183--1210, 1969.
+\newblock \url{https://doi.org/10.1080/01621459.1969.10501049}.
 
 \bibitem{winkler1993}
 William E. Winkler.
@@ -690,26 +759,43 @@ William E. Winkler.
 William E. Winkler.
 \newblock Frequency-based matching in the Fellegi--Sunter model of record linkage.
 \newblock Statistical Research Division, U.S. Bureau of the Census, Research Report Series RR2000/06, 2000.
+\newblock \url{https://www.census.gov/library/working-papers/2000/adrm/rr2000-06.html}.
 
 \bibitem{christen2012}
 Peter Christen.
 \newblock Data Matching: Concepts and Techniques for Record Linkage, Entity Resolution, and Duplicate Detection.
 \newblock Springer, 2012.
+\newblock \url{https://doi.org/10.1007/978-3-642-31164-2}.
 
 \bibitem{davis2006}
 Jesse Davis and Mark Goadrich.
 \newblock The relationship between precision-recall and ROC curves.
 \newblock In Proceedings of the 23rd International Conference on Machine Learning, pages 233--240, 2006.
+\newblock \url{https://doi.org/10.1145/1143844.1143874}.
 
 \bibitem{mclachlan2000}
 Geoffrey McLachlan and David Peel.
 \newblock Finite Mixture Models.
 \newblock John Wiley \& Sons, 2000.
+\newblock \url{https://doi.org/10.1002/0471721182}.
 
 \bibitem{pipeline}
 Denis Robert.
 \newblock A two-stage entity resolution pipeline with FAISS blocking and Splink matching.
 \newblock Technical report, Independent Researcher, 2026.
+
+\bibitem{splink}
+Rebecca Linacre et al.
+\newblock Splink: Automatic record linkage and linkage quality assessment with Python.
+\newblock International Journal of Population Data Science, 7(3):1794, 2022.
+\newblock \url{https://doi.org/10.23889/ijpds.v7i3.1794}.
+\newblock Software repository: \url{https://github.com/moj-analytical-services/splink}.
+
+\bibitem{brier}
+Glenn W. Brier.
+\newblock Verification of forecasts expressed in terms of probability.
+\newblock Monthly Weather Review, 78(1):1--3, 1950.
+\newblock \url{https://doi.org/10.1175/1520-0493(1950)078<0001:VOFEIT>2.0.CO;2}.
 \end{thebibliography}
 
 \appendix
@@ -736,29 +822,39 @@ With Laplace (Dirichlet) smoothing of concentration $\alpha$ (Section~\ref{sec:s
 Non-symmetric versions use $\alpha_m$ and $\alpha_u$, respectively. The labelled sample also
 yields a prior estimate $\hat\lambda=N_M/(N_M+N_U)$ from the match rate among candidate
 pairs; this is the rate \emph{within the blocked candidate set} and, for a prior over
-random pairs, must be corrected by dividing by the blocking recall
-\cite{winkler2000}.
+random pairs, must be corrected by dividing by the blocking recall.
 
 \subsection{Expectation-maximisation (unlabeled) estimation}
 When no labels exist, the true match status of each candidate pair is a latent variable
-$z_i\in\{M,U\}$. The EM algorithm iterates:
+$z_i\in\{M,U\}$ and the parameters are estimated by expectation--maximisation. In this
+pipeline we use Splink's EM (``\texttt{estimate\_parameters\_using\_expectation\_maximisation}'')
+over the blocked candidate pairs; conceptually it iterates:
 \begin{enumerate}
-\item[\textbf{E-step.}] Using current estimates $(\hat m,\hat u,\hat\lambda)$, compute the
-posterior probability that pair $i$ is a match from \eqref{eq:posterior}, equivalently from
-the log-odds decomposition \eqref{eq:logodds}.
+\item[\textbf{E-step.}] Using current estimates $(\hat m,\hat u)$, compute the posterior
+probability that pair $i$ is a match from \eqref{eq:posterior} with the current prior,
+equivalently from the log-odds decomposition \eqref{eq:logodds}.
 \item[\textbf{M-step.}] Re-estimate the level probabilities as \emph{expected} relative
 frequencies,
 \begin{equation}
 \hat m_k=\frac{\sum_{i}\mathbb E[ \mathbf 1_{\{z_i=M\}}]\mathbf 1_{\{k_i=k\}}}{N_M'},
 \end{equation}
 with $N_M'=\sum_i \mathbb E[\mathbf 1_{\{z_i=M\}}]$ a weighted total, and similarly for
-$u_k$; and update the prior as
-\begin{equation}
-\hat\lambda=\frac{1}{n}\sum_i\mathbb E[\mathbf 1_{\{z_i=M\}}],
-\end{equation}
-the expected match proportion among the $n$ candidate pairs. The cycle is repeated to a
-fixed point.
+$u_k$. The cycle is repeated to a fixed point. In all experiments the loop is bounded to at
+most $15$ iterations with a relative-convergence threshold of $10^{-3}$, over a candidate
+pool capped at $10^6$ pairs
+(\texttt{max\_iterations=15}, \texttt{em\_convergence=0.001}, \texttt{max\_pairs=1e6}, seed 42),
+so a run that does not converge in that budget is reported at its 15th iterate. This bounded
+budget is part of why the fitted EM parameters should be read as ``partially-converged'' in
+Section~\ref{sec:paradox}.
 \end{enumerate}
+Two points must be flagged. First, the match prior $\hat\lambda$ is \emph{not} an EM
+M-step statistic over the responsibilities: in Splink it is set separately by
+``\texttt{estimate\_probability\_two\_random\_records\_match}'', which combines an assumed
+number of matches with a blocking-recall parameter. The prior is therefore a designed
+input to (not a product of) the EM loop, which matters for the prior-coupling mechanism of
+Section~\ref{sec:paradox}. Second, the level probabilities above are the standard
+categorical EM update; Splink fits them inside its own framework, and this appendix gives
+the recipe it instantiates, not a separate implementation.
 
 Note that in this pipeline EM is run on the comparison vectors of the \emph{blocked
 candidate pairs} --- generated by Splink exact-equality blocking on the
@@ -782,7 +878,7 @@ expected to be \emph{larger} than with fixed-value equality blocking. Embedding
 neighbourhoods are selected by overall resemblance, so the retained candidate pairs are even
 more similar to each other than pairs sharing a name or date of birth, concentrating the
 non-match mass around near-duplicate collisions; a free $\hat\lambda$ can then drift upward
-substantially more than the $7.2\times10^{-3}$ observed here, and the fitted classes overlap
+substantially more than the $7.1\times10^{-3}$ observed here, and the fitted classes overlap
 even more. The mechanism is therefore not an artefact of the particular blocking keys: any
 blocker that concentrates candidates near true matches intensifies prior coupling, so
 canopy-based training must be paired even more strictly with prior anchoring and joint
@@ -790,10 +886,27 @@ $(\lambda,\tau)$ selection. Second, only the ratios $m_k/u_k$
 enter the decision, and EM additionally fixes the overall scale relative to $\lambda$; both
 the scale and $\lambda$ jointly set the operating point, so neither can be changed
 independently of $\tau$. Third, richer estimators --- frequency-based refinement of $m/u$
-\cite{winkler2000}, or regularised and Bayesian variants of EM \cite{mclachlan2000} ---
-modify the M-step but leave the coupling of Section~\ref{sec:paradox} intact. The tandem
-calibration of Section~\ref{sec:alg} is the layer that reconciles whatever estimator is used
-with a chosen $\tau$.
+(which Winkler motivates via name frequencies \cite{winkler2000}), or regularised and
+Bayesian variants of EM \cite{mclachlan2000} --- modify the M-step but leave the coupling of
+Section~\ref{sec:paradox} intact. The tandem calibration of Section~\ref{sec:alg} is the
+layer that reconciles whatever estimator is used with a chosen $\tau$.
+
+\section*{Reproducibility}
+All numeric results are stored as JSON artifacts under \texttt{results/calibration/} of the
+companion repository, and each table and figure caption names the exact file behind it
+(\texttt{mu\_tau\_interaction.json}, \texttt{mu\_prior\_tau\_surface.json},
+\texttt{mu\_calibration\_results.json}, \texttt{smoothing\_sweep.json},
+\texttt{ncvoter\_mu\_comparison.json}, \texttt{paradox\_figures\_\{synth,ncvoter\}\_summary.json}).
+The companion repository's verification harness
+(\texttt{scripts/verify\_claims.py}) maps each number to its producing script and field.
+Software versions: Splink 4.x (DuckDB backend), \texttt{sentence-transformers} with
+\texttt{all-MiniLM-L6-v2}, \texttt{faiss-cpu}, Faker, pandas, numpy; all runs use seed 42 and
+the batching parameters stated in each artifact's \texttt{parameters} block. The experiment
+entry points are \texttt{scripts/experiment\_mu\_tau\_interaction.py},
+\texttt{scripts/experiment\_mu\_prior\_tau\_surface.py},
+\texttt{scripts/experiment\_mu\_calibration.py}, \texttt{scripts/experiment\_smoothing\_sweep.py},
+\texttt{scripts/ncvoter/experiment\_mu\_comparison.py}, and
+\texttt{scripts/experiment\_paradox\_figures.py}.
 
 \section*{Use of Artificial Intelligence}
 During the preparation of this work the author used an AI coding and writing assistant (the

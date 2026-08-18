@@ -100,6 +100,7 @@ def generate_person(fake: Faker, missing_rate: float = 0.3) -> Person:
 def generate_people(count: int = 50000, missing_rate: float = 0.3, seed: int = 42) -> List[Person]:
     """Generate a list of people with configurable missing data rate."""
     random.seed(seed)
+    Faker.seed(seed)  # also seed Faker's RNG so generation is reproducible
     fake = Faker('en_CA')
     fake.add_provider(CanadianAddressProvider)
     

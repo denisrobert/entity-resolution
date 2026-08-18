@@ -1,0 +1,87 @@
+{
+  "parameters": {
+    "count": 10000,
+    "missing_rate": 0.3,
+    "k": 20,
+    "threshold_default": 0.85,
+    "seed": 42,
+    "decay": true,
+    "residency": 20.6,
+    "weibull_k": null,
+    "fit_tk": false,
+    "train_splink": true,
+    "input_records": null,
+    "holdout_frac": 0.2,
+    "prior_grid": [
+      0.5,
+      0.2,
+      0.1,
+      0.05,
+      0.02,
+      0.01,
+      0.005,
+      0.002,
+      0.001
+    ],
+    "tau_grid": [
+      0.99,
+      0.95,
+      0.9,
+      0.85,
+      0.8,
+      0.7,
+      0.6,
+      0.5,
+      0.4,
+      0.3,
+      0.2,
+      0.1
+    ]
+  },
+  "timing": {
+    "index_build_seconds": 73.80493740001111,
+    "blocking_seconds": 221.21805239999958,
+    "n_queries": 30000,
+    "n_candidate_rows": 600000
+  },
+  "continuous": {
+    "train_seconds": 40.44023530000413,
+    "infer_seconds": 0.23905030000120556,
+    "ms_query": 0.007968343333373519,
+    "fitted_pi": 0.5982657071805231,
+    "prior": 1e-06,
+    "tau": 0.99,
+    "metrics": {
+      "accuracy": 0.9926666666666667,
+      "precision": 0.9955290611028316,
+      "recall": 0.993554784333168,
+      "specificity": 0.9908443540183113,
+      "f1": 0.9945409429280397
+    }
+  },
+  "splink_untrained": {
+    "infer_seconds_plus_setup": 179.47871879999002,
+    "prior": 0.002,
+    "tau": 0.99,
+    "metrics": {
+      "accuracy": 0.9891666666666666,
+      "precision": 0.9920654599553682,
+      "recall": 0.9918195339613287,
+      "specificity": 0.9837232960325534,
+      "f1": 0.9919424817156316
+    }
+  },
+  "splink_trained": {
+    "train_seconds": 4.9434423000056995,
+    "infer_seconds": 182.72051799998735,
+    "prior": 0.01,
+    "tau": 0.85,
+    "metrics": {
+      "accuracy": 0.7636666666666667,
+      "precision": 0.7964641885766093,
+      "recall": 0.8710956866633615,
+      "specificity": 0.54323499491353,
+      "f1": 0.8321098744968032
+    }
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "parameters": {
+    "base_records": 100000,
+    "match_rate": 0.03,
+    "duplicate_pairs": 3000,
+    "reference_records": 103000,
+    "total_queries": 6000,
+    "positive_queries": 3000,
+    "negative_queries": 3000,
+    "missing_rate": 0.3,
+    "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+    "blocking_k": 20,
+    "match_threshold": 0.85,
+    "close_variation_rate": 0.15,
+    "seed": 42
+  },
+  "timing": {
+    "dataset_seconds": 38.115406999975676,
+    "index_build_seconds": 1712.9372627999983,
+    "blocking_seconds": 346.1444618999958,
+    "untrained_seconds": 2.665453499997966,
+    "supervised_seconds": 2.5079094999819063,
+    "em_seconds": 3.0623275999969337
+  },
+  "m_u": {
+    "em_prior": 0.007093798723844713,
+    "supervised_prior": 0.0001,
+    "untrained_prior": 0.0001
+  },
+  "variants": {
+    "untrained": {
+      "confusion_matrix": {
+        "TP": 2920,
+        "FN": 80,
+        "FP": 320,
+        "TN": 2680
+      },
+      "metrics": {
+        "accuracy": 0.9333333333333333,
+        "precision": 0.9012345679012346,
+        "recall": 0.9733333333333334,
+        "specificity": 0.8933333333333333,
+        "f1": 0.9358974358974359
+      }
+    },
+    "supervised": {
+      "confusion_matrix": {
+        "TP": 2930,
+        "FN": 70,
+        "FP": 975,
+        "TN": 2025
+      },
+      "metrics": {
+        "accuracy": 0.8258333333333333,
+        "precision": 0.7503201024327785,
+        "recall": 0.9766666666666667,
+        "specificity": 0.675,
+        "f1": 0.8486603910209993
+      }
+    },
+    "em": {
+      "confusion_matrix": {
+        "TP": 2927,
+        "FN": 73,
+        "FP": 2236,
+        "TN": 764
+      },
+      "metrics": {
+        "accuracy": 0.6151666666666666,
+        "precision": 0.5669184582607012,
+        "recall": 0.9756666666666667,
+        "specificity": 0.25466666666666665,
+        "f1": 0.7171383069949774
+      }
+    }
+  },
+  "summary": {
+    "untrained": {
+      "accuracy": 0.9333,
+      "precision": 0.9012,
+      "recall": 0.9733,
+      "specificity": 0.8933,
+      "f1": 0.9359
+    },
+    "supervised": {
+      "accuracy": 0.8258,
+      "precision": 0.7503,
+      "recall": 0.9767,
+      "specificity": 0.675,
+      "f1": 0.8487
+    },
+    "em": {
+      "accuracy": 0.6152,
+      "precision": 0.5669,
+      "recall": 0.9757,
+      "specificity": 0.2547,
+      "f1": 0.7171
+    }
+  }
+}

@@ -1,0 +1,145 @@
+{
+  "parameters": {
+    "reference_records": 50000,
+    "query_rows": 2000,
+    "queries_per_row": 3,
+    "total_queries": 6000,
+    "missing_rate": 0.3,
+    "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+    "blocking_k": 20,
+    "match_threshold": 0.85,
+    "close_variation_rate": 0.15,
+    "smoothing_values": [
+      0.5,
+      5.0,
+      50.0
+    ],
+    "seed": 42
+  },
+  "timing": {
+    "load_seconds": 11.91400310001336,
+    "blocking_seconds": 155.5389996000158
+  },
+  "variants": {
+    "untrained": {
+      "confusion_matrix": {
+        "TP": 3966,
+        "FN": 34,
+        "FP": 116,
+        "TN": 1884
+      },
+      "by_category": {
+        "identical": {
+          "TP": 2000,
+          "FN": 0
+        },
+        "close_same_entity": {
+          "TP": 1966,
+          "FN": 34
+        },
+        "unrelated": {
+          "FP": 116,
+          "TN": 1884
+        }
+      },
+      "metrics": {
+        "accuracy": 0.975,
+        "precision": 0.9715825575698187,
+        "recall": 0.9915,
+        "specificity": 0.942,
+        "f1": 0.9814402375649591
+      },
+      "score_ms": 1760.3443999832962
+    },
+    "supervised_alpha_0.5": {
+      "confusion_matrix": {
+        "TP": 3968,
+        "FN": 32,
+        "FP": 469,
+        "TN": 1531
+      },
+      "by_category": {
+        "identical": {
+          "TP": 2000,
+          "FN": 0
+        },
+        "close_same_entity": {
+          "TP": 1968,
+          "FN": 32
+        },
+        "unrelated": {
+          "FP": 469,
+          "TN": 1531
+        }
+      },
+      "metrics": {
+        "accuracy": 0.9165,
+        "precision": 0.8942979490646833,
+        "recall": 0.992,
+        "specificity": 0.7655,
+        "f1": 0.9406187033305677
+      },
+      "score_ms": 1719.8777000012342
+    },
+    "supervised_alpha_5": {
+      "confusion_matrix": {
+        "TP": 3972,
+        "FN": 28,
+        "FP": 503,
+        "TN": 1497
+      },
+      "by_category": {
+        "identical": {
+          "TP": 2000,
+          "FN": 0
+        },
+        "close_same_entity": {
+          "TP": 1972,
+          "FN": 28
+        },
+        "unrelated": {
+          "FP": 503,
+          "TN": 1497
+        }
+      },
+      "metrics": {
+        "accuracy": 0.9115,
+        "precision": 0.8875977653631285,
+        "recall": 0.993,
+        "specificity": 0.7485,
+        "f1": 0.9373451327433628
+      },
+      "score_ms": 1923.4284000121988
+    },
+    "supervised_alpha_50": {
+      "confusion_matrix": {
+        "TP": 3972,
+        "FN": 28,
+        "FP": 533,
+        "TN": 1467
+      },
+      "by_category": {
+        "identical": {
+          "TP": 2000,
+          "FN": 0
+        },
+        "close_same_entity": {
+          "TP": 1972,
+          "FN": 28
+        },
+        "unrelated": {
+          "FP": 533,
+          "TN": 1467
+        }
+      },
+      "metrics": {
+        "accuracy": 0.9065,
+        "precision": 0.8816870144284129,
+        "recall": 0.993,
+        "specificity": 0.7335,
+        "f1": 0.9340388007054674
+      },
+      "score_ms": 1566.7270999983884
+    }
+  }
+}

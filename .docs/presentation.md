@@ -46,7 +46,7 @@ size: 16:9
 <!--
 Note (presenter): One deck, three audience-tuned parts. Part 1 C-suite (why),
 Part 2 Engineering leadership (architecture & design), Part 3 Line engineers
-(orientation; these teammates read the paper after the talk).
+(orientation; these teammates go hands-on with the code after the talk).
 -->
 
 # Entity Resolution with FAISS + Splink
@@ -62,7 +62,7 @@ Denis Robert
 |---|---|---|---|
 | **1** | C-suite | Value, risk, cost | Decision / review |
 | **2** | Engineering leadership | Architecture, design, roadmap | Carry it forward |
-| **3** | Line engineers | Orientation + map to the paper | **Read the paper** |
+| **3** | Line engineers | Orientation, stack, hands-on | **Go hands-on** |
 
 > Line engineers: this orients you. The whitepaper (`docs/entity_resolution_whitepaper.pdf`) is the source of record; the numbers here come from it.
 
@@ -101,8 +101,8 @@ Query ──► [embed] ──► [FAISS top-k]
 
 # What it delivers
 
-- **99.6% F1** on the synthetic test corpus (15,000 labelled queries).
-- **~8 ms per query** — sub-millisecond blocking, probabilistic verdict on top.
+- **99.5% F1** on the synthetic test corpus (15,000 labelled queries).
+- **~7.5 ms per query** — sub-millisecond blocking, probabilistic verdict on top.
 - **Persisted and reusable**: the index reloads without re-embedding the population.
 - **Defensible numbers**: every result reproduces by re-running the code.
 
@@ -157,7 +157,7 @@ Around **7–14 M records** (or when you need replicated, multi-region durabilit
 - Sponsor a short **proof-on-real-data** phase: a representative, labelled sample of the population we must link (with access/privacy).
 - We then commit to an F1 on *that* data, not the synthetic one.
 
-**Value in one line:** near-perfect, explainable identity resolution at ~8 ms, with a priceable path to scale.
+**Value in one line:** near-perfect, explainable identity resolution at ~7.5 ms, with a priceable path to scale.
 
 ---
 
@@ -184,9 +184,9 @@ Query ──► MiniLM embed ──► FAISS top-k ──► Splink ──► p(
 
 **Blocking recall is the ceiling; Splink is where F1 is won or lost.**
 
-- Top-20 blocking recall: **99.91%** (default), **99.95%** (compact serialization).
-- End-to-end recall: **99.57%** → the ~0.3% gap is lost in *linkage*, not blocking.
-- A "perfect" blocker buys only **~0.08% more F1** (99.66 → 99.74% ceiling).
+- Top-20 blocking recall: **99.88%** (default), **99.95%** (compact serialization).
+- End-to-end recall: **99.41%** → the ~0.5% gap is lost in *linkage*, not blocking.
+- A "perfect" blocker buys only **~0.2 more F1 points** (99.46 → ~99.69% ceiling).
 
 > Design implication: improving the embedding/blocking engine is **not** the lever today; linkage configuration is.
 
@@ -196,11 +196,11 @@ Query ──► MiniLM embed ──► FAISS top-k ──► Splink ──► p(
 
 | Lever | Effect | Verdict |
 |---|---|---|
-| **Threshold τ** | 0.85→0.95 lifts F1 99.53→99.63% | Yes — cheap precision knob |
-| **Serialization** | compact: recall 99.95%, F1 99.74% | Yes — small but real |
+| **Threshold τ** | 0.85→0.95 lifts F1 99.46→99.64% | Yes — cheap precision knob |
+| **Serialization** | compact: recall 99.95%, F1 99.73% | Yes — small but real |
 | **Blocking size k** | 20→100: +recall, 2.4× Splink time | Diminishing returns |
 | **Weaken address** | never beat full-strength | No (this data) |
-| **Retrain m/u** | untrained F1 98.1% vs supervised 94.4% | Keep defaults |
+| **Retrain m/u** | untrained F1 98.1% vs supervised 94.1% | Keep defaults |
 
 ---
 
@@ -213,7 +213,7 @@ Splink's decision rule: classify as *match* when `P(M|γ) ≥ τ` (range ~[0.5, 
 
 Decision-theoretic setting: `τ* = C_FP / (C_FP + C_FN)`.
 
-- Measured: `τ` 0.85 → 0.95 lifted F1 99.53% → 99.63% (precision 99.62→99.96%, FP 38→4); recall slipped only 99.44→99.30%.
+- Measured: `τ` 0.85 → 0.95 lifted F1 99.46% → 99.64% (precision 99.51→99.94%, FP 49→6); recall slipped only 99.41→99.34%.
 - With recall headroom, raising `τ` is the cheapest precision lever — the mechanism to encode FP/FN business costs. (Methods: whitepaper **Appendix — Deriving τ**.)
 
 ---
@@ -222,8 +222,8 @@ Decision-theoretic setting: `τ* = C_FP / (C_FP + C_FN)`.
 
 Retraining the match model (`m/u`) made results **worse**, not better.
 
-1. **Prior coupling (dominant):** EM's fitted prior (0.0072 vs 0.0001) shifts all scores up → mass false positives. Pinning the prior raises EM's F1 from ~0.86 to ~0.95–0.97.
-2. **A genuine residual:** even with the prior pinned, trained `m/u` stay below defaults (supervised 94.4% vs untrained 98.1%; EM optimum 95.5%) by over-weighting partial matches.
+1. **Prior coupling (dominant):** EM's fitted prior (0.0071 vs 0.0001) shifts all scores up → mass false positives. Pinning the prior raises EM's F1 from ~0.83 to ~0.95.
+2. **A genuine residual:** even with the prior pinned, trained `m/u` stay below defaults (supervised 94.1% vs untrained 98.1%; EM optimum 95.5%) by over-weighting partial matches.
 
 > EM training generates candidate pairs by exact-equality blocking on two keys: `first_name` and `date_of_birth` (`block_on("first_name")`, `block_on("date_of_birth")`).
 
@@ -257,7 +257,7 @@ See paper §8.1 and the joint `τ × prior` table.
 ---
 
 # Part 3 · Line Engineers
-## Orientation → then go read the paper
+## Orientation — where the knobs are
 
 ---
 
@@ -276,9 +276,9 @@ Store     : add / update / delete / save / load (no re-embed on load)
 
 # Scorecard to remember
 
-- Confusion matrix (5k refs / 15k queries): **F1 99.57%**, recall 99.57%, precision 99.56%.
-- Blocking recall: **99.91%** @k=20 (99.95% compact).
-- **8.42 ms/query** (embed + block + batched Splink).
+- Confusion matrix (5k refs / 15k queries): **F1 99.46%**, recall 99.41%, precision 99.51%.
+- Blocking recall: **99.88%** @k=20 (99.95% compact).
+- **7.48 ms/query** (embed + block + batched Splink).
 - NC-voter (real, mutated): **F1 92–94%**; blocking is the binding constraint.
 
 > Baseline engineering numbers — config, hardware, and data shape all move them.
@@ -327,7 +327,7 @@ For **your** data: population-based scripts accept `--input-records FILE`.
 
 ---
 
-# Now read the paper
+# Where the details live
 
 Whitepaper: `docs/entity_resolution_whitepaper.pdf` (source: `.tex`).
 
@@ -339,6 +339,10 @@ Whitepaper: `docs/entity_resolution_whitepaper.pdf` (source: `.tex`).
 - **Appendix: Tuning the Match Prior** — anchor `λ`, then tune `(λ, τ)` jointly (the calibration-paradox fix).
 - **Use of AI** — disclosure and verification.
 
+<!-- Every section above is reproduced at the level of detail you need -->
+<!-- in the source `.tex`; the artifacts under `results/erwhitepaper/` are  -->
+<!-- the exact numbers behind them (100% verifiable ↔ `verify_claims.py`). -->
+
 ---
 
 # Checklist before you leave
@@ -348,7 +352,7 @@ Whitepaper: `docs/entity_resolution_whitepaper.pdf` (source: `.tex`).
 3. Swap `--input-records <your file>` into a population-based experiment.
 4. Find where **blocking recall** caps your F1 — then plan linkage work.
 
-That is the fastest way to make the paper your own.
+That is the fastest way to make these results your own.
 
 ---
 

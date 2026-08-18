@@ -1,0 +1,1094 @@
+{
+  "parameters": {
+    "count": 5000,
+    "input_records": null,
+    "ablation_count": 500,
+    "missing_rate": 0.3,
+    "model": "sentence-transformers/all-MiniLM-L6-v2",
+    "seed": 42,
+    "k_values": [
+      10,
+      20,
+      50,
+      100
+    ],
+    "thresholds": [
+      0.5,
+      0.65,
+      0.75,
+      0.85,
+      0.9,
+      0.95
+    ],
+    "strategies": [
+      "default",
+      "identity_first",
+      "compact"
+    ],
+    "output": "results\\erwhitepaper\\section7_results.json",
+    "csv_output": "results\\erwhitepaper\\section7_metrics.csv"
+  },
+  "strategies": {
+    "default": {
+      "build_seconds": 35.715298499999335,
+      "storage": {
+        "faiss_bytes": 7680045,
+        "metadata_bytes": 817771,
+        "total_bytes": 8497816
+      },
+      "blocking_recall": {
+        "10": {
+          "hits": 9981,
+          "positives": 10000,
+          "recall": 0.9981
+        },
+        "20": {
+          "hits": 9988,
+          "positives": 10000,
+          "recall": 0.9988
+        },
+        "50": {
+          "hits": 9995,
+          "positives": 10000,
+          "recall": 0.9995
+        },
+        "100": {
+          "hits": 9996,
+          "positives": 10000,
+          "recall": 0.9996
+        }
+      },
+      "scoring_k": 20,
+      "threshold_metrics": {
+        "0.5": {
+          "tp": 9987,
+          "tn": 4795,
+          "fp": 205,
+          "fn": 13,
+          "accuracy": 0.9854666666666667,
+          "precision": 0.979886185243328,
+          "recall": 0.9987,
+          "specificity": 0.959,
+          "false_match_rate": 0.041,
+          "f1": 0.9892036450079238
+        },
+        "0.65": {
+          "tp": 9985,
+          "tn": 4800,
+          "fp": 200,
+          "fn": 15,
+          "accuracy": 0.9856666666666667,
+          "precision": 0.9803632793323515,
+          "recall": 0.9985,
+          "specificity": 0.96,
+          "false_match_rate": 0.04,
+          "f1": 0.9893485261332673
+        },
+        "0.75": {
+          "tp": 9985,
+          "tn": 4804,
+          "fp": 196,
+          "fn": 15,
+          "accuracy": 0.9859333333333333,
+          "precision": 0.9807484530006876,
+          "recall": 0.9985,
+          "specificity": 0.9608,
+          "false_match_rate": 0.0392,
+          "f1": 0.989544621178336
+        },
+        "0.85": {
+          "tp": 9985,
+          "tn": 4951,
+          "fp": 49,
+          "fn": 15,
+          "accuracy": 0.9957333333333334,
+          "precision": 0.995116603547937,
+          "recall": 0.9985,
+          "specificity": 0.9902,
+          "false_match_rate": 0.0098,
+          "f1": 0.9968054307676949
+        },
+        "0.9": {
+          "tp": 9979,
+          "tn": 4952,
+          "fp": 48,
+          "fn": 21,
+          "accuracy": 0.9954,
+          "precision": 0.995212925102224,
+          "recall": 0.9979,
+          "specificity": 0.9904,
+          "false_match_rate": 0.0096,
+          "f1": 0.9965546512208517
+        },
+        "0.95": {
+          "tp": 9979,
+          "tn": 4994,
+          "fp": 6,
+          "fn": 21,
+          "accuracy": 0.9982,
+          "precision": 0.9993990986479719,
+          "recall": 0.9979,
+          "specificity": 0.9988,
+          "false_match_rate": 0.0012,
+          "f1": 0.998648986740055
+        }
+      },
+      "calibration": [
+        {
+          "lower": 0.0,
+          "upper": 0.1,
+          "count": 4701,
+          "mean_probability": 0.0019716249949747,
+          "empirical_match_rate": 0.0025526483726866626
+        },
+        {
+          "lower": 0.1,
+          "upper": 0.2,
+          "count": 60,
+          "mean_probability": 0.11470886351517862,
+          "empirical_match_rate": 0.016666666666666666
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.3,
+          "count": 14,
+          "mean_probability": 0.29059950336998935,
+          "empirical_match_rate": 0
+        },
+        {
+          "lower": 0.3,
+          "upper": 0.4,
+          "count": 30,
+          "mean_probability": 0.34756847755830084,
+          "empirical_match_rate": 0
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.5,
+          "count": 3,
+          "mean_probability": 0.45033258204606663,
+          "empirical_match_rate": 0
+        },
+        {
+          "lower": 0.5,
+          "upper": 0.6,
+          "count": 2,
+          "mean_probability": 0.5366236062304922,
+          "empirical_match_rate": 1
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.7,
+          "count": 7,
+          "mean_probability": 0.6360552077750254,
+          "empirical_match_rate": 0
+        },
+        {
+          "lower": 0.7,
+          "upper": 0.8,
+          "count": 85,
+          "mean_probability": 0.765165427458631,
+          "empirical_match_rate": 0
+        },
+        {
+          "lower": 0.8,
+          "upper": 0.9,
+          "count": 71,
+          "mean_probability": 0.8111987993654216,
+          "empirical_match_rate": 0.08450704225352113
+        },
+        {
+          "lower": 0.9,
+          "upper": 1.0,
+          "count": 10027,
+          "mean_probability": 0.9996798044578099,
+          "empirical_match_rate": 0.995212925102224
+        }
+      ],
+      "latency_ms": {
+        "mean": 19.501720726445395,
+        "p50": 19.223249997594394,
+        "p95": 25.49992001586361,
+        "p99": 30.802104022004645,
+        "samples": 15000,
+        "scope": "embedding plus FAISS blocking per query"
+      },
+      "splink_batch_seconds": 10.48453420001897,
+      "estimated_end_to_end_mean_milliseconds": 20.200689673113327
+    },
+    "identity_first": {
+      "build_seconds": 39.3889319000009,
+      "storage": {
+        "faiss_bytes": 7680045,
+        "metadata_bytes": 817771,
+        "total_bytes": 8497816
+      },
+      "blocking_recall": {
+        "10": {
+          "hits": 9981,
+          "positives": 10000,
+          "recall": 0.9981
+        },
+        "20": {
+          "hits": 9985,
+          "positives": 10000,
+          "recall": 0.9985
+        },
+        "50": {
+          "hits": 9995,
+          "positives": 10000,
+          "recall": 0.9995
+        },
+        "100": {
+          "hits": 9996,
+          "positives": 10000,
+          "recall": 0.9996
+        }
+      },
+      "scoring_k": 20,
+      "threshold_metrics": {
+        "0.5": {
+          "tp": 9984,
+          "tn": 4792,
+          "fp": 208,
+          "fn": 16,
+          "accuracy": 0.9850666666666666,
+          "precision": 0.9795918367346939,
+          "recall": 0.9984,
+          "specificity": 0.9584,
+          "false_match_rate": 0.0416,
+          "f1": 0.9889064976228209
+        },
+        "0.65": {
+          "tp": 9982,
+          "tn": 4797,
+          "fp": 203,
+          "fn": 18,
+          "accuracy": 0.9852666666666666,
+          "precision": 0.9800687285223367,
+          "recall": 0.9982,
+          "specificity": 0.9594,
+          "false_match_rate": 0.0406,
+          "f1": 0.989051275699777
+        },
+        "0.75": {
+          "tp": 9982,
+          "tn": 4801,
+          "fp": 199,
+          "fn": 18,
+          "accuracy": 0.9855333333333334,
+          "precision": 0.9804537864649838,
+          "recall": 0.9982,
+          "specificity": 0.9602,
+          "false_match_rate": 0.0398,
+          "f1": 0.989247311827957
+        },
+        "0.85": {
+          "tp": 9982,
+          "tn": 4949,
+          "fp": 51,
+          "fn": 18,
+          "accuracy": 0.9954,
+          "precision": 0.9949167746436759,
+          "recall": 0.9982,
+          "specificity": 0.9898,
+          "false_match_rate": 0.0102,
+          "f1": 0.9965556831228473
+        },
+        "0.9": {
+          "tp": 9977,
+          "tn": 4950,
+          "fp": 50,
+          "fn": 23,
+          "accuracy": 0.9951333333333333,
+          "precision": 0.99501346364815,
+          "recall": 0.9977,
+          "specificity": 0.99,
+          "false_match_rate": 0.01,
+          "f1": 0.9963549208568433
+        },
+        "0.95": {
+          "tp": 9977,
+          "tn": 4994,
+          "fp": 6,
+          "fn": 23,
+          "accuracy": 0.9980666666666667,
+          "precision": 0.9993989782630471,
+          "recall": 0.9977,
+          "specificity": 0.9988,
+          "false_match_rate": 0.0012,
+          "f1": 0.9985487664514837
+        }
+      },
+      "calibration": [
+        {
+          "lower": 0.0,
+          "upper": 0.1,
+          "count": 4699,
+          "mean_probability": 0.0020732399563355717,
+          "empirical_match_rate": 0.003192168546499255
+        },
+        {
+          "lower": 0.1,
+          "upper": 0.2,
+          "count": 60,
+          "mean_probability": 0.11470886351517862,
+          "empirical_match_rate": 0.016666666666666666
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.3,
+          "count": 14,
+          "mean_probability": 0.29059950336998935,
+          "empirical_match_rate": 0
+        },
+        {
+          "lower": 0.3,
+          "upper": 0.4,
+          "count": 32,
+          "mean_probability": 0.3487972001184303,
+          "empirical_match_rate": 0
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.5,
+          "count": 3,
+          "mean_probability": 0.45033258204606663,
+          "empirical_match_rate": 0
+        },
+        {
+          "lower": 0.5,
+          "upper": 0.6,
+          "count": 2,
+          "mean_probability": 0.5366236062304922,
+          "empirical_match_rate": 1
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.7,
+          "count": 7,
+          "mean_probability": 0.6360552077750254,
+          "empirical_match_rate": 0
+        },
+        {
+          "lower": 0.7,
+          "upper": 0.8,
+          "count": 85,
+          "mean_probability": 0.765165427458631,
+          "empirical_match_rate": 0
+        },
+        {
+          "lower": 0.8,
+          "upper": 0.9,
+          "count": 71,
+          "mean_probability": 0.8103171512283964,
+          "empirical_match_rate": 0.07042253521126761
+        },
+        {
+          "lower": 0.9,
+          "upper": 1.0,
+          "count": 10027,
+          "mean_probability": 0.999665379621702,
+          "empirical_match_rate": 0.99501346364815
+        }
+      ],
+      "latency_ms": {
+        "mean": 19.294642526538034,
+        "p50": 19.018199993297458,
+        "p95": 24.367415007145606,
+        "p99": 26.82304199290229,
+        "samples": 15000,
+        "scope": "embedding plus FAISS blocking per query"
+      },
+      "splink_batch_seconds": 9.795018799981335,
+      "estimated_end_to_end_mean_milliseconds": 19.947643779870123
+    },
+    "compact": {
+      "build_seconds": 30.83559790000436,
+      "storage": {
+        "faiss_bytes": 7680045,
+        "metadata_bytes": 817771,
+        "total_bytes": 8497816
+      },
+      "blocking_recall": {
+        "10": {
+          "hits": 9993,
+          "positives": 10000,
+          "recall": 0.9993
+        },
+        "20": {
+          "hits": 9995,
+          "positives": 10000,
+          "recall": 0.9995
+        },
+        "50": {
+          "hits": 9996,
+          "positives": 10000,
+          "recall": 0.9996
+        },
+        "100": {
+          "hits": 9998,
+          "positives": 10000,
+          "recall": 0.9998
+        }
+      },
+      "scoring_k": 20,
+      "threshold_metrics": {
+        "0.5": {
+          "tp": 9994,
+          "tn": 4825,
+          "fp": 175,
+          "fn": 6,
+          "accuracy": 0.9879333333333333,
+          "precision": 0.982790834890353,
+          "recall": 0.9994,
+          "specificity": 0.965,
+          "false_match_rate": 0.035,
+          "f1": 0.9910258317219495
+        },
+        "0.65": {
+          "tp": 9992,
+          "tn": 4830,
+          "fp": 170,
+          "fn": 8,
+          "accuracy": 0.9881333333333333,
+          "precision": 0.9832710096437709,
+          "recall": 0.9992,
+          "specificity": 0.966,
+          "false_match_rate": 0.034,
+          "f1": 0.9911715107628211
+        },
+        "0.75": {
+          "tp": 9992,
+          "tn": 4834,
+          "fp": 166,
+          "fn": 8,
+          "accuracy": 0.9884,
+          "precision": 0.9836582004331561,
+          "recall": 0.9992,
+          "specificity": 0.9668,
+          "false_match_rate": 0.0332,
+          "f1": 0.9913681912888184
+        },
+        "0.85": {
+          "tp": 9992,
+          "tn": 4953,
+          "fp": 47,
+          "fn": 8,
+          "accuracy": 0.9963333333333333,
+          "precision": 0.9953182587907162,
+          "recall": 0.9992,
+          "specificity": 0.9906,
+          "false_match_rate": 0.0094,
+          "f1": 0.9972553520634763
+        },
+        "0.9": {
+          "tp": 9986,
+          "tn": 4954,
+          "fp": 46,
+          "fn": 14,
+          "accuracy": 0.996,
+          "precision": 0.995414673046252,
+          "recall": 0.9986,
+          "specificity": 0.9908,
+          "false_match_rate": 0.0092,
+          "f1": 0.9970047923322685
+        },
+        "0.95": {
+          "tp": 9986,
+          "tn": 4994,
+          "fp": 6,
+          "fn": 14,
+          "accuracy": 0.9986666666666667,
+          "precision": 0.9993995196156925,
+          "recall": 0.9986,
+          "specificity": 0.9988,
+          "false_match_rate": 0.0012,
+          "f1": 0.998999599839936
+        }
+      },
+      "calibration": [
+        {
+          "lower": 0.0,
+          "upper": 0.1,
+          "count": 4735,
+          "mean_probability": 0.0018240636787335727,
+          "empirical_match_rate": 0.0010559662090813093
+        },
+        {
+          "lower": 0.1,
+          "upper": 0.2,
+          "count": 49,
+          "mean_probability": 0.11480446196192186,
+          "empirical_match_rate": 0.02040816326530612
+        },
+        {
+          "lower": 0.2,
+          "upper": 0.3,
+          "count": 15,
+          "mean_probability": 0.29059950336998935,
+          "empirical_match_rate": 0
+        },
+        {
+          "lower": 0.3,
+          "upper": 0.4,
+          "count": 29,
+          "mean_probability": 0.3459661308968153,
+          "empirical_match_rate": 0
+        },
+        {
+          "lower": 0.4,
+          "upper": 0.5,
+          "count": 3,
+          "mean_probability": 0.45033258204606663,
+          "empirical_match_rate": 0
+        },
+        {
+          "lower": 0.5,
+          "upper": 0.6,
+          "count": 2,
+          "mean_probability": 0.5366236062304922,
+          "empirical_match_rate": 1
+        },
+        {
+          "lower": 0.6,
+          "upper": 0.7,
+          "count": 7,
+          "mean_probability": 0.6360552077750254,
+          "empirical_match_rate": 0
+        },
+        {
+          "lower": 0.7,
+          "upper": 0.8,
+          "count": 71,
+          "mean_probability": 0.7649617748812114,
+          "empirical_match_rate": 0
+        },
+        {
+          "lower": 0.8,
+          "upper": 0.9,
+          "count": 57,
+          "mean_probability": 0.812714615460658,
+          "empirical_match_rate": 0.10526315789473684
+        },
+        {
+          "lower": 0.9,
+          "upper": 1.0,
+          "count": 10032,
+          "mean_probability": 0.9996902932767927,
+          "empirical_match_rate": 0.995414673046252
+        }
+      ],
+      "latency_ms": {
+        "mean": 16.45264030661007,
+        "p50": 16.449150003609248,
+        "p95": 20.841309992829338,
+        "p99": 23.84212699602358,
+        "samples": 15000,
+        "scope": "embedding plus FAISS blocking per query"
+      },
+      "splink_batch_seconds": 10.089096200012136,
+      "estimated_end_to_end_mean_milliseconds": 17.12524671994421
+    }
+  },
+  "ablations": {
+    "baseline": {
+      "count": 500,
+      "blocking_recall": {
+        "10": 1.0,
+        "20": 1.0,
+        "50": 1.0,
+        "100": 1.0
+      },
+      "threshold_metrics": {
+        "0.5": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.65": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.75": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.85": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.9": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.95": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        }
+      }
+    },
+    "missing_email": {
+      "count": 500,
+      "blocking_recall": {
+        "10": 1.0,
+        "20": 1.0,
+        "50": 1.0,
+        "100": 1.0
+      },
+      "threshold_metrics": {
+        "0.5": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.65": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.75": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.85": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.9": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.95": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        }
+      }
+    },
+    "missing_address": {
+      "count": 500,
+      "blocking_recall": {
+        "10": 0.998,
+        "20": 1.0,
+        "50": 1.0,
+        "100": 1.0
+      },
+      "threshold_metrics": {
+        "0.5": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.65": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.75": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.85": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.9": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.95": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        }
+      }
+    },
+    "missing_both": {
+      "count": 500,
+      "blocking_recall": {
+        "10": 0.988,
+        "20": 0.998,
+        "50": 1.0,
+        "100": 1.0
+      },
+      "threshold_metrics": {
+        "0.5": {
+          "tp": 499,
+          "tn": 0,
+          "fp": 0,
+          "fn": 1,
+          "accuracy": 0.998,
+          "precision": 1.0,
+          "recall": 0.998,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 0.998998998998999
+        },
+        "0.65": {
+          "tp": 499,
+          "tn": 0,
+          "fp": 0,
+          "fn": 1,
+          "accuracy": 0.998,
+          "precision": 1.0,
+          "recall": 0.998,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 0.998998998998999
+        },
+        "0.75": {
+          "tp": 499,
+          "tn": 0,
+          "fp": 0,
+          "fn": 1,
+          "accuracy": 0.998,
+          "precision": 1.0,
+          "recall": 0.998,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 0.998998998998999
+        },
+        "0.85": {
+          "tp": 499,
+          "tn": 0,
+          "fp": 0,
+          "fn": 1,
+          "accuracy": 0.998,
+          "precision": 1.0,
+          "recall": 0.998,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 0.998998998998999
+        },
+        "0.9": {
+          "tp": 499,
+          "tn": 0,
+          "fp": 0,
+          "fn": 1,
+          "accuracy": 0.998,
+          "precision": 1.0,
+          "recall": 0.998,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 0.998998998998999
+        },
+        "0.95": {
+          "tp": 499,
+          "tn": 0,
+          "fp": 0,
+          "fn": 1,
+          "accuracy": 0.998,
+          "precision": 1.0,
+          "recall": 0.998,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 0.998998998998999
+        }
+      }
+    },
+    "address_change": {
+      "count": 500,
+      "blocking_recall": {
+        "10": 1.0,
+        "20": 1.0,
+        "50": 1.0,
+        "100": 1.0
+      },
+      "threshold_metrics": {
+        "0.5": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.65": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.75": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.85": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.9": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.95": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        }
+      }
+    },
+    "name_perturbation": {
+      "count": 500,
+      "blocking_recall": {
+        "10": 1.0,
+        "20": 1.0,
+        "50": 1.0,
+        "100": 1.0
+      },
+      "threshold_metrics": {
+        "0.5": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.65": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.75": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.85": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.9": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        },
+        "0.95": {
+          "tp": 500,
+          "tn": 0,
+          "fp": 0,
+          "fn": 0,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "false_match_rate": 0.0,
+          "f1": 1.0
+        }
+      }
+    }
+  }
+}
