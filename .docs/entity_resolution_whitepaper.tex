@@ -148,7 +148,7 @@ where $s_{\mathrm{identity}}$ is the retrieval score on the invariant fields (fi
 Measured on the synthetic population with a controlled age gap (6{,}000-record index, 180 duplicate pairs, $T{=}10$ years), this recovers the temporal failure mode: in the long-gap case the address-only ``contact'' view collapses to $0.22$ recall at $k{=}1$, while the gap-weighted score recovers $0.99$ at $k{=}1$ and $1.0$ by $k{=}5$ --- comparable to relying on invariant identity alone, and far above the unweighted single view. In the short-gap case it also reaches $1.0$ by $k{=}5$, at the cost of a small $k{=}1$ penalty against the address-rich ``full'' view ($0.91$ versus $1.00$), which disappears in the working range ($k \geq 5$). The details and full table appear in the companion paper on batch deduplication~\cite{vectordedupbatch}; for insertion-time blocking with known capture dates the same decay should be used. When capture dates are unavailable, or when the population is effectively co-temporal (all records sharing one generation date, as in the synthetic experiments of Section~\ref{sec:confusion-matrix}), the temporal caveat does not apply and the single-vector ``full'' index suffices. The decay rate $T$ must be set from the deployment's observed residency distribution rather than assumed.
 
 \textbf{Relation to earlier work on time decay in probabilistic linkage.}
-That a comparison's evidence depends on the length of time between two records is a documented phenomenon in the record-linkage literature rather than a novelty of the present pipeline. \textsc{Li} et al.\ introduced \emph{time-decay} to the temporal record-linkage problem, applying a decay to capture the effect of elapsed time on value evolution~\cite{lidong2011}. \textsc{Christen} and \textsc{Gayler} later made the temporal likelihoods adaptive on dynamic databases~\cite{christengayler2013}, and Hu et al.\ estimated the gap-dependent agreement directly with regression classification in temporal record linkage~\cite{hu2017regression}. \textsc{Li}, \textsc{Lee}, \textsc{Hsu}, and \textsc{Tan} modeled the probability that an entity transitions to a particular attribute value after some time period and showed that value transitions can be exploited to link temporal records and profile entities over time~\cite{li2015transition}; \textsc{Chiang}, \textsc{Doan}, and \textsc{Naughton} developed the related idea of modeling entity evolution for temporal record matching~\cite{chiang2014}. \textsc{Ranbaduge} and \textsc{Christen} extended these ideas to privacy-preserving temporal record linkage~\cite{ranbaduge2020}, and \textsc{Litoux} and \textsc{Ray} model explicit agreement and ``disagreement decay'' on time-stamped vessel records~\cite{litoux2026}. Most directly, \textsc{Shim}'s recent TimeLink proposal replaces static $m_k$ with a time-dependent $m_k(\Delta t)$ derived from a semi-Markov generative model of field evolution, keeping $u_k$ time-independent, and reports that static Fellegi--Sunter collapses on decade-long gaps~\cite{shim2026}.
+That a comparison's evidence depends on the length of time between two records is a documented phenomenon in the record-linkage literature rather than a novelty of the present pipeline. \textsc{Li} et al.\ introduced \emph{time-decay} to the temporal record-linkage problem, applying a decay to capture the effect of elapsed time on value evolution~\cite{lidong2011}. \textsc{Christen} and \textsc{Gayler} later made the temporal likelihoods adaptive on dynamic databases~\cite{christengayler2013}, and Hu et al.\ estimated the gap-dependent agreement directly with regression classification in temporal record linkage~\cite{hu2017regression}. \textsc{Chiang}, \textsc{Doan}, and \textsc{Naughton} developed the related idea of modeling entity evolution for temporal record matching~\cite{chiang2014}. Most directly, \textsc{Shim}'s recent TimeLink proposal replaces static $m_k$ with a time-dependent $m_k(\Delta t)$ derived from a semi-Markov generative model of field evolution, keeping $u_k$ time-independent, and reports that static Fellegi--Sunter collapses on decade-long gaps~\cite{shim2026}.
 
 Two aspects of the present design distinguish it from this line of work. First, the decay is applied here as an \emph{additive, pair-conditional term} on the existing $\log_2(m_c/u_c)$ weight stack rather than a re-parameterization of $m$/$u$: the gap-dependent penalty is a function of the pair's capture-date gap, and because it is additive it composes with any $m$/$u$ calibration (default, supervised, or EM) instead of requiring re-estimation of the field probabilities. Second, the claim here is not that decay exists --- that is established in the literature above --- but that it is \emph{observable at distinct rates per field} in a FAISS/Splink pipeline (Sections~\ref{sec:confusion-matrix} and the measured gap-stratified results above), and that leaving it out of the comparison model produces a specific, reproducible failure mode (the address view collapsing to $0.22$--$0.03$ recall on long gaps) that no fixed $m$/$u$ scaling can remove, because the capture-date gap is a covariate absent from the comparison vector. These positioning facts are documented in the companion design note~\cite{decaynote}. A principled, non-ad-hoc derivation of the decay is developed in the accompanying literature survey~\cite{decaylitreview}: for a field with mean value residency $\bar\tau_c$ the max-entropy survival is exponential, so the likelihood-ratio weight specialises to $w_c(\Delta t)=\log_2\bigl(u_c+(m_c(0)-u_c)e^{-\Delta t/\bar\tau_c}\bigr)-\log_2 u_c$, with $\bar\tau_c$ and $m_c(0)$ estimated from matched pairs --- i.e.\ the decay is the estimated entropy-loss curve of the field, not a tuned constant.
 
@@ -488,16 +488,16 @@ The standard recipe treats a continuous score $x$ as a comparison level of infin
 \[
  \frac{m(x)}{u(x)} \;=\; \frac{f(x \mid M)}{f(x \mid U)},
 \]
-which feeds the same Fellegi--Sunter log-odds as a discrete level weight. The two densities must be estimated from data. The classic treatments are Belin and Rubin~\cite{belin1995}, who calibrate match and non-match rates directly from a continuous weight via a normal-mixture model of the score density, and Copas and Hilton~\cite{copashilton1990}, who model the distribution of a continuous log-likelihood-ratio score under match and non-match. Winkler~\cite{winkler2006} reviews how comparators' scores are mapped to weights.
+which feeds the same Fellegi--Sunter log-odds as a discrete level weight. The two densities must be estimated from data, by fitting a normal-mixture model to the score distribution, by calibration against labelled pairs, or by EM~\cite{christen2012}. Winkler~\cite{winkler2006} reviews how comparators' scores are mapped to weights.
 
-The modern, directly relevant line applies the same idea to learned matchers: the end-to-end surveys of Christophides et al.~\cite{christophides2021} position learned matchers and Fellegi--Sunter linkage as complementary stages of one entity-resolution pipeline, and Sadinle and Fienberg~\cite{sadinle2013} generalise the Fellegi--Sunter construction to the multiple-record setting, fitting match patterns from the comparison data by mixture maximum likelihood. Together with the continuous-score treatments of Belin--Rubin and Copas--Hilton above, this yields the practical recipe for this paper's setting: treat the matcher score as the comparison, estimate $f(x\mid M)$ and $f(x\mid U)$ (by mixture modelling as in Belin--Rubin, by calibration against labelled pairs, or by EM), form $w(x)=\log_2[f(x\mid M)/f(x\mid U)]$, and add it to the FS log-odds exactly like a level weight, with the match prior $\lambda$ unchanged.
+The modern, directly relevant line applies the same idea to learned matchers: the end-to-end surveys of Christophides et al.~\cite{christophides2021} position learned matchers and Fellegi--Sunter linkage as complementary stages of one entity-resolution pipeline, and Sadinle and Fienberg~\cite{sadinle2013} generalise the Fellegi--Sunter construction to the multiple-record setting, fitting match patterns from the comparison data by mixture maximum likelihood. Together these yield the practical recipe for this paper's setting: treat the matcher score as the comparison, estimate $f(x\mid M)$ and $f(x\mid U)$ (by mixture modelling~\cite{christen2012}, by calibration against labelled pairs, or by EM), form $w(x)=\log_2[f(x\mid M)/f(x\mid U)]$, and add it to the FS log-odds exactly like a level weight, with the match prior $\lambda$ unchanged.
 
 This matters for two reasons in the present work. First, the deep-matcher literature --- DeepMatcher~\cite{mudgal2018}, DeepER~\cite{ebreheem2018}, Ditto~\cite{li2020ditto}, and large-language-model matchers~\cite{peeters2023} --- all classify \emph{already-retrieved} candidate pairs; none addresses the retrieval-side question of whether a far-apart duplicate is a candidate at all. That is the gap the gap-weighted, capture-date-conditional fusion of this paper targets, and it is orthogonal to how the matcher's score is converted into a weight. Second, the $m/u$ calibration caveats already established here apply a fortiori to continuous scores: a score distribution fitted on resemblance-biased candidate pairs (as from dense-neighbour blocking) will inherit the same prior drift as the value-blocking case, so the calibration lesson --- anchor the prior and re-tune $\tau$ --- carries over unchanged.
 
 \subsection{Replication on non-synthetic data}
 The central experiments in this paper are measured on synthetically generated Canadian person records (Faker with a custom Canadian address provider). Synthetic data is valuable because it supplies controlled missingness, exact ground truth, and repeatable duplicate rates, but it embeds assumptions about name distributions, address formats and volatility, email conventions, and how errors arise between records of the same entity. The replication on the North Carolina voter data (Section~\ref{sec:ncvoter-replication}) is a first step toward real data, but, as noted there, it is a near-best-case scenario that does not exercise cross-record duplicates, naming variation, or birth-date errors. Whether the findings hold more broadly with real data is therefore still an open empirical question, and the experiments should be replicated on non-synthetic, labelled record-linkage data. The replication should run the identical pipeline and protocols --- same top-$k$ FAISS blocking, same comparisons and decision machinery, the confusion-matrix three-query protocol, and the trained/untrained/supervised $m/u$, threshold, and address-weight sweeps --- and compare the resulting confusion matrices, F1, and the conclusions drawn from them.
 
-The natural test beds are public benchmark record-linkage data sets with known ground truth. These include the Cora citation data~\cite{mccallum2000}, the FEBRL restaurant data~\cite{christen2004}, and the product and citation pairs from the Abt--Buy, Amazon--Google, and DBLP--ACM entity-resolution benchmarks~\cite{kopcke2010,mudgal2018}, together with analogous entity data. Where a data set lacks the fields used here (date of birth, address, email), the comparison should be restricted to the fields it does provide, or the pipeline should be adapted to the available schema while keeping the methodology fixed. While the benchmark data sets above provide authentic duplicate pairs with ground truth, public registration data such as the North Carolina voter file is a useful but limited test bed: it is heavily de-duplicated by the source and typically lacks a full date of birth, so it contains no authentic duplicate registrations and cannot exercise birth-date errors. The mutation-model replication in Section~\ref{sec:ncvoter-replication} supplies a noisy-duplicate proxy on a real schema, but authentic duplicates and full-DOB comparisons still require the labelled benchmark or corporate data discussed below.
+The natural test beds are public benchmark record-linkage data sets with known ground truth. These include the Cora citation data~\cite{mccallum2000}, the FEBRL restaurant data~\cite{christen2012}, and the product and citation pairs from the Abt--Buy, Amazon--Google, and DBLP--ACM benchmarks used in the deep-matcher literature~\cite{mudgal2018} (data sets: \url{https://dbs.uni-leipzig.de/research/projects/benchmark-datasets-for-entity-resolution/}). Where a data set lacks the fields used here (date of birth, address, email), the comparison should be restricted to the fields it does provide, or the pipeline should be adapted to the available schema while keeping the methodology fixed. While the benchmark data sets above provide authentic duplicate pairs with ground truth, public registration data such as the North Carolina voter file is a useful but limited test bed: it is heavily de-duplicated by the source and typically lacks a full date of birth, so it contains no authentic duplicate registrations and cannot exercise birth-date errors. The mutation-model replication in Section~\ref{sec:ncvoter-replication} supplies a noisy-duplicate proxy on a real schema, but authentic duplicates and full-DOB comparisons still require the labelled benchmark or corporate data discussed below.
 
 Such replication serves several specific purposes. First, it tests whether the address field is as informative as the synthetic data suggests: public and production datasets expose real address volatility and generic or unit-only addresses, so the finding that weakening the address comparison did not help may not transfer. Second, real data can reveal whether retraining $m/u$ on the collection itself behaves like the lab setting, where the untrained default outperformed the trained variants, or whether genuinely noisy real duplicates make calibration beneficial. Third, the recall distributions and blocking ceiling measured at $k=20$ in Section~\ref{sec:further-research} may differ when names collide at realistic rates, changing where the F1 budget lies between the blocking and linkage stages. Finally, replication must handle missing values, inconsistent postal/date formats, and multilingual names, which the synthetic generator controls but real data exposes. Privacy considerations apply because person records are personally identifying; labels and ground truth should be obtained from datasets that are published for research or from de-identified data with controlled access. The goal is not to certify a specific score but to confirm which qualitative conclusions --- which levers move F1 and which do not --- survive contact with real data.
 
@@ -549,9 +549,9 @@ so the expected F1 reduces to
 \[
 E[F_1(\tau)]=\frac{2\sum_{j\in D_\tau}p_j}{|D_\tau|+\sum_{j}p_j},
 \]
-where $\sum_j p_j$ is the total expected number of matches in the candidate-pair set $S$. One then selects $\tau^*=\operatorname{arg\,max}_\tau E[F_1(\tau)]$ over a dense grid. This is a direct use of the calibrated posterior probabilities produced by the mixture/EM fitting of the Fellegi--Sunter model~\cite{mclachlan2000,christen2012}; it approximates the cost-based rule when the two error types are weighted equally.
+where $\sum_j p_j$ is the total expected number of matches in the candidate-pair set $S$. One then selects $\tau^*=\operatorname{arg\,max}_\tau E[F_1(\tau)]$ over a dense grid. This is a direct use of the calibrated posterior probabilities produced by the mixture/EM fitting of the Fellegi--Sunter model~\cite{christen2012}; it approximates the cost-based rule when the two error types are weighted equally.
 
-\paragraph{Gaussian-mixture valley detection.} The Fellegi--Sunter weights $w_j=\log_2 R(\gamma_j)$ are typically bimodal: a large peak of low-weight non-matches and a smaller high-weight match peak. Fitting a two-component Gaussian mixture~\cite{mclachlan2000} to the weights yields densities $f_U(w)$ and $f_M(w)$ for the non-match and match components; the threshold is placed at the intersection
+\paragraph{Gaussian-mixture valley detection.} The Fellegi--Sunter weights $w_j=\log_2 R(\gamma_j)$ are typically bimodal: a large peak of low-weight non-matches and a smaller high-weight match peak. Fitting a two-component Gaussian mixture~\cite{christen2012} to the weights yields densities $f_U(w)$ and $f_M(w)$ for the non-match and match components; the threshold is placed at the intersection
 \[
 p\, f_M(w^*)=(1-p)\, f_U(w^*),
 \]
@@ -643,13 +643,6 @@ Jeff Johnson, Matthijs Douze, and Herv\'e J\'egou.
 \newblock \url{https://doi.org/10.1109/TBDATA.2019.2921572}.
 \newblock Preprint: \url{https://arxiv.org/abs/1702.08734}.
 
-\bibitem{kopcke2010}
-Hanna K\"opcke, Andreas Thor, and Erhard Rahm.
-\newblock Evaluation of entity resolution approaches on real-world match problems.
-\newblock Proceedings of the VLDB Endowment, 3(1--2):484--493, 2010.
-\newblock \url{https://doi.org/10.14778/1920841.1920904}.
-\newblock Data sets (Abt--Buy, Amazon--Google, DBLP--ACM, North Carolina Voters, Cora): \url{https://dbs.uni-leipzig.de/research/projects/benchmark-datasets-for-entity-resolution/}.
-
 \bibitem{mccallum2000}
 Andrew McCallum, Kamal Nigam, and Lyle H. Ungar.
 \newblock Efficient clustering of high-dimensional data sets with application to reference matching.
@@ -669,30 +662,11 @@ Wei Zhang, Hao Wei, Bunyamin Sisman, Xin Luna Dong, Christos Faloutsos, and Davi
 \newblock In Proceedings of the 13th ACM International Conference on Web Search and Data Mining (WSDM), pages 744--752, 2020.
 \newblock \url{https://doi.org/10.1145/3336191.3371813}.
 
-\bibitem{christen2004}
-Peter Christen, Tim Churches, and Markus Hegland.
-\newblock Febrl -- A parallel open source data linkage system.
-\newblock In Proceedings of the Eighth Pacific-Asia Conference on Knowledge Discovery and Data Mining (PAKDD), volume 3056 of Lecture Notes in Artificial Intelligence, pages 638--647, 2004.
-\newblock \url{https://doi.org/10.1007/978-3-540-24775-3_75}.
-\newblock FEBRL data sets: \url{https://www.kaggle.com/datasets/adrianevensen/restaurants-entity-resolution} and \url{https://sourceforge.net/projects/febrl/}.
-
 \bibitem{mudgal2018}
 Sidharth Mudgal, Han Li, Theodoros Rekatsinas, AnHai Doan, Youngchoon Park, Ganesh Krishnan, Rohit Deep, Esteban Arcaute, and Vijay Raghavendra.
 \newblock Deep learning for entity matching: A design space exploration.
 \newblock In Proceedings of the 2018 International Conference on Management of Data (SIGMOD), pages 19--34, 2018.
 \newblock \url{https://doi.org/10.1145/3183713.3196926}.
-
-\bibitem{belin1995}
-Thomas R. Belin and Donald B. Rubin.
-\newblock A method for calibrating false-match rates in record linkage.
-\newblock Journal of the American Statistical Association, 90(430):694--707, 1995.
-\newblock \url{https://doi.org/10.1080/01621459.1995.10476563}.
-
-\bibitem{copashilton1990}
-John B. Copas and F. J. Hilton.
-\newblock Record linkage: Statistical models for matching computer records.
-\newblock Journal of the Royal Statistical Society, Series A, 153(3):287--320, 1990.
-\newblock \url{https://doi.org/10.2307/2982975}.
 
 \bibitem{christophides2021}
 Vassilis Christophides, Vasilis Efthymiou, Themis Palpanas, George Papadakis, and Kostas Stefanidis.
@@ -752,12 +726,6 @@ Peter Christen.
 \newblock Springer, Data-Centric Systems and Applications, 2012.
 \newblock \url{https://doi.org/10.1007/978-3-642-31164-2}.
 
-\bibitem{mclachlan2000}
-Geoffrey McLachlan and David Peel.
-\newblock Finite Mixture Models.
-\newblock John Wiley \& Sons, Wiley Series in Probability and Statistics, 2000.
-\newblock \url{https://doi.org/10.1002/0471721182}.
-
 \bibitem{lidong2011}
 Pei Li, Xin Luna Dong, Andrea Maurino, and Divesh Srivastava.
 \newblock Linking temporal records.
@@ -776,29 +744,11 @@ Yichen Hu, Qing Wang, Dinusha Vatsalan, and Peter Christen.
 \newblock In Proceedings of the 21st Pacific-Asia Conference on Knowledge Discovery and Data Mining (PAKDD), pages 561--573, 2017.
 \newblock \url{https://doi.org/10.1007/978-3-319-57454-7_44}.
 
-\bibitem{li2015transition}
-Furong Li, Mong Li Lee, Wynne Hsu, and Wang-Chiew Tan.
-\newblock Linking temporal records for profiling entities.
-\newblock Proceedings of the 2015 ACM SIGMOD International Conference on Management of Data, pages 593--605, 2015.
-\newblock \url{https://doi.org/10.1145/2723372.2737789}.
-
 \bibitem{chiang2014}
 Yueh-Hsuan Chiang, AnHai Doan, and Jeffrey F.\ Naughton.
 \newblock Modeling entity evolution for temporal record matching.
 \newblock Proceedings of the 2014 ACM SIGMOD International Conference on Management of Data, pages 1175--1186, 2014.
 \newblock \url{https://doi.org/10.1145/2588555.2588560}.
-
-\bibitem{ranbaduge2020}
-Thilina Ranbaduge and Peter Christen.
-\newblock A scalable privacy-preserving framework for temporal record linkage.
-\newblock Knowledge and Information Systems, 62(1):45--78, 2020.
-\newblock \url{https://doi.org/10.1007/s10115-019-01370-1}.
-
-\bibitem{litoux2026}
-Victor Litoux and Cyril Ray.
-\newblock Temporal record linkage using time decay models applied to vessel data.
-\newblock 2026 27th IEEE International Conference on Mobile Data Management (MDM), 2026.
-\newblock \url{https://doi.org/10.1109/MDM71479.2026.00044}.
 
 \bibitem{shim2026}
 Kwan Bo Shim.

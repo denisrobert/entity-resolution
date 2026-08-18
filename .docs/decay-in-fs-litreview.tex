@@ -40,8 +40,7 @@ with temporal variants in which agreement probabilities, comparison weights, or 
 similarity score become functions of the elapsed time between record timestamps. We
 summarize the primary points of the founding temporal-linkage papers and of the works closest
 to the present project: Li et al.\ (2011), Christen and Gayler (2013), Chiang et al.\ (2014),
-Li et al.\ (2015), Hu et al.\ (2017), Ranbaduge and Christen (2018/2020), Litoux and Ray
-(2026), and Shim's \emph{TimeLink} (2026). We then present an information-theoretic reading:
+Hu et al.\ (2017), and Shim's \emph{TimeLink} (2026). We then present an information-theoretic reading:
 a Fellegi--Sunter weight is a log-likelihood ratio measured in bits, its match-conditional
 expectation is a Kullback--Leibler divergence, and $u$ is tied, in the frequency model, to a
 R\'enyi collision entropy; ``decay of evidence with age'' is therefore the statement that the
@@ -67,7 +66,7 @@ are \emph{constants}, independent of any covariate of the pair.
 The temporal literature inserts ``decay'' at four distinct points:
 \begin{enumerate}[leftmargin=*]
   \item \textbf{Blocking and similarity.} The retrieval score is attenuated by the
-        timestamp gap (Li et al.\ 2011; Litoux and Ray 2026; the present project's
+        timestamp gap (Li et al.\ 2011; the present project's
         multi-view blocker).
   \item \textbf{Weight exponent.} The per-field contribution $\log(m_c/u_c)$ is multiplied
         by a decay factor of the gap.
@@ -152,21 +151,6 @@ information about how the entities evolve''. It proposes:
 This is the paper that turns ``decay'' into ``stochastic value evolution,'' a full
 transition model; TimeLink's semi-Markov formulation is in this lineage.
 
-\subsection{Li, Lee, Hsu, Tan (2015)}
-
-Furong Li, Mong Li Lee, Wynne Hsu, Wang-Chiew Tan.
-\emph{Linking temporal records for profiling entities}.
-SIGMOD 2015, pages 593--605.
-DOI: \url{https://doi.org/10.1145/2723372.2737789}~\cite{ll15}.
-
-The abstract introduces a transition model that ``captures the probability that an entity may
-change to a particular attribute value after some time period'' and combines it with
-\emph{source quality/freshness} metrics: timestamps, the value-transition model, and source
-timeliness are jointly exploited to link temporal records into the correct time period of
-the entity profile. Each source's freshness acts as an additional, source-level
-``$u$ moving with era,'' which connects to the open question in this survey
-(Section~\ref{sec:gap}, item~3).
-
 \subsection{Hu, Wang, Vatsalan, Christen (2017): regression classification}
 
 Yichen Hu, Qing Wang, Dinusha Vatsalan, Peter Christen.
@@ -196,37 +180,6 @@ Relevance to the project: this is the strongest published statement that a decay
 free; without value-frequency-aware $u$ and a regularized (hard) gap effect it can pass
 below the untrained static baseline on real data --- a result that the project's
 calibration experiments reproduce.
-
-\subsection{Ranbaduge and Christen (2018, 2020): temporal and privacy}
-
-Thilina Ranbaduge and Peter Christen.
-2018: \emph{Privacy-preserving temporal record linkage}. ICDM 2018, pages 377--386.
-DOI: \url{https://doi.org/10.1109/ICDM.2018.00053}~\cite{rc2018}.
-2020: \emph{A scalable privacy-preserving framework for temporal record linkage}.
-Knowledge and Information Systems 62(1):45--78.
-DOI: \url{https://doi.org/10.1007/s10115-019-01370-1}~\cite{rc2020}.
-
-These works operate at the intersection of temporal linkage and privacy-preserving
-record linkage (Bloom filters and homomorphic encryption), and use the same
-phenomenon --- that entity attributes evolve over time --- to adjust an encoded
-similarity, obtaining ``better linkage quality compared to non-temporal PPRL'' on data
-sets of several million records. Their contribution is a protocol that safely uses the
-value-change probability, i.e.\ they make use of a time-conditioned $m/u$ without
-revealing the raw values.
-
-\subsection{Litoux and Ray (2026): two kinds of decay on vessel data}
-
-Victor Litoux, Cyril Ray.
-\emph{Temporal record linkage using time decay models applied to vessel data}.
-IEEE MDM 2026, pages 313--318.
-DOI: \url{https://doi.org/10.1109/MDM71479.2026.00044}~\cite{lr2026}.
-
-An applied paper that explicitly separates \emph{disagreement decay} (the probability that
-an entity's value changes across the gap) from \emph{agreement decay} (the weight given to
-the shared attributes), applied to Automatic Identification System (AIS) vessel
-trajectories: common attributes anchor the linkage and the score is the decayed
-combination of these two effects. This is the closest item to the present project's
-pair-conditional decay framing, though on vessel data rather than person records.
 
 \subsection{Shim (2026): TimeLink}
 
@@ -405,7 +358,7 @@ To the best of our knowledge:
         the entropy framing above;
   \item nobody has formulated the natural blocker consequence --- drop a field from a
         fused index once it has roughly exhausted its mutual information --- although
-        Litoux and Ray use the idea and TimeLink keeps table lookups separate;
+        TimeLink's field-specific lookups touch on this idea;
   \item the ``$u$ static'' assumption of the time-dependent-FS line is not carefully
         tested against \emph{cohort drift} (the value distribution itself changes over
         decades, changing $u$), a concern present in Hu et al.\ (2017), in the Li et al.\
@@ -442,25 +395,9 @@ P.~Christen and R.~W.~Gayler. Adaptive temporal entity resolution on dynamic dat
 Y.~Chiang, A.~Doan, and J.~F.~Naughton. Modeling entity evolution for temporal record
 matching. \newblock SIGMOD 2014:1175--1186.
 
-\bibitem{ll15}
-F.~Li, M.~L.~Lee, W.~Hsu, and W.-C.~Tan. Linking temporal records for profiling.
-\newblock SIGMOD 2015:593--605.
-
 \bibitem{hu2017}
 Y.~Hu, Q.~Wang, D.~Vatsalan, and P.~Christen. Improving temporal record linkage using
 regression classification. \newblock PAKDD 2017, LNCS 10235:561--573.
-
-\bibitem{rc2018}
-T.~Ranbaduge and P.~Christen. Privacy-preserving temporal record linkage.
-\newblock ICDM 2018:377--386.
-
-\bibitem{rc2020}
-T.~Ranbaduge and P.~Christen. A scalable privacy-preserving framework for temporal record
-linkage. \newblock KAIS 62(1):45--78, 2020.
-
-\bibitem{lr2026}
-V.~Litoux and C.~Ray. Temporal record linkage using time decay models applied to vessel
-data. \newblock MDM 2026:313--318.
 
 \bibitem{shim2026}
 K.~B.~Shim. TimeLink: time-aware record linkage with semi-Markov dynamics.
