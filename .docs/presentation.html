@@ -85,7 +85,7 @@
 <h1 id="what-it-delivers">What it delivers</h1>
 <ul>
 <li><strong>99.5% F1</strong> on the synthetic test corpus (15,000 labelled queries).</li>
-<li><strong>~7.5 ms per query</strong> — sub-millisecond blocking, probabilistic verdict on top.</li>
+<li><strong>~7.5 ms/query</strong> — <em>amortized batched</em> processing (batched embedding + blocking + one Splink run); the per-query online resolver path is slower.</li>
 <li><strong>Persisted and reusable</strong>: the index reloads without re-embedding the population.</li>
 <li><strong>Defensible numbers</strong>: every result reproduces by re-running the code.</li>
 </ul>
@@ -180,9 +180,9 @@ is at or above a threshold <strong><code>τ</code></strong>. One number encodes 
 <h1 id="where-performance-comes-from">Where performance comes from</h1>
 <p><strong>Blocking recall is the ceiling; Splink is where F1 is won or lost.</strong></p>
 <ul>
-<li>Top-20 blocking recall: <strong>99.88%</strong> (default), <strong>99.95%</strong> (compact serialization).</li>
-<li>End-to-end recall: <strong>99.41%</strong> → the ~0.5% gap is lost in <em>linkage</em>, not blocking.</li>
-<li>A &quot;perfect&quot; blocker buys only <strong>~0.2 more F1 points</strong> (99.46 → ~99.69% ceiling).</li>
+<li>On the confusion-matrix query set (15k queries): top-20 blocking recall <strong>99.46%</strong> → end-to-end recall <strong>99.40%</strong> — the linkage stage rejects only 6 of the 9,946 retrieved positives.</li>
+<li>A &quot;perfect&quot; blocker buys at most ~<strong>0.3 more F1 points</strong> (99.45 → ~99.73% ceiling), computed from the same artifact.</li>
+<li>(Section 7, a different query construction: blocking recall 99.88%; compact serialization raises it to 99.95%.)</li>
 </ul>
 <blockquote>
 <p>Design implication: improving the embedding/blocking engine is <strong>not</strong> the lever today; linkage configuration is.</p>
@@ -202,13 +202,13 @@ is at or above a threshold <strong><code>τ</code></strong>. One number encodes 
 <tbody>
 <tr>
 <td><strong>Threshold τ</strong></td>
-<td>0.85→0.95 lifts F1 99.46→99.64%</td>
+<td>0.85→0.95 lifts F1 99.45→99.63%</td>
 <td>Yes — cheap precision knob</td>
 </tr>
 <tr>
 <td><strong>Serialization</strong></td>
-<td>compact: recall 99.95%, F1 99.73%</td>
-<td>Yes — small but real</td>
+<td>single seed: recall 99.95%, F1 99.73%; five-seed mean diff only 0.005 F1 pts</td>
+<td>Not confirmable (recheck on your data)</td>
 </tr>
 <tr>
 <td><strong>Blocking size k</strong></td>
@@ -222,7 +222,7 @@ is at or above a threshold <strong><code>τ</code></strong>. One number encodes 
 </tr>
 <tr>
 <td><strong>Retrain m/u</strong></td>
-<td>untrained F1 98.1% vs supervised 94.1%</td>
+<td>untrained F1 97.9% vs supervised 93.8% (entity-disjoint)</td>
 <td>Keep defaults</td>
 </tr>
 </tbody>
@@ -238,7 +238,7 @@ is at or above a threshold <strong><code>τ</code></strong>. One number encodes 
 </ul>
 <p>Decision-theoretic setting: <code>τ* = C_FP / (C_FP + C_FN)</code> — presumes a calibrated posterior, zero cost for correct decisions, and per-pair decisions (whitepaper Appendix — Deriving τ).</p>
 <ul>
-<li>Measured: <code>τ</code> 0.85 → 0.95 lifted F1 99.46% → 99.64% (precision 99.51→99.94%, FP 49→6); recall slipped only 99.41→99.34%.</li>
+<li>Measured: <code>τ</code> 0.85 → 0.95 lifted F1 99.45% → 99.63% (precision 99.51→99.94%, FP 49→6); recall slipped only 99.40→99.33%.</li>
 <li>With recall headroom, raising <code>τ</code> is the cheapest precision lever — the mechanism to encode FP/FN business costs. (Methods: whitepaper <strong>Appendix — Deriving τ</strong>.)</li>
 </ul>
 <footer>Entity Resolution with FAISS + Splink</footer>
@@ -247,8 +247,8 @@ is at or above a threshold <strong><code>τ</code></strong>. One number encodes 
 <h1 id="the-calibration-paradox">The calibration paradox</h1>
 <p>Retraining the match model (<code>m/u</code>) made results <strong>worse</strong>, not better.</p>
 <ol>
-<li><strong>Prior coupling (dominant):</strong> EM's fitted prior (0.0071 vs 0.0001) shifts all scores up → mass false positives. Pinning the prior raises EM's F1 from ~0.83 to ~0.95.</li>
-<li><strong>A genuine residual:</strong> even with the prior pinned, trained <code>m/u</code> stay below defaults (supervised 94.1% vs untrained 98.1%; EM optimum 95.5%) by over-weighting partial matches.</li>
+<li><strong>Prior coupling (dominant):</strong> EM's fitted prior (0.0071 vs 0.0001) shifts all scores up → mass false positives. Pinning the prior recovers EM's F1 (entity-disjoint: with a pinned prior the best EM F1 rises from ~0.82 to ~0.97).</li>
+<li><strong>A genuine residual:</strong> even with the prior pinned, trained <code>m/u</code> stay below defaults at equal prior (supervised 93.8% vs untrained 97.9% in §8.1; EM optimum 96.8% vs 100% on the small duplicate-bearing set) by over-weighting partial matches.</li>
 </ol>
 <blockquote>
 <p>EM training generates candidate pairs by exact-equality blocking on two keys: <code>first_name</code> and <code>date_of_birth</code> (<code>block_on(&quot;first_name&quot;)</code>, <code>block_on(&quot;date_of_birth&quot;)</code>).</p>
@@ -304,10 +304,10 @@ Store     : add / update / delete / save / load (no re-embed on load)
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="21" data-paginate="true" data-footer="Entity Resolution with FAISS + Splink" data-theme="default" lang="en-US" data-marpit-pagination="21" style="--paginate:true;--footer:Entity Resolution with FAISS + Splink;--theme:default;" data-marpit-pagination-total="27" data-size="16:9">
 <h1 id="scorecard-to-remember">Scorecard to remember</h1>
 <ul>
-<li>Confusion matrix (5k refs / 15k queries): <strong>F1 99.46%</strong>, recall 99.41%, precision 99.51%.</li>
-<li>Blocking recall: <strong>99.88%</strong> @k=20 (99.95% compact).</li>
-<li><strong>7.48 ms/query</strong> (embed + block + batched Splink).</li>
-<li>NC-voter (real, mutated): <strong>F1 92–94%</strong>; blocking is the binding constraint at the default <code>k=20</code> (Splink becomes binding at <code>k=100</code>).</li>
+<li>Confusion matrix (5k refs / 15k queries): <strong>F1 99.45%</strong>, recall 99.40%, precision 99.51%.</li>
+<li>Same-set blocking recall: <strong>99.46%</strong> @k=20 (Section 7's different query set: 99.88%; compact 99.95%).</li>
+<li><strong>~7.5 ms/query amortized batched</strong> (embed + block + one Splink run); online per-query path is slower (~0.9 s incl. per-query Linker construction).</li>
+<li>NC-voter (real schema, synthetic mutations): <strong>F1 92–94%</strong>; blocking is the binding constraint at the default <code>k=20</code> (Splink becomes binding at <code>k=100</code>).</li>
 </ul>
 <blockquote>
 <p>Baseline engineering numbers — config, hardware, and data shape all move them.</p>

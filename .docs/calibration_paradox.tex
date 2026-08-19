@@ -348,6 +348,21 @@ Table~\ref{tab:metrics} are evaluated over the blocked candidate pairs rather th
 labelled query set, so their F1 magnitudes differ from the query-level tables (many more
 non-match candidate pairs enter the denominator); the text notes this wherever it occurs.
 
+\begin{quotation}\noindent\textbf{Evaluation-split scope.} The registration and supervised-calibration
+numbers in this companion paper were produced before the entity-disjoint re-evaluation in the
+main pipeline paper. In this companion, the supervised training pairs and the evaluated
+positive queries are generated from \emph{the same} 5{,}000-record base population (identical
+and mutated variants of the same entities), so the supervised figures here read as
+\emph{same-population calibration rather than a held-out evaluation}. The parent paper's
+Section~8.1/8.2 now re-run the calibration and duplicate-benchmark upright entity-disjoint
+(calibration pairs and evaluation queries come from disjoint base records) and report the
+updated F1s (untrained $97.9\%$ vs.\ supervised $93.8\%$ on the 50{,}000-record index; untrained
+$94.3\%$ vs.\ supervised $85.3\%$ vs.\ EM $72.2\%$ on the entity-disjoint 100K benchmark). The
+qualitative conclusion of this companion --- prior coupling dominates, and a genuine $m/u$
+residual remains after the prior is pinned --- is unchanged by the split; only the absolute
+figures shift.
+\end{quotation}
+
 \begin{table}[h]
 \centering
 \caption{Duplicate-bearing benchmark (5{,}000 base records, 300 queries,
