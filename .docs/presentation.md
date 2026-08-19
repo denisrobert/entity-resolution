@@ -123,7 +123,7 @@ The cost-based rule:
 ```
 
 If a **false link** (FP) is 20× more costly than a **missed link** (FN), then
-`τ* = 20/21 ≈ 0.95` — the model is tuned to the cost of each mistake.
+`τ* = 20/21 ≈ 0.95` — the model is tuned to the cost of each mistake. (Valid under calibrated probabilities; with labels, sweep `τ` on validation — whitepaper Appendix — Deriving τ.)
 
 > One parameter lets a risk-averse line (fraud/AML) and a recall-first line (marketing) share the same model, each tuned to its own economics.
 
@@ -211,7 +211,7 @@ Splink's decision rule: classify as *match* when `P(M|γ) ≥ τ` (range ~[0.5, 
 - **Raise `τ`** → fewer false positives, at more false negatives.
 - **Lower `τ`** → more true matches, at more false positives.
 
-Decision-theoretic setting: `τ* = C_FP / (C_FP + C_FN)`.
+Decision-theoretic setting: `τ* = C_FP / (C_FP + C_FN)` — presumes a calibrated posterior, zero cost for correct decisions, and per-pair decisions (whitepaper Appendix — Deriving τ).
 
 - Measured: `τ` 0.85 → 0.95 lifted F1 99.46% → 99.64% (precision 99.51→99.94%, FP 49→6); recall slipped only 99.41→99.34%.
 - With recall headroom, raising `τ` is the cheapest precision lever — the mechanism to encode FP/FN business costs. (Methods: whitepaper **Appendix — Deriving τ**.)
@@ -279,7 +279,7 @@ Store     : add / update / delete / save / load (no re-embed on load)
 - Confusion matrix (5k refs / 15k queries): **F1 99.46%**, recall 99.41%, precision 99.51%.
 - Blocking recall: **99.88%** @k=20 (99.95% compact).
 - **7.48 ms/query** (embed + block + batched Splink).
-- NC-voter (real, mutated): **F1 92–94%**; blocking is the binding constraint.
+- NC-voter (real, mutated): **F1 92–94%**; blocking is the binding constraint at the default `k=20` (Splink becomes binding at `k=100`).
 
 > Baseline engineering numbers — config, hardware, and data shape all move them.
 

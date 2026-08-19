@@ -103,7 +103,7 @@ is at or above a threshold <strong><code>τ</code></strong>. One number encodes 
 <pre is="marp-pre" data-auto-scaling="downscale-only"><code>τ* = C_FP / (C_FP + C_FN)
 </code></pre>
 <p>If a <strong>false link</strong> (FP) is 20× more costly than a <strong>missed link</strong> (FN), then<br />
-<code>τ* = 20/21 ≈ 0.95</code> — the model is tuned to the cost of each mistake.</p>
+<code>τ* = 20/21 ≈ 0.95</code> — the model is tuned to the cost of each mistake. (Valid under calibrated probabilities; with labels, sweep <code>τ</code> on validation — whitepaper Appendix — Deriving τ.)</p>
 <blockquote>
 <p>One parameter lets a risk-averse line (fraud/AML) and a recall-first line (marketing) share the same model, each tuned to its own economics.</p>
 </blockquote>
@@ -236,7 +236,7 @@ is at or above a threshold <strong><code>τ</code></strong>. One number encodes 
 <li><strong>Raise <code>τ</code></strong> → fewer false positives, at more false negatives.</li>
 <li><strong>Lower <code>τ</code></strong> → more true matches, at more false positives.</li>
 </ul>
-<p>Decision-theoretic setting: <code>τ* = C_FP / (C_FP + C_FN)</code>.</p>
+<p>Decision-theoretic setting: <code>τ* = C_FP / (C_FP + C_FN)</code> — presumes a calibrated posterior, zero cost for correct decisions, and per-pair decisions (whitepaper Appendix — Deriving τ).</p>
 <ul>
 <li>Measured: <code>τ</code> 0.85 → 0.95 lifted F1 99.46% → 99.64% (precision 99.51→99.94%, FP 49→6); recall slipped only 99.41→99.34%.</li>
 <li>With recall headroom, raising <code>τ</code> is the cheapest precision lever — the mechanism to encode FP/FN business costs. (Methods: whitepaper <strong>Appendix — Deriving τ</strong>.)</li>
@@ -307,7 +307,7 @@ Store     : add / update / delete / save / load (no re-embed on load)
 <li>Confusion matrix (5k refs / 15k queries): <strong>F1 99.46%</strong>, recall 99.41%, precision 99.51%.</li>
 <li>Blocking recall: <strong>99.88%</strong> @k=20 (99.95% compact).</li>
 <li><strong>7.48 ms/query</strong> (embed + block + batched Splink).</li>
-<li>NC-voter (real, mutated): <strong>F1 92–94%</strong>; blocking is the binding constraint.</li>
+<li>NC-voter (real, mutated): <strong>F1 92–94%</strong>; blocking is the binding constraint at the default <code>k=20</code> (Splink becomes binding at <code>k=100</code>).</li>
 </ul>
 <blockquote>
 <p>Baseline engineering numbers — config, hardware, and data shape all move them.</p>
