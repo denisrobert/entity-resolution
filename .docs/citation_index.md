@@ -64,11 +64,12 @@ available copies are flagged with the local link in their row.
 
 | Key | Used in | Reference | Verify at |
 |---|---|---|---|
-| `lidong2011` | whitepaper, litreview (keys `lidong2011` / `li2011`) | Li, Dong, Maurino, Srivastava, "Linking temporal records", *PVLDB* 4(11):956–967, 2011 | https://doi.org/10.14778/3402707.3402733 ✅ · local: [LinkingTemporalRecords.pdf](../source_papers/LinkingTemporalRecords.pdf) |
-| `christengayler2013` | whitepaper, litreview (key `cg2013`) | Christen, Gayler, "Adaptive temporal entity resolution on dynamic databases", PAKDD 2013, 558–569 | https://doi.org/10.1007/978-3-642-37456-2_47 ✅ · local: [AdaptiveTemporalEntityResolutionOnDynamicDatabases.pdf](../source_papers/AdaptiveTemporalEntityResolutionOnDynamicDatabases.pdf) (author copy, ANU repo) |
-| `hu2017regression` | whitepaper, litreview (key `hu2017`) | Hu, Wang, Vatsalan, Christen, "Improving temporal record linkage using regression classification", PAKDD 2017, 561–573 | https://doi.org/10.1007/978-3-319-57454-7_44 ✅ · local: [ImprovingTemporalRecordLinkageUsingRegressionClassification.pdf](../source_papers/ImprovingTemporalRecordLinkageUsingRegressionClassification.pdf) (author copy, ANU repo) |
-| `chiang2014` | whitepaper, litreview (key `cd14`) | Chiang, Doan, Naughton, "Modeling entity evolution for temporal record matching", SIGMOD 2014, 1175–1186 | https://doi.org/10.1145/2588555.2588560 ✅ · local: [ModelingEntityEvolution.pdf](../source_papers/ModelingEntityEvolution.pdf) |
-| `shim2026` | whitepaper, litreview | Shim, "TimeLink: time-aware record linkage with semi-Markov dynamics", SSRN preprint 6468518, 2026 | https://doi.org/10.2139/ssrn.6468518 ✅ · local: [TimeLink.pdf](../source_papers/TimeLink.pdf) |
+| `lidong2011` | litreview | Li, Dong, Maurino, Srivastava, "Linking temporal records", *PVLDB* 4(11):956–967, 2011 | https://doi.org/10.14778/3402707.3402733 ✅ · local: [LinkingTemporalRecords.pdf](../source_papers/LinkingTemporalRecords.pdf) |
+| `christengayler2013` | litreview (key `cg2013`) | Christen, Gayler, "Adaptive temporal entity resolution on dynamic databases", PAKDD 2013, 558–569 | https://doi.org/10.1007/978-3-642-37456-2_47 ✅ · local: [AdaptiveTemporalEntityResolutionOnDynamicDatabases.pdf](../source_papers/AdaptiveTemporalEntityResolutionOnDynamicDatabases.pdf) (author copy, ANU repo) |
+| `hu2017regression` | litreview (key `hu2017`) | Hu, Wang, Vatsalan, Christen, "Improving temporal record linkage using regression classification", PAKDD 2017, 561–573 | https://doi.org/10.1007/978-3-319-57454-7_44 ✅ · local: [ImprovingTemporalRecordLinkageUsingRegressionClassification.pdf](../source_papers/ImprovingTemporalRecordLinkageUsingRegressionClassification.pdf) (author copy, ANU repo) |
+| `chiang2014` | litreview (key `cd14`) | Chiang, Doan, Naughton, "Modeling entity evolution for temporal record matching", SIGMOD 2014, 1175–1186 | https://doi.org/10.1145/2588555.2588560 ✅ · local: [ModelingEntityEvolution.pdf](../source_papers/ModelingEntityEvolution.pdf) |
+| `shim2026` | litreview | Shim, "TimeLink: time-aware record linkage with semi-Markov dynamics", SSRN preprint 6468518, 2026 | https://doi.org/10.2139/ssrn.6468518 ✅ · local: [TimeLink.pdf](../source_papers/TimeLink.pdf) |
+| `linacrepc2026` | whitepaper | Linacre, "Comment on Splink issue #3240 concerning piecewise temporal decay via comparison levels", GitHub, moj-analytical-services/splink, 2026 | https://github.com/moj-analytical-services/splink/issues/3240#issuecomment-5309218620 ✅ |
 
 ## E. Data sources and external resources
 
