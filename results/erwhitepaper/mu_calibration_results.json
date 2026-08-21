@@ -24,12 +24,12 @@
     }
   },
   "timing": {
-    "load_seconds": 15.5625519999885,
-    "training_seconds": 8.472734800016042,
-    "blocking_seconds": 182.93838080001296,
+    "load_seconds": 10.297632700006943,
+    "training_seconds": 4.52482739998959,
+    "blocking_seconds": 149.22510799998417,
     "query_total_ms": {
-      "untrained": 3484.6635999856517,
-      "trained": 3339.065399952233
+      "untrained": 48875.11630001245,
+      "trained": 48407.13230002439
     }
   },
   "m_u": {
@@ -43,8 +43,8 @@
       "confusion_matrix": {
         "TP": 3875,
         "FN": 125,
-        "FP": 64,
-        "TN": 1936
+        "FP": 62,
+        "TN": 1938
       },
       "by_category": {
         "identical": {
@@ -56,24 +56,24 @@
           "FN": 125
         },
         "unrelated": {
-          "FP": 64,
-          "TN": 1936
+          "FP": 62,
+          "TN": 1938
         }
       },
       "metrics": {
-        "accuracy": 0.9685,
-        "precision": 0.9837522213759837,
+        "accuracy": 0.9688333333333333,
+        "precision": 0.984251968503937,
         "recall": 0.96875,
-        "specificity": 0.968,
-        "f1": 0.9761934752487719
+        "specificity": 0.969,
+        "f1": 0.9764394607534332
       }
     },
     "trained": {
       "confusion_matrix": {
         "TP": 3877,
         "FN": 123,
-        "FP": 236,
-        "TN": 1764
+        "FP": 0,
+        "TN": 2000
       },
       "by_category": {
         "identical": {
@@ -85,16 +85,16 @@
           "FN": 123
         },
         "unrelated": {
-          "FP": 236,
-          "TN": 1764
+          "FP": 0,
+          "TN": 2000
         }
       },
       "metrics": {
-        "accuracy": 0.9401666666666667,
-        "precision": 0.9426209579382446,
+        "accuracy": 0.9795,
+        "precision": 1.0,
         "recall": 0.96925,
-        "specificity": 0.882,
-        "f1": 0.9557500308147417
+        "specificity": 1.0,
+        "f1": 0.984384918116034
       }
     }
   },

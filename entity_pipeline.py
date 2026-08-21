@@ -32,6 +32,9 @@ from typing import Any, Generic, List, Optional, Sequence, Tuple, TypeVar
 import numpy as np
 from splink import block_on
 
+from scorer import DEFAULT_THRESHOLD as SCORER_DEFAULT_TAU
+from scorer import SplinkScorer, WeightTable, UNTRAINED_PRIOR as SCORER_UNTR_PRIOR
+
 DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 DEFAULT_K = 20
 DEFAULT_TAU = 0.85
@@ -520,11 +523,38 @@ class Linker:
         # Trained Splink model (settings dict with fitted m/u and prior). When
         # set, link() uses these parameters instead of the untrained defaults.
         self._trained_settings: Optional[dict] = None
+        # Cached lightweight scorer used for inference. Rebuilt after training
+        # so it always reflects the current m/u. No Splink Linker is constructed
+        # at inference time.
+        self._scorer: Optional[SplinkScorer] = None
 
     @property
     def is_trained(self) -> bool:
         """Whether m/u parameters have been trained with :meth:`train`."""
         return self._trained_settings is not None
+
+    def _ensure_scorer(self, threshold: Optional[float] = None) -> SplinkScorer:
+        """Return (building lazily) a lightweight scorer over the current m/u.
+
+        Uses the trained settings when available (falling back to the default
+        comparison objects' default m/u for any level that was never trained),
+        otherwise the untrained comparisons. The scorer is a persistent object
+        holding a single DuckDB connection reused across queries.
+        """
+        tau = self.tau if threshold is None else float(threshold)
+        if self._trained_settings is not None and self._scorer is None:
+            settings = dict(self._trained_settings)
+            settings.pop("blocking_rules_to_generate_predictions", None)
+            self._scorer = SplinkScorer.from_settings(
+                settings,
+                threshold=tau,
+                fallback_comparisons=self.comparisons,
+            )
+        elif self._trained_settings is None and self._scorer is None:
+            self._scorer = SplinkScorer.from_comparisons(
+                self.comparisons, prior=SCORER_UNTR_PRIOR, threshold=tau
+            )
+        return self._scorer
 
     def _settings(self) -> dict:
         settings: dict = {
@@ -662,6 +692,8 @@ class Linker:
             )
 
         self._trained_settings = linker.misc.save_model_to_json()
+        # Trained m/u changed; drop the cached scorer so it is rebuilt lazily.
+        self._scorer = None
         return self._trained_settings
 
     def link(
@@ -680,58 +712,27 @@ class Linker:
         if not candidates:
             return []
 
-        import pandas as pd
-        import splink
-
         input_row = _record_dict(input_record)
-        query_records = [dict(input_row, unique_id="INPUT_QUERY")]
         candidate_records = [
-            dict(
-                _record_dict(candidate.record),
-                unique_id=f"CAND_{i}",
-            )
-            for i, candidate in enumerate(candidates)
+            dict(_record_dict(candidate.record))
+            for candidate in candidates
         ]
-        # All query/candidate rows for this resolution share a block key so the
-        # linker compares the input against every candidate.
-        for row in query_records + candidate_records:
-            row["block_id"] = 0
-            row["source_dataset"] = "query" if row["unique_id"] == "INPUT_QUERY" else "candidate"
-
-        settings = self._link_settings()
-        linker = splink.Linker(
-            [pd.DataFrame(query_records), pd.DataFrame(candidate_records)],
-            settings,
-            db_api=splink.DuckDBAPI(),
-            set_up_basic_logging=False,
-            input_table_aliases=["query", "candidate"],
-        )
-        predictions = linker.inference.predict(
-            threshold_match_probability=threshold
-        ).as_pandas_dataframe()
-        if predictions.empty:
-            return []
+        scorer = self._ensure_scorer(threshold)
+        posteriors = scorer.score_batch(input_row, candidate_records)
 
         matches: List[MatchResult] = []
-        for _, row in predictions.iterrows():
-            query_id = row["unique_id_l"]
-            cand_id = row["unique_id_r"]
-            if query_id != "INPUT_QUERY" and cand_id != "INPUT_QUERY":
+        for i, candidate in enumerate(candidates):
+            prob = float(posteriors[i])
+            if prob < threshold:
                 continue
-            candidate_id = cand_id if query_id == "INPUT_QUERY" else query_id
-            if not candidate_id.startswith("CAND_"):
-                continue
-            candidate_index = int(candidate_id.split("_", 1)[1])
-            candidate = candidates[candidate_index]
             matches.append(
                 MatchResult(
                     record=candidate.record,
-                    match_probability=float(row["match_probability"]),
+                    match_probability=prob,
                     blocking_score=candidate.score,
                     candidate_position=candidate.position,
                 )
             )
-
         matches.sort(key=lambda m: m.match_probability, reverse=True)
         return matches
 

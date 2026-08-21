@@ -22,387 +22,387 @@
     ]
   },
   "timing": {
-    "index_build_seconds": 46.420369900006335,
-    "blocking_seconds": 133.47894650005037
+    "index_build_seconds": 57.21756550000282,
+    "blocking_seconds": 120.40153049997753
   },
   "grid": [
     {
       "address_strength": 0.6,
       "threshold": 0.85,
       "confusion_matrix": {
-        "TP": 9889,
-        "FN": 111,
-        "FP": 259,
-        "TN": 4741
+        "TP": 9883,
+        "FN": 117,
+        "FP": 39,
+        "TN": 4961
       },
       "metrics": {
-        "accuracy": 0.9753333333333334,
-        "precision": 0.974477729601892,
-        "recall": 0.9889,
-        "specificity": 0.9482,
-        "f1": 0.9816358943815764
+        "accuracy": 0.9896,
+        "precision": 0.9960693408586978,
+        "recall": 0.9883,
+        "specificity": 0.9922,
+        "f1": 0.9921694608975002
       },
-      "score_seconds": 15.226168999972288
+      "score_seconds": 138.5272607000079
     },
     {
       "address_strength": 0.6,
       "threshold": 0.87,
       "confusion_matrix": {
-        "TP": 9889,
-        "FN": 111,
-        "FP": 244,
-        "TN": 4756
+        "TP": 9873,
+        "FN": 127,
+        "FP": 38,
+        "TN": 4962
       },
       "metrics": {
-        "accuracy": 0.9763333333333334,
-        "precision": 0.975920260534886,
-        "recall": 0.9889,
-        "specificity": 0.9512,
-        "f1": 0.9823672577360553
+        "accuracy": 0.989,
+        "precision": 0.9961658762990616,
+        "recall": 0.9873,
+        "specificity": 0.9924,
+        "f1": 0.9917131233991261
       },
-      "score_seconds": 15.226168999972288
+      "score_seconds": 138.5272607000079
     },
     {
       "address_strength": 0.6,
       "threshold": 0.9,
       "confusion_matrix": {
-        "TP": 9889,
-        "FN": 111,
-        "FP": 243,
-        "TN": 4757
+        "TP": 9873,
+        "FN": 127,
+        "FP": 38,
+        "TN": 4962
       },
       "metrics": {
-        "accuracy": 0.9764,
-        "precision": 0.976016581129096,
-        "recall": 0.9889,
-        "specificity": 0.9514,
-        "f1": 0.9824160540433141
+        "accuracy": 0.989,
+        "precision": 0.9961658762990616,
+        "recall": 0.9873,
+        "specificity": 0.9924,
+        "f1": 0.9917131233991261
       },
-      "score_seconds": 15.226168999972288
+      "score_seconds": 138.5272607000079
     },
     {
       "address_strength": 0.6,
       "threshold": 0.92,
       "confusion_matrix": {
-        "TP": 9889,
-        "FN": 111,
-        "FP": 242,
-        "TN": 4758
+        "TP": 9873,
+        "FN": 127,
+        "FP": 38,
+        "TN": 4962
       },
       "metrics": {
-        "accuracy": 0.9764666666666667,
-        "precision": 0.9761129207383279,
-        "recall": 0.9889,
-        "specificity": 0.9516,
-        "f1": 0.9824648551984502
+        "accuracy": 0.989,
+        "precision": 0.9961658762990616,
+        "recall": 0.9873,
+        "specificity": 0.9924,
+        "f1": 0.9917131233991261
       },
-      "score_seconds": 15.226168999972288
+      "score_seconds": 138.5272607000079
     },
     {
       "address_strength": 0.6,
       "threshold": 0.95,
       "confusion_matrix": {
-        "TP": 9889,
-        "FN": 111,
-        "FP": 219,
-        "TN": 4781
+        "TP": 9873,
+        "FN": 127,
+        "FP": 8,
+        "TN": 4992
       },
       "metrics": {
-        "accuracy": 0.978,
-        "precision": 0.9783339928769291,
-        "recall": 0.9889,
-        "specificity": 0.9562,
-        "f1": 0.9835886214442013
+        "accuracy": 0.991,
+        "precision": 0.9991903653476368,
+        "recall": 0.9873,
+        "specificity": 0.9984,
+        "f1": 0.9932095971027615
       },
-      "score_seconds": 15.226168999972288
+      "score_seconds": 138.5272607000079
     },
     {
       "address_strength": 0.8,
       "threshold": 0.85,
       "confusion_matrix": {
-        "TP": 9889,
-        "FN": 111,
-        "FP": 259,
-        "TN": 4741
+        "TP": 9883,
+        "FN": 117,
+        "FP": 39,
+        "TN": 4961
       },
       "metrics": {
-        "accuracy": 0.9753333333333334,
-        "precision": 0.974477729601892,
-        "recall": 0.9889,
-        "specificity": 0.9482,
-        "f1": 0.9816358943815764
+        "accuracy": 0.9896,
+        "precision": 0.9960693408586978,
+        "recall": 0.9883,
+        "specificity": 0.9922,
+        "f1": 0.9921694608975002
       },
-      "score_seconds": 15.63030429999344
+      "score_seconds": 134.08762710000155
     },
     {
       "address_strength": 0.8,
       "threshold": 0.87,
       "confusion_matrix": {
-        "TP": 9889,
-        "FN": 111,
-        "FP": 244,
-        "TN": 4756
+        "TP": 9873,
+        "FN": 127,
+        "FP": 38,
+        "TN": 4962
       },
       "metrics": {
-        "accuracy": 0.9763333333333334,
-        "precision": 0.975920260534886,
-        "recall": 0.9889,
-        "specificity": 0.9512,
-        "f1": 0.9823672577360553
+        "accuracy": 0.989,
+        "precision": 0.9961658762990616,
+        "recall": 0.9873,
+        "specificity": 0.9924,
+        "f1": 0.9917131233991261
       },
-      "score_seconds": 15.63030429999344
+      "score_seconds": 134.08762710000155
     },
     {
       "address_strength": 0.8,
       "threshold": 0.9,
       "confusion_matrix": {
-        "TP": 9889,
-        "FN": 111,
-        "FP": 230,
-        "TN": 4770
+        "TP": 9873,
+        "FN": 127,
+        "FP": 24,
+        "TN": 4976
       },
       "metrics": {
-        "accuracy": 0.9772666666666666,
-        "precision": 0.9772704812728531,
-        "recall": 0.9889,
-        "specificity": 0.954,
-        "f1": 0.9830508474576272
+        "accuracy": 0.9899333333333333,
+        "precision": 0.9975750227341619,
+        "recall": 0.9873,
+        "specificity": 0.9952,
+        "f1": 0.9924109162185254
       },
-      "score_seconds": 15.63030429999344
+      "score_seconds": 134.08762710000155
     },
     {
       "address_strength": 0.8,
       "threshold": 0.92,
       "confusion_matrix": {
-        "TP": 9889,
-        "FN": 111,
-        "FP": 229,
-        "TN": 4771
+        "TP": 9873,
+        "FN": 127,
+        "FP": 24,
+        "TN": 4976
       },
       "metrics": {
-        "accuracy": 0.9773333333333334,
-        "precision": 0.9773670685906306,
-        "recall": 0.9889,
-        "specificity": 0.9542,
-        "f1": 0.9830997117009643
+        "accuracy": 0.9899333333333333,
+        "precision": 0.9975750227341619,
+        "recall": 0.9873,
+        "specificity": 0.9952,
+        "f1": 0.9924109162185254
       },
-      "score_seconds": 15.63030429999344
+      "score_seconds": 134.08762710000155
     },
     {
       "address_strength": 0.8,
       "threshold": 0.95,
       "confusion_matrix": {
-        "TP": 9889,
-        "FN": 111,
-        "FP": 219,
-        "TN": 4781
+        "TP": 9873,
+        "FN": 127,
+        "FP": 8,
+        "TN": 4992
       },
       "metrics": {
-        "accuracy": 0.978,
-        "precision": 0.9783339928769291,
-        "recall": 0.9889,
-        "specificity": 0.9562,
-        "f1": 0.9835886214442013
+        "accuracy": 0.991,
+        "precision": 0.9991903653476368,
+        "recall": 0.9873,
+        "specificity": 0.9984,
+        "f1": 0.9932095971027615
       },
-      "score_seconds": 15.63030429999344
+      "score_seconds": 134.08762710000155
     },
     {
       "address_strength": 0.9,
       "threshold": 0.85,
       "confusion_matrix": {
-        "TP": 9889,
-        "FN": 111,
-        "FP": 246,
-        "TN": 4754
+        "TP": 9883,
+        "FN": 117,
+        "FP": 25,
+        "TN": 4975
       },
       "metrics": {
-        "accuracy": 0.9762,
-        "precision": 0.9757276763690182,
-        "recall": 0.9889,
-        "specificity": 0.9508,
-        "f1": 0.9822696796622796
+        "accuracy": 0.9905333333333334,
+        "precision": 0.9974767864352039,
+        "recall": 0.9883,
+        "specificity": 0.995,
+        "f1": 0.9928671890697207
       },
-      "score_seconds": 17.161440299998503
+      "score_seconds": 123.55994160001865
     },
     {
       "address_strength": 0.9,
       "threshold": 0.87,
       "confusion_matrix": {
-        "TP": 9889,
-        "FN": 111,
-        "FP": 231,
-        "TN": 4769
+        "TP": 9873,
+        "FN": 127,
+        "FP": 24,
+        "TN": 4976
       },
       "metrics": {
-        "accuracy": 0.9772,
-        "precision": 0.9771739130434782,
-        "recall": 0.9889,
-        "specificity": 0.9538,
-        "f1": 0.9830019880715706
+        "accuracy": 0.9899333333333333,
+        "precision": 0.9975750227341619,
+        "recall": 0.9873,
+        "specificity": 0.9952,
+        "f1": 0.9924109162185254
       },
-      "score_seconds": 17.161440299998503
+      "score_seconds": 123.55994160001865
     },
     {
       "address_strength": 0.9,
       "threshold": 0.9,
       "confusion_matrix": {
-        "TP": 9889,
-        "FN": 111,
-        "FP": 230,
-        "TN": 4770
+        "TP": 9873,
+        "FN": 127,
+        "FP": 24,
+        "TN": 4976
       },
       "metrics": {
-        "accuracy": 0.9772666666666666,
-        "precision": 0.9772704812728531,
-        "recall": 0.9889,
-        "specificity": 0.954,
-        "f1": 0.9830508474576272
+        "accuracy": 0.9899333333333333,
+        "precision": 0.9975750227341619,
+        "recall": 0.9873,
+        "specificity": 0.9952,
+        "f1": 0.9924109162185254
       },
-      "score_seconds": 17.161440299998503
+      "score_seconds": 123.55994160001865
     },
     {
       "address_strength": 0.9,
       "threshold": 0.92,
       "confusion_matrix": {
-        "TP": 9889,
-        "FN": 111,
-        "FP": 229,
-        "TN": 4771
+        "TP": 9873,
+        "FN": 127,
+        "FP": 24,
+        "TN": 4976
       },
       "metrics": {
-        "accuracy": 0.9773333333333334,
-        "precision": 0.9773670685906306,
-        "recall": 0.9889,
-        "specificity": 0.9542,
-        "f1": 0.9830997117009643
+        "accuracy": 0.9899333333333333,
+        "precision": 0.9975750227341619,
+        "recall": 0.9873,
+        "specificity": 0.9952,
+        "f1": 0.9924109162185254
       },
-      "score_seconds": 17.161440299998503
+      "score_seconds": 123.55994160001865
     },
     {
       "address_strength": 0.9,
       "threshold": 0.95,
       "confusion_matrix": {
-        "TP": 9889,
-        "FN": 111,
-        "FP": 216,
-        "TN": 4784
+        "TP": 9873,
+        "FN": 127,
+        "FP": 5,
+        "TN": 4995
       },
       "metrics": {
-        "accuracy": 0.9782,
-        "precision": 0.9786244433448787,
-        "recall": 0.9889,
-        "specificity": 0.9568,
-        "f1": 0.983735389206665
+        "accuracy": 0.9912,
+        "precision": 0.9994938246608626,
+        "recall": 0.9873,
+        "specificity": 0.999,
+        "f1": 0.9933594929067311
       },
-      "score_seconds": 17.161440299998503
+      "score_seconds": 123.55994160001865
     },
     {
       "address_strength": 1.0,
       "threshold": 0.85,
       "confusion_matrix": {
-        "TP": 9886,
-        "FN": 114,
-        "FP": 23,
-        "TN": 4977
+        "TP": 9883,
+        "FN": 117,
+        "FP": 22,
+        "TN": 4978
       },
       "metrics": {
-        "accuracy": 0.9908666666666667,
-        "precision": 0.9976788777878696,
-        "recall": 0.9886,
-        "specificity": 0.9954,
-        "f1": 0.9931186900396806
+        "accuracy": 0.9907333333333334,
+        "precision": 0.997778899545684,
+        "recall": 0.9883,
+        "specificity": 0.9956,
+        "f1": 0.9930168299422256
       },
-      "score_seconds": 15.976268099970184
+      "score_seconds": 121.82720899995184
     },
     {
       "address_strength": 1.0,
       "threshold": 0.87,
       "confusion_matrix": {
-        "TP": 9876,
-        "FN": 124,
-        "FP": 23,
-        "TN": 4977
+        "TP": 9873,
+        "FN": 127,
+        "FP": 20,
+        "TN": 4980
       },
       "metrics": {
         "accuracy": 0.9902,
-        "precision": 0.9976765329831296,
-        "recall": 0.9876,
-        "specificity": 0.9954,
-        "f1": 0.9926126941052315
+        "precision": 0.9979783685434145,
+        "recall": 0.9873,
+        "specificity": 0.996,
+        "f1": 0.9926104659930629
       },
-      "score_seconds": 15.976268099970184
+      "score_seconds": 121.82720899995184
     },
     {
       "address_strength": 1.0,
       "threshold": 0.9,
       "confusion_matrix": {
-        "TP": 9876,
-        "FN": 124,
-        "FP": 23,
-        "TN": 4977
+        "TP": 9873,
+        "FN": 127,
+        "FP": 20,
+        "TN": 4980
       },
       "metrics": {
         "accuracy": 0.9902,
-        "precision": 0.9976765329831296,
-        "recall": 0.9876,
-        "specificity": 0.9954,
-        "f1": 0.9926126941052315
+        "precision": 0.9979783685434145,
+        "recall": 0.9873,
+        "specificity": 0.996,
+        "f1": 0.9926104659930629
       },
-      "score_seconds": 15.976268099970184
+      "score_seconds": 121.82720899995184
     },
     {
       "address_strength": 1.0,
       "threshold": 0.92,
       "confusion_matrix": {
-        "TP": 9876,
-        "FN": 124,
-        "FP": 23,
-        "TN": 4977
+        "TP": 9873,
+        "FN": 127,
+        "FP": 20,
+        "TN": 4980
       },
       "metrics": {
         "accuracy": 0.9902,
-        "precision": 0.9976765329831296,
-        "recall": 0.9876,
-        "specificity": 0.9954,
-        "f1": 0.9926126941052315
+        "precision": 0.9979783685434145,
+        "recall": 0.9873,
+        "specificity": 0.996,
+        "f1": 0.9926104659930629
       },
-      "score_seconds": 15.976268099970184
+      "score_seconds": 121.82720899995184
     },
     {
       "address_strength": 1.0,
       "threshold": 0.95,
       "confusion_matrix": {
-        "TP": 9876,
-        "FN": 124,
-        "FP": 6,
-        "TN": 4994
+        "TP": 9873,
+        "FN": 127,
+        "FP": 4,
+        "TN": 4996
       },
       "metrics": {
-        "accuracy": 0.9913333333333333,
-        "precision": 0.9993928354584092,
-        "recall": 0.9876,
-        "specificity": 0.9988,
-        "f1": 0.9934614223921134
+        "accuracy": 0.9912666666666666,
+        "precision": 0.9995950187303837,
+        "recall": 0.9873,
+        "specificity": 0.9992,
+        "f1": 0.9934094682296121
       },
-      "score_seconds": 15.976268099970184
+      "score_seconds": 121.82720899995184
     }
   ],
   "best": {
     "address_strength": 1.0,
     "threshold": 0.95,
     "confusion_matrix": {
-      "TP": 9876,
-      "FN": 124,
-      "FP": 6,
-      "TN": 4994
+      "TP": 9873,
+      "FN": 127,
+      "FP": 4,
+      "TN": 4996
     },
     "metrics": {
-      "accuracy": 0.9913333333333333,
-      "precision": 0.9993928354584092,
-      "recall": 0.9876,
-      "specificity": 0.9988,
-      "f1": 0.9934614223921134
+      "accuracy": 0.9912666666666666,
+      "precision": 0.9995950187303837,
+      "recall": 0.9873,
+      "specificity": 0.9992,
+      "f1": 0.9934094682296121
     },
-    "score_seconds": 15.976268099970184
+    "score_seconds": 121.82720899995184
   }
 }

@@ -7,21 +7,21 @@
     "missing_rate": 0.3,
     "model_name": "sentence-transformers/all-MiniLM-L6-v2",
     "blocking_k": 20,
-    "match_threshold": 0.85,
+    "match_threshold": 0.95,
     "close_variation_rate": 0.15,
     "seed": 42,
     "address_strength": 1.0
   },
   "timing": {
-    "index_build_seconds": 37.59284070000285,
-    "query_seconds": 264.38373649999266,
-    "mean_query_milliseconds": 17.625582433332845
+    "index_build_seconds": 33.21306949999416,
+    "query_seconds": 299.3622322999872,
+    "mean_query_milliseconds": 19.95748215333248
   },
   "confusion_matrix": {
-    "TP": 9883,
-    "FN": 117,
-    "FP": 22,
-    "TN": 4978
+    "TP": 9873,
+    "FN": 127,
+    "FP": 4,
+    "TN": 4996
   },
   "by_category": {
     "identical": {
@@ -31,13 +31,13 @@
     },
     "close_same_entity": {
       "expected_match": true,
-      "TP": 4883,
-      "FN": 117
+      "TP": 4873,
+      "FN": 127
     },
     "unrelated": {
       "expected_match": false,
-      "FP": 22,
-      "TN": 4978
+      "FP": 4,
+      "TN": 4996
     }
   },
   "blocking_recall": {
@@ -56,7 +56,7 @@
     },
     "blocked_in_but_rejected": {
       "identical": 0,
-      "close_same_entity": 4
+      "close_same_entity": 14
     },
     "overall_recall": 0.9887
   },
@@ -65,11 +65,11 @@
     "note": "unrelated queries sharing first/last name and date of birth with their reference record (hard negatives)"
   },
   "metrics": {
-    "accuracy": 0.9907333333333334,
-    "precision": 0.997778899545684,
-    "recall": 0.9883,
-    "specificity": 0.9956,
-    "f1": 0.9930168299422256
+    "accuracy": 0.9912666666666666,
+    "precision": 0.9995950187303837,
+    "recall": 0.9873,
+    "specificity": 0.9992,
+    "f1": 0.9934094682296121
   },
   "environment": {
     "python": "3.13.1",

@@ -87,27 +87,30 @@ def block_all(queries: list[tuple[str, Person]], store: Any, k: int):
 
 
 def score_all(query_df: pd.DataFrame, candidate_df: pd.DataFrame, comparisons) -> dict[str, float]:
-    """Return {query_id: max match probability} for one comparison config."""
-    settings = {
-        "link_type": "link_only",
-        "unique_id_column_name": "unique_id",
-        "source_dataset_column_name": "source_dataset",
-        "comparisons": comparisons,
-        "blocking_rules_to_generate_predictions": [block_on("block_id")],
-        "probability_two_random_records_match": 0.0001,
-    }
-    linker = Linker(
-        [query_df, candidate_df],
-        settings,
-        db_api=splink.DuckDBAPI(),
-        set_up_basic_logging=False,
-        input_table_aliases=["query", "candidate"],
-    )
-    predictions = linker.inference.predict(threshold_match_probability=0.0).as_pandas_dataframe()
+    """Return {query_id: max match probability} for one comparison config.
+
+    Uses the lightweight Splink-trained scorer over ``comparisons`` (no batched
+    Splink Linker).
+    """
+    from collections import defaultdict
+    from scorer import SplinkScorer
+
+    query_records = query_df.to_dict("records")
+    candidate_records = candidate_df.to_dict("records")
+    by_block: dict[int, list[dict]] = defaultdict(list)
+    for cd in candidate_records:
+        by_block[cd["block_id"]].append(cd)
+
+    scorer = SplinkScorer.from_comparisons(comparisons, prior=0.0001)
     probs: dict[str, float] = {}
-    for _, row in predictions.iterrows():
-        query_id = row["unique_id_l"] if str(row["unique_id_l"]).startswith("Q_") else row["unique_id_r"]
-        probs[query_id] = max(probs.get(query_id, 0.0), float(row["match_probability"]))
+    for qi, qd in enumerate(query_records):
+        qid = qd["unique_id"]
+        cands = by_block.get(qi, [])
+        posteriors = scorer.score_batch(qd, cands)
+        for ci, cd in enumerate(cands):
+            p = float(posteriors[ci])
+            if p > probs.get(qid, 0.0):
+                probs[qid] = p
     return probs
 
 

@@ -66,34 +66,29 @@ def measure(
     """Run ``resolve`` per query and return cold per-query latency statistics.
 
     Each query is a close variant of a reference record, so ``resolve`` runs its
-    full cold path: FAISS blocking, per-query candidate DataFrame + Splink
-    ``Linker`` construction, and a per-query ``predict``. When ``breakdown`` is
-    set, the same internal steps are timed separately per query so the reader
-    sees what fraction is FAISS versus Splink construction beyond the end-to-end
-    distribution.
+    full cold path: FAISS blocking and lightweight Splink-trained scoring (the
+    train-with-Splink, infer-with-custom-code mechanism --- no per-query Splink
+    ``Linker`` or DuckDB pipeline). When ``breakdown`` is set, the FAISS blocking
+    and scorer phases are timed separately per query.
     """
     totals: list[float] = []
     block_times: list[float] = []
-    linker_times: list[float] = []
-    predict_times: list[float] = []
+    scorer_times: list[float] = []
+    embed_times: list[float] = []
     for i, person in enumerate(queries):
         if breakdown:
-            # Time the three internal phases individually (without running the
-            # full resolve again, to keep this representative of the online path).
-            import pandas as pd
-            import splink
-            from splink import Linker
-
-            tc = time.perf_counter()
             candidates = resolver.store.search_by_person(person, k=resolver.blocking_k)
-            block_times.append((time.perf_counter() - tc) * 1000)
-            tl = time.perf_counter()
-            df = resolver._prepare_candidate_data(person, candidates)
-            linker = resolver._create_linker(df)
-            linker_times.append((time.perf_counter() - tl) * 1000)
-            tp = time.perf_counter()
-            preds = linker.inference.predict(threshold_match_probability=0.0).as_pandas_dataframe()
-            predict_times.append((time.perf_counter() - tp) * 1000)
+            cand_records = [p.to_dict() for p, _ in candidates]
+            qd = person.to_dict()
+            te = time.perf_counter()
+            resolver.store.embedding.embed_documents([person.to_text()])
+            embed_times.append((time.perf_counter() - te) * 1000)
+            tb = time.perf_counter()
+            resolver.store.search_by_person(person, k=resolver.blocking_k)
+            block_times.append((time.perf_counter() - tb) * 1000)
+            ts = time.perf_counter()
+            resolver._scorer.score_batch(qd, cand_records)
+            scorer_times.append((time.perf_counter() - ts) * 1000)
 
         t0 = time.perf_counter()
         resolver.resolve(person, threshold=None)
@@ -113,16 +108,16 @@ def measure(
         "stdev_ms": statistics.stdev(totals) if len(totals) > 1 else 0.0,
         "scope": (
             "cold per-query end-to-end PersonEntityResolver.resolve: FAISS blocking "
-            "+ per-query candidate DataFrame + Splink Linker construction + predict"
+            "+ lightweight Splink-trained scoring (no per-query Splink Linker)"
         ),
     }
     if breakdown:
+        stats["embedding_mean_ms"] = statistics.mean(embed_times) if embed_times else 0.0
         stats["blocking_mean_ms"] = statistics.mean(block_times) if block_times else 0.0
-        stats["linker_construction_mean_ms"] = statistics.mean(linker_times) if linker_times else 0.0
-        stats["predict_mean_ms"] = statistics.mean(predict_times) if predict_times else 0.0
+        stats["scorer_mean_ms"] = statistics.mean(scorer_times) if scorer_times else 0.0
         stats["breakdown_scope"] = (
-            "independently timed: search_by_person (FAISS), _prepare_candidate_data + "
-            "_create_linker (Splink Linker object), predict (Splink score)"
+            "independently timed: embedding, search_by_person (FAISS blocking), "
+            "scorer.score_batch (lightweight Splink-trained scoring)"
         )
     return stats
 
@@ -139,7 +134,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--close-variation-rate", type=float, default=0.15)
     parser.add_argument("--breakdown", action="store_true",
-                        help="also record approximate Linker construction time")
+                        help="also record embedding / FAISS blocking / scorer phase times")
     parser.add_argument("--output", default="online_resolver_latency.json")
     args = parser.parse_args()
 

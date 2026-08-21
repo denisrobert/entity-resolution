@@ -29,10 +29,8 @@ _PATH_CURRENT = Path(__file__).resolve().parent
 sys.path.insert(0, str(_PATH_CURRENT.parent))
 sys.path.insert(0, str(_PATH_CURRENT))
 
-import pandas as pd  # noqa: E402
-import splink  # noqa: E402
-
 from common import UNTRAINED_PRIOR, build_batch, to_link_settings, untrained_settings  # noqa: E402
+from scorer import SplinkScorer  # noqa: E402
 from entity_pipeline import (  # noqa: E402
     Blocker,
     FlatIndexingStrategy,
@@ -54,18 +52,19 @@ def build_index(persons) -> MemoryVectorDatabase:
 
 
 def score_all(query_records, candidate_records, settings) -> dict[str, float]:
-    linker = splink.Linker(
-        [pd.DataFrame(query_records), pd.DataFrame(candidate_records)],
-        settings,
-        db_api=splink.DuckDBAPI(),
-        set_up_basic_logging=False,
-        input_table_aliases=["query", "candidate"],
-    )
-    predictions = linker.inference.predict(threshold_match_probability=0.0).as_pandas_dataframe()
+    by_block: dict[Any, list[dict[str, Any]]] = {}
+    for cand in candidate_records:
+        by_block.setdefault(cand["block_id"], []).append(cand)
+    scorer = SplinkScorer.from_settings(settings, threshold=0.0,
+                                       fallback_comparisons=default_comparisons())
     probs: dict[str, float] = {}
-    for _, row in predictions.iterrows():
-        query_id = row["unique_id_l"] if str(row["unique_id_l"]).startswith("Q_") else row["unique_id_r"]
-        probs[query_id] = max(probs.get(query_id, 0.0), float(row["match_probability"]))
+    for qd in query_records:
+        qid = qd["unique_id"]
+        cands = by_block.get(qd["block_id"], [])
+        if not cands:
+            continue
+        prob = max(float(value) for value in scorer.score_batch(qd, cands))
+        probs[qid] = max(probs.get(qid, 0.0), prob)
     return probs
 
 

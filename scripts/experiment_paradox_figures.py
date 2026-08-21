@@ -41,12 +41,11 @@ matplotlib.rcParams["mathtext.fontset"] = "dejavusans"
 matplotlib.rcParams["text.usetex"] = False
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
-import pandas as pd  # noqa: E402
-import splink  # noqa: E402
 
 import ncvoter_util  # noqa: E402
 import metrics  # noqa: E402
 from common import build_batch, to_link_settings  # noqa: E402
+from scorer import SplinkScorer  # noqa: E402
 from entity_pipeline import (  # noqa: E402
     Blocker,
     FlatIndexingStrategy,
@@ -105,29 +104,43 @@ def run_weights(query_records, candidate_records, settings, base_pos_by_qid):
     A pair is a *match* when its query is a positive ``Q_pos_i`` and the candidate
     position lies in ``base_pos_by_qid[query]`` (a tuple of the true-match positions);
     all other scored pairs are non-matches.
+
+    Scoring uses the train-with-Splink/infer-with-custom lightweight scorer rather
+    than constructing a Splink ``Linker`` per configuration. Candidates are
+    grouped by ``block_id`` (which equals the query index), so each query is
+    scored against its own blocked candidates with one vectorised
+    :meth:`scorer.SplinkScorer.match_weight_batch` call. Per-pair posterior probability is
+    converted to the same log-odds match weight Splink emitted in ``match_weight``.
     """
-    linker = splink.Linker(
-        [pd.DataFrame(query_records), pd.DataFrame(candidate_records)],
-        settings, db_api=splink.DuckDBAPI(), set_up_basic_logging=False,
-        input_table_aliases=["query", "candidate"],
-    )
-    preds = linker.inference.predict(threshold_match_probability=0.0).as_pandas_dataframe()
+    from collections import defaultdict
+
+    scorer = SplinkScorer.from_settings(settings, threshold=0.0,
+                                        fallback_comparisons=default_comparisons())
+    by_block: dict[int, list[dict]] = defaultdict(list)
+    for cd in candidate_records:
+        by_block[cd["block_id"]].append(cd)
+
     match_w, nonmatch_w = [], []
     y, p = [], []
-    for _, row in preds.iterrows():
-        right = str(row["unique_id_r"])
-        left = str(row["unique_id_l"])
-        base = base_pos_by_qid.get(right)
-        pos = None
-        m = re.match(r"C_\d+_(\d+)", left)
-        if m:
-            pos = int(m.group(1))
-        is_match = (base is not None) and (pos in base)
-        w = float(row["match_weight"])
-        prob = float(row["match_probability"])
-        (match_w if is_match else nonmatch_w).append(w)
-        y.append(1.0 if is_match else 0.0)
-        p.append(prob)
+    for qd in query_records:
+        qid = str(qd["unique_id"])
+        cands = by_block.get(qd["block_id"], [])
+        if not cands:
+            continue
+        weights = scorer.match_weight_batch(qd, cands)
+        posteriors = scorer.score_batch(qd, cands)
+        base = base_pos_by_qid.get(qid)
+        for w, prob, cd in zip(weights, posteriors, cands):
+            w = float(w)
+            prob = float(prob)
+            pos = None
+            m = re.match(r"C_\d+_(\d+)", str(cd["unique_id"]))
+            if m:
+                pos = int(m.group(1))
+            is_match = (base is not None) and (pos in base)
+            (match_w if is_match else nonmatch_w).append(w)
+            y.append(1.0 if is_match else 0.0)
+            p.append(prob)
     return np.asarray(y), np.asarray(p), np.asarray(match_w), np.asarray(nonmatch_w)
 
 

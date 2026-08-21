@@ -1,0 +1,54 @@
+{
+  "parameters": {
+    "reference_records": 2000,
+    "use_index_dir": null,
+    "query_rows": 600,
+    "queries_per_row": 3,
+    "total_queries": 1800,
+    "blocking_k": 20,
+    "threshold": 0.85,
+    "missing_rate": 0.3,
+    "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+    "prior": 0.0001,
+    "seed": 42,
+    "candidate_pairs": 36000
+  },
+  "comparison_vs_splink": {
+    "n_pairs_compared": 36000,
+    "max_abs_diff": 0.004462978096983816,
+    "mean_abs_diff": 4.3690409679656237e-07,
+    "median_abs_diff": 5.169878828456423e-26,
+    "fraction_within_1e-6": 0.9988333333333334
+  },
+  "latency": {
+    "n_queries": 40,
+    "lightweight_per_query_ms": {
+      "mean": 6.544837502588052,
+      "median": 6.472400040365756,
+      "p95": 8.019600005354732,
+      "max": 8.713699993677437
+    },
+    "splink_per_query_ms": {
+      "mean": 300.63548250182066,
+      "median": 291.938400012441,
+      "p95": 345.29089997522533,
+      "max": 356.2907000305131
+    },
+    "latency_ratio_median": 45.1051230133704,
+    "reference_batch_seconds": 1.7169075999991037
+  },
+  "environment": {
+    "python": "3.13.1",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "cpu": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",
+    "threads": 8,
+    "libs": {
+      "pandas": "3.0.5",
+      "numpy": "2.4.6",
+      "faiss": "1.14.3",
+      "splink": "4.0.16",
+      "sentence_transformers": "5.6.1",
+      "torch": "2.13.0+cpu"
+    }
+  }
+}

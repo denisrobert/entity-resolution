@@ -45,8 +45,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import splink
-from splink import DuckDBAPI, block_on
+from splink import DuckDBAPI
 from splink.clustering import cluster_pairwise_predictions_at_threshold
 
 # Make the project root and this scripts/ folder importable.
@@ -57,6 +56,7 @@ sys.path.insert(0, str(_PATH_CURRENT.parent))
 sys.path.insert(0, str(_PATH_CURRENT))
 
 from common import UNTRAINED_PRIOR  # noqa: E402
+from scorer import SplinkScorer  # noqa: E402
 from entity_pipeline import (  # noqa: E402
     Blocker,
     FlatIndexingStrategy,
@@ -269,34 +269,45 @@ def dedup_link(
 ) -> pd.DataFrame:
     """Score canopy candidate pairs and cluster into connected components.
 
-    The single input table carries wide ``anchor_<j>`` columns (one blocking rule
-    each) so Splink's ``dedupe_only`` generates exactly the canopy candidate
-    pairs. Returns a dataframe with columns ``node_id`` and ``cluster_id``;
-    records in no candidate pair are emitted as their own singleton cluster.
+    The canopy candidate pairs are reconstructed from the k-means ``assignments``
+    (each record belongs to its top-``overlap_m`` canopies), and scored with the
+    lightweight train-with-Splink/infer-with-custom :class:`scorer.SplinkScorer`
+    rather than a Splink ``Linker``. Returns a dataframe with columns ``node_id``
+    and ``cluster_id``; records in no candidate pair are emitted as their own
+    singleton cluster.
     """
     nodes_df = _membership_node_df(records, assignments)
 
-    blocking_rules = [
-        block_on(f"anchor_{j}") for j in range(assignments.shape[1])
-    ]
-    settings = {
-        "link_type": "dedupe_only",
-        "unique_id_column_name": "unique_id",
-        "comparisons": comparisons,
-        "blocking_rules_to_generate_predictions": blocking_rules,
-        "probability_two_random_records_match": UNTRAINED_PRIOR,
-    }
-    linker = splink.Linker(
-        nodes_df,
-        settings,
-        db_api=DuckDBAPI(),
-        set_up_basic_logging=False,
+    scorer = SplinkScorer.from_settings(
+        {
+            "comparisons": comparisons,
+            "probability_two_random_records_match": UNTRAINED_PRIOR,
+        },
+        threshold=threshold,
+        fallback_comparisons=default_comparisons(),
     )
-    predictions = linker.inference.predict(
-        threshold_match_probability=threshold
-    ).as_pandas_dataframe()
 
-    predicted = predictions[["unique_id_l", "unique_id_r", "match_probability"]].copy()
+    n_clusters = int(assignments.max()) + 1 if len(assignments) else 0
+    canopies: list[set[int]] = [set() for _ in range(n_clusters)]
+    for record_i, row in enumerate(assignments):
+        for centroid in row:
+            if centroid >= 0:
+                canopies[int(centroid)].add(record_i)
+    candidate_pairs = canopy_candidate_pairs(canopies)
+
+    node_records = {pos: records[pos].to_dict() for pos in range(len(records))}
+    rows = []
+    for _, pair in candidate_pairs.iterrows():
+        l_pos, r_pos = int(pair["unique_id_l"]), int(pair["unique_id_r"])
+        rows.append({
+            "unique_id_l": str(l_pos),
+            "unique_id_r": str(r_pos),
+            "match_probability": float(scorer.score(node_records[l_pos], node_records[r_pos])),
+        })
+    predicted = pd.DataFrame(
+        rows, columns=["unique_id_l", "unique_id_r", "match_probability"]
+    )
+
     cluster_df = cluster_pairwise_predictions_at_threshold(
         nodes_df[["unique_id"]],
         predicted,

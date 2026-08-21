@@ -1,7 +1,18 @@
-"""Splink-based entity resolution for person matching."""
+"""Entity resolution for person matching: FAISS blocking + Splink-trained scorer."""
+
+import sys
+from pathlib import Path
 
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import asdict
+
+# Make the project root (scorer module) and this scripts/ folder importable.
+_PATH_CURRENT = Path(__file__).resolve().parent
+if str(_PATH_CURRENT.parent) not in sys.path:
+    sys.path.insert(0, str(_PATH_CURRENT.parent))
+if str(_PATH_CURRENT) not in sys.path:
+    sys.path.insert(0, str(_PATH_CURRENT))
+
 import splink
 from splink import Linker, SettingsCreator, block_on
 from splink.comparison_library import (
@@ -11,6 +22,9 @@ from splink.comparison_library import (
     DateOfBirthComparison,
 )
 import pandas as pd
+
+from scorer import DEFAULT_THRESHOLD as SCORER_DEFAULT_TAU
+from scorer import SplinkScorer, UNTRAINED_PRIOR
 
 from generate_data import Person
 from vector_store import FaissPersonStore
@@ -39,6 +53,14 @@ class PersonEntityResolver:
         self.blocking_k = blocking_k
         self._linker = None
         self._setup_splink()
+        # Lightweight scorer over the configured comparisons (untrained/default
+        # m/u here). Built once and reused across queries -- no per-query Splink
+        # Linker or DuckDB pipeline.
+        self._scorer = SplinkScorer.from_comparisons(
+            self._settings["comparisons"],
+            prior=UNTRAINED_PRIOR,
+            threshold=self.match_threshold,
+        )
     
     def _setup_splink(self) -> None:
         """Configure Splink settings for person matching."""
@@ -140,52 +162,33 @@ class PersonEntityResolver:
         """
         threshold = resolve_threshold(threshold, self.match_threshold)
         
-        # Step 1: Block using FAISS - get top 20 candidates
+        # Step 1: Block using FAISS - get top k candidates
         candidates = self.store.search_by_person(input_person, k=self.blocking_k)
         
         if not candidates:
             return None
         
-        # Step 2: Prepare data for Splink
-        df = self._prepare_candidate_data(input_person, candidates)
+        # Step 2: Score all candidates with the lightweight Splink-trained scorer.
+        # All candidates are evaluated in one vectorised pass per query; no
+        # per-query Splink Linker or DuckDB pipeline is constructed.
+        candidate_records = [p.to_dict() for p, _ in candidates]
+        input_dict = input_person.to_dict()
+        posteriors = self._scorer.score_batch(input_dict, candidate_records)
         
-        # Step 3: Run Splink probabilistic matching
-        linker = self._create_linker(df)
+        # Sort candidates by match probability descending
+        ordered = sorted(
+            enumerate(zip(candidates, posteriors)),
+            key=lambda item: item[1][1],
+            reverse=True,
+        )
         
-        # Predict matches
-        predictions = linker.inference.predict(threshold_match_probability=threshold)
-        
-        # Get results as pandas DataFrame
-        results_df = predictions.as_pandas_dataframe()
-        
-        # Filter for matches involving the input query
-        matches = results_df[
-            (results_df['unique_id_l'] == 'INPUT_QUERY') | 
-            (results_df['unique_id_r'] == 'INPUT_QUERY')
-        ].copy()
-        
-        if matches.empty:
-            return None
-        
-        # Sort by match probability descending
-        matches = matches.sort_values('match_probability', ascending=False)
-        
-        # Get the best match
-        best_match = matches.iloc[0]
-        match_prob = best_match['match_probability']
+        best_idx, best_pair = ordered[0]
+        (matched_person, faiss_score), match_prob = best_pair
         
         if match_prob < threshold:
             return None
         
-        # Determine which side is the candidate
-        if best_match['unique_id_l'] == 'INPUT_QUERY':
-            candidate_id = best_match['unique_id_r']
-        else:
-            candidate_id = best_match['unique_id_l']
-        
-        # Find the matched candidate
-        candidate_idx = int(candidate_id.split('_')[1])
-        matched_person, faiss_score = candidates[candidate_idx]
+        candidate_idx = best_idx
         
         return {
             'matched_person': matched_person,
@@ -196,18 +199,10 @@ class PersonEntityResolver:
                 {
                     'person': p,
                     'faiss_score': s,
-                    'match_probability': float(
-                        matches[
-                            (matches['unique_id_l'] == f'CAND_{i}') | 
-                            (matches['unique_id_r'] == f'CAND_{i}')
-                        ]['match_probability'].values[0]
-                    ) if len(matches[
-                        (matches['unique_id_l'] == f'CAND_{i}') | 
-                        (matches['unique_id_r'] == f'CAND_{i}')
-                    ]) > 0 else None
+                    'match_probability': float(prob),
                 }
-                for i, (p, s) in enumerate(candidates)
-            ]
+                for i, ((p, s), prob) in ordered
+            ],
         }
     
     def resolve_batch(

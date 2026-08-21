@@ -73,19 +73,19 @@
 <p><strong>Fast retrieval + explainable matching.</strong></p>
 </blockquote>
 <pre is="marp-pre" data-auto-scaling="downscale-only"><code>Query ──► [embed] ──► [FAISS top-k]
-      ──► [Splink linkage] ──► Match / No match
+      ──► [trained scorer] ──► Match / No match
 </code></pre>
 <ul>
 <li><strong>Blocking</strong> (FAISS): cheaply finds the few most likely matches.</li>
-<li><strong>Linkage</strong> (Splink): weighs the evidence per field and returns a probability, not just yes/no.</li>
+<li><strong>Linkage</strong> (trained scorer): weighs the evidence per field and returns a probability, not just yes/no. Splink trains the <code>m/u</code>; a lightweight scorer serves them per query.</li>
 </ul>
 <footer>Entity Resolution with FAISS + Splink</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="6" data-paginate="true" data-footer="Entity Resolution with FAISS + Splink" data-theme="default" lang="en-US" data-marpit-pagination="6" style="--paginate:true;--footer:Entity Resolution with FAISS + Splink;--theme:default;" data-marpit-pagination-total="27" data-size="16:9">
 <h1 id="what-it-delivers">What it delivers</h1>
 <ul>
-<li><strong>99.5% F1</strong> on the synthetic test corpus (15,000 labelled queries).</li>
-<li><strong>~7.5 ms/query amortized</strong> <em>batched</em> throughput; the honest <strong>online</strong> per-query path is slower (~seconds, dominated by per-query Splink construction).</li>
+<li><strong>99.3% F1</strong> on the synthetic test corpus (15,000 labelled queries).</li>
+<li><strong>~18 ms/query amortized</strong> <em>batched</em> throughput; the honest <strong>online</strong> per-query path is <strong>~38 ms median</strong> (embedding + FAISS + a lightweight trained scorer — no per-query Splink construction).</li>
 <li><strong>Persisted and reusable</strong>: the index reloads without re-embedding the population.</li>
 <li><strong>Defensible numbers</strong>: every result reproduces by re-running the code.</li>
 </ul>
@@ -144,7 +144,7 @@ is at or above a threshold <strong><code>τ</code></strong>. One number encodes 
 <h1 id="the-honest-caveats">The honest caveats</h1>
 <ul>
 <li>Results are measured on <strong>synthetic data</strong>; production needs a <strong>labelled sample of true duplicates</strong> to calibrate and validate.</li>
-<li><strong>Retraining the match model without also resetting the threshold backfires.</strong> The shipped defaults work best until proper joint calibration. Don't let a team &quot;just retune&quot; today.</li>
+<li><strong>Calibrate <code>m/u</code> with labels before production</strong> — supervised calibration improves precision (→100% here); do it with a <strong>pinned prior</strong> so the EM route's free prior can't shift scores (the whitepaper's calibration-pitfall).</li>
 <li>Volume must clear our capacity thresholds before any external-infra spend.</li>
 </ul>
 <footer>Entity Resolution with FAISS + Splink</footer>
@@ -155,7 +155,7 @@ is at or above a threshold <strong><code>τ</code></strong>. One number encodes 
 <li>Sponsor a short <strong>proof-on-real-data</strong> phase: a representative, labelled sample of the population we must link (with access/privacy).</li>
 <li>We then commit to an F1 on <em>that</em> data, not the synthetic one.</li>
 </ul>
-<p><strong>Value in one line:</strong> near-perfect, explainable identity resolution with batched throughput ~7.5 ms/query, and a path to scale -- but online per-query latency is seconds (Splink rebuild per call), which the paper is honest about and gives a future direction for.</p>
+<p><strong>Value in one line:</strong> near-perfect, explainable identity resolution with batched throughput ~18 ms/query and <strong>online per-query latency ~38 ms</strong> — the per-query Splink rebuild is gone, replaced by a lightweight trained scorer (whitepaper §3.3).</p>
 <footer>Entity Resolution with FAISS + Splink</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="11" data-paginate="true" data-footer="Entity Resolution with FAISS + Splink" data-theme="default" lang="en-US" data-marpit-pagination="11" style="--paginate:true;--footer:Entity Resolution with FAISS + Splink;--theme:default;" data-marpit-pagination-total="27" data-size="16:9">
@@ -165,23 +165,24 @@ is at or above a threshold <strong><code>τ</code></strong>. One number encodes 
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="12" data-paginate="true" data-footer="Entity Resolution with FAISS + Splink" data-theme="default" lang="en-US" data-marpit-pagination="12" style="--paginate:true;--footer:Entity Resolution with FAISS + Splink;--theme:default;" data-marpit-pagination-total="27" data-size="16:9">
 <h1 id="architecture-at-a-glance">Architecture at a glance</h1>
-<pre is="marp-pre" data-auto-scaling="downscale-only"><code>Query ──► MiniLM embed ──► FAISS top-k ──► Splink ──► p(M | γ)
+<pre is="marp-pre" data-auto-scaling="downscale-only"><code>Query ──► MiniLM embed ──► FAISS top-k ──► lightweight scorer ──► p(M | γ)
                                     ▲
               name / DOB / email / address comparisons, τ threshold
 </code></pre>
 <ul>
 <li>Embeddings are <strong>L2-normalized</strong>, so FAISS inner product = cosine.</li>
-<li>Splink = <strong>Fellegi–Sunter</strong>: per-field weight <code>w = log2(m/u)</code>, combined with a match prior, compared to <code>τ</code>.</li>
+<li><strong>Fellegi–Sunter</strong>: per-field weight <code>w = log2(m/u)</code>, combined with a match prior, compared to <code>τ</code>.</li>
+<li><strong>Train with Splink, infer with a lightweight scorer</strong>: Splink trains the <code>m/u</code> once; each query is scored by a small weight-table scorer (Splink's comparison SQL, precompiled) — no per-query Splink <code>Linker</code> or DuckDB pipeline. The scorer matches Splink's posteriors to ~1e-7.</li>
 <li>A store abstraction lets us swap the in-memory index for an <strong>external vector DB</strong> later without changing blocking or linkage.</li>
 </ul>
 <footer>Entity Resolution with FAISS + Splink</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="13" data-paginate="true" data-footer="Entity Resolution with FAISS + Splink" data-theme="default" lang="en-US" data-marpit-pagination="13" style="--paginate:true;--footer:Entity Resolution with FAISS + Splink;--theme:default;" data-marpit-pagination-total="27" data-size="16:9">
 <h1 id="where-performance-comes-from">Where performance comes from</h1>
-<p><strong>Blocking recall is the ceiling; Splink is where F1 is won or lost.</strong></p>
+<p><strong>Blocking recall is the ceiling; the scorer is where F1 is won or lost.</strong></p>
 <ul>
-<li>On the confusion-matrix query set (15k queries): top-20 blocking recall <strong>98.89%</strong> → end-to-end recall <strong>98.86%</strong> — the linkage stage rejects only 3 of the 9,889 retrieved positives; blocking is the binding constraint.</li>
-<li>A &quot;perfect&quot; blocker would take F1 from <strong>99.31 → ~99.87%</strong>, since 111 positives were missed at top-20; retrieval now has real headroom.</li>
+<li>On the confusion-matrix query set (15k queries): top-20 blocking recall <strong>98.87%</strong> → end-to-end recall <strong>98.83%</strong> — the linkage stage rejects only 4 of the 9,887 retrieved positives; blocking is the binding constraint.</li>
+<li>A &quot;perfect&quot; blocker would take F1 from <strong>99.30 → ~99.87%</strong>, since 113 positives were missed at top-20; retrieval now has real headroom.</li>
 <li>(Section 7, a different query construction: blocking recall 99.75%; compact raises it to 99.88%.)</li>
 </ul>
 <blockquote>
@@ -202,7 +203,7 @@ is at or above a threshold <strong><code>τ</code></strong>. One number encodes 
 <tbody>
 <tr>
 <td><strong>Threshold τ</strong></td>
-<td>0.85→0.95: F1 barely moves (99.31→99.35%); recall scarce</td>
+<td>0.85→0.95: F1 barely moves (99.30→99.34%); recall scarce</td>
 <td>Small—retrieval is the lever now</td>
 </tr>
 <tr>
@@ -212,7 +213,7 @@ is at or above a threshold <strong><code>τ</code></strong>. One number encodes 
 </tr>
 <tr>
 <td><strong>Blocking size k</strong></td>
-<td>20→100: +recall, 2.4× Splink time</td>
+<td>20→100: +recall, ~2.4× scorer time</td>
 <td>Diminishing returns</td>
 </tr>
 <tr>
@@ -222,8 +223,8 @@ is at or above a threshold <strong><code>τ</code></strong>. One number encodes 
 </tr>
 <tr>
 <td><strong>Retrain m/u</strong></td>
-<td>§8.1: untrained 97.6% vs supervised 95.6%; §8.2 100k: EM at default prior is best (97.9%)</td>
-<td>Prior and data-dependent</td>
+<td>§8.1: supervised <strong>improves</strong> (98.44 vs 97.64, precision→100%); §8.2 100k: EM at default prior best (97.85%)</td>
+<td>Yes for supervised; EM needs prior pinned</td>
 </tr>
 </tbody>
 </table>
@@ -238,26 +239,26 @@ is at or above a threshold <strong><code>τ</code></strong>. One number encodes 
 </ul>
 <p>Decision-theoretic setting: <code>τ* = C_FP / (C_FP + C_FN)</code> — presumes a calibrated posterior, zero cost for correct decisions, and per-pair decisions (whitepaper Appendix — Deriving τ).</p>
 <ul>
-<li>Measured: <code>τ</code> 0.85 → 0.95 moved F1 barely (99.31% → 99.35%; FP 23→6) because recall — not threshold — is the scarce resource.</li>
+<li>Measured: <code>τ</code> 0.85 → 0.95 moved F1 barely (99.30% → 99.34%; FP 22→4) because recall — not threshold — is the scarce resource.</li>
 <li>With recall headroom, raising <code>τ</code> is the cheapest precision lever — the mechanism to encode FP/FN business costs. (Methods: whitepaper <strong>Appendix — Deriving τ</strong>.)</li>
 </ul>
 <footer>Entity Resolution with FAISS + Splink</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="16" data-paginate="true" data-footer="Entity Resolution with FAISS + Splink" data-theme="default" lang="en-US" data-marpit-pagination="16" style="--paginate:true;--footer:Entity Resolution with FAISS + Splink;--theme:default;" data-marpit-pagination-total="27" data-size="16:9">
-<h1 id="the-calibration-paradox">The calibration paradox</h1>
-<p>Retraining the match model (<code>m/u</code>) made results <strong>worse</strong>, not better.</p>
+<h1 id="calibration-stable-and-worth-doing">Calibration: stable and worth doing</h1>
+<p>Retraining the match model is <strong>worth doing with real labels</strong> — and stays coherent when the prior is handled properly.</p>
 <ol>
-<li><strong>Prior coupling (dominant):</strong> EM's <em>free</em> prior (0.0071 vs 0.0001) shifted scores up -&gt; mass false positives in earlier data. <strong>Pin the prior and EM becomes the best variant</strong> on the 100k duplicate benchmark (97.85% F1, 100% precision/specificity).</li>
-<li><strong>The residual shrinks with realistic data:</strong> supervised still trails untrained in 8.1 (95.6% vs 97.6%) at the inherited prior/threshold, but EM at the default prior now wins on the duplicate-bearing set -- the residual is data- and prior-dependent.</li>
+<li><strong>Supervised calibration improves results</strong> (§8.1): fitting <code>m/u</code> on labelled match/non-match pairs lifts F1 to <strong>98.44% vs 97.64% untrained</strong>, precision to <strong>100%</strong> (FP 62→0) at unchanged recall — under the lightweight scorer's weight tables.</li>
+<li><strong>EM matches or beats untrained</strong> in every measured configuration (including the duplicate-bearing set where all variants reach F1 1.0 at τ=0.85): calibrated m/u never underperform the defaults at a fixed operating point.</li>
 </ol>
 <blockquote>
-<p>EM training generates candidate pairs by exact-equality blocking on two keys: <code>first_name</code> and <code>date_of_birth</code> (<code>block_on(&quot;first_name&quot;)</code>, <code>block_on(&quot;date_of_birth&quot;)</code>).</p>
+<p>Supervised calibration uses genuine match/non-match evidence; EM fits <code>m/u</code> from the (resemblance-biased) candidate structure. Both stay stable when the prior is kept coherent.</p>
 </blockquote>
 <blockquote>
 <p><strong>Rule:</strong> the default config is a coherent bundle (weights + prior + <code>τ</code>). Change any part and re-validate <strong>all three</strong> on held-out data.</p>
 </blockquote>
-<p>The fix is a recipe, not a guess: <strong>anchor the prior</strong> (default or blocking-adjusted), fit <code>m/u</code> with the prior pinned, then <strong>tune <code>τ</code> jointly</strong>, with a score-shift guard. Full algorithm: <strong>Appendix — Tuning the Match Prior</strong>.</p>
-<p>See paper §8.1 and the joint <code>τ × prior</code> table.</p>
+<p>Keep the prior anchored (default or blocking-adjusted estimate), fit <code>m/u</code> with the prior pinned, then <strong>tune <code>τ</code> jointly</strong>, with a coherence guard. Full algorithm: <strong>Appendix — Tuning the Match Prior</strong>.</p>
+<p>See paper §8.1.</p>
 <footer>Entity Resolution with FAISS + Splink</footer>
 </section>
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="17" data-paginate="true" data-footer="Entity Resolution with FAISS + Splink" data-theme="default" lang="en-US" data-marpit-pagination="17" style="--paginate:true;--footer:Entity Resolution with FAISS + Splink;--theme:default;" data-marpit-pagination-total="27" data-size="16:9">
@@ -292,11 +293,13 @@ is at or above a threshold <strong><code>τ</code></strong>. One number encodes 
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="20" data-paginate="true" data-footer="Entity Resolution with FAISS + Splink" data-theme="default" lang="en-US" data-marpit-pagination="20" style="--paginate:true;--footer:Entity Resolution with FAISS + Splink;--theme:default;" data-marpit-pagination-total="27" data-size="16:9">
 <h1 id="what-the-code-does">What the code does</h1>
 <pre is="marp-pre" data-auto-scaling="downscale-only"><code>Blocker   : embed query → FAISS top-k candidates (cosine)
-Linker    : Splink comparisons → per-candidate match probability
+Scorer    : Splink-trained weight tables → per-candidate match probability
+            (Splink comparison SQL, precompiled; no per-query Splink Linker)
 Store     : add / update / delete / save / load (no re-embed on load)
 </code></pre>
 <ul>
 <li>Match probability = Bayesian combination of per-field weights <code>w = log2(m/u)</code>, a match prior, thresholded at <code>τ</code>.</li>
+<li>Splink is the <strong>training</strong> engine (estimates <code>m/u</code> and the prior); the lightweight scorer serves them at query time and matches Splink's posteriors to ~1e-7.</li>
 <li>In-memory index today; <code>IndexingStrategy</code>/<code>VectorDatabase</code> is the seam for a vector DB later.</li>
 </ul>
 <footer>Entity Resolution with FAISS + Splink</footer>
@@ -304,10 +307,10 @@ Store     : add / update / delete / save / load (no re-embed on load)
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="21" data-paginate="true" data-footer="Entity Resolution with FAISS + Splink" data-theme="default" lang="en-US" data-marpit-pagination="21" style="--paginate:true;--footer:Entity Resolution with FAISS + Splink;--theme:default;" data-marpit-pagination-total="27" data-size="16:9">
 <h1 id="scorecard-to-remember">Scorecard to remember</h1>
 <ul>
-<li>Confusion matrix (5k refs / 15k queries): <strong>F1 99.31%</strong>, recall 98.86%, precision 99.77%.</li>
-<li>Same-set blocking recall: <strong>98.89%</strong> @k=20 (Section 7's query set: 99.75%; compact 99.88%).</li>
-<li><strong>~7.5 ms/query amortized batched</strong> (embed + block + one Splink run); <strong>cold per-query online path median ~0.4 s on a quiet run</strong> (per-query Linker construction ~0.17 s + predict ~0.19 s; can exceed ~1 s under load).</li>
-<li>NC-voter (real schema, synthetic mutations): <strong>F1 92–94%</strong>; blocking is the binding constraint at the default <code>k=20</code> (Splink becomes binding at <code>k=100</code>).</li>
+<li>Confusion matrix (5k refs / 15k queries): <strong>F1 99.30%</strong>, recall 98.83%, precision 99.78%.</li>
+<li>Same-set blocking recall: <strong>98.87%</strong> @k=20 (Section 7's query set: 99.75%; compact 99.88%).</li>
+<li><strong>~18 ms/query amortized batched</strong> (embed + block + scorer); <strong>cold per-query online path median ~38 ms</strong> on the 50k index (embedding ~24 ms + FAISS ~25 ms + scorer ~11 ms).</li>
+<li>NC-voter (real schema, synthetic mutations): <strong>F1 92–94%</strong>; blocking is the binding constraint at the default <code>k=20</code> (linkage becomes binding at <code>k=100</code>).</li>
 </ul>
 <blockquote>
 <p>Baseline engineering numbers — config, hardware, and data shape all move them.</p>
@@ -346,7 +349,7 @@ Store     : add / update / delete / save / load (no re-embed on load)
 <td><code>scripts/experiment_f1_sweep.py</code></td>
 </tr>
 <tr>
-<td>calibration paradox</td>
+<td>calibration robustness</td>
 <td><code>scripts/experiment_mu_tau_interaction.py</code></td>
 </tr>
 <tr>
@@ -365,7 +368,7 @@ Store     : add / update / delete / save / load (no re-embed on load)
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="23" data-paginate="true" data-footer="Entity Resolution with FAISS + Splink" data-class="compact" data-theme="default" lang="en-US" class="compact" data-marpit-pagination="23" style="--paginate:true;--footer:Entity Resolution with FAISS + Splink;--class:compact;--theme:default;" data-marpit-pagination-total="27" data-size="16:9">
 <h1 id="gotchas--tuning--thresholds">Gotchas — tuning &amp; thresholds</h1>
 <ul>
-<li><strong>Don't &quot;just retune&quot; m/u.</strong> It looks worse (prior/τ coupling). Anchor the prior and re-validate prior + <code>τ</code> + weights together (Appendix — Tuning the Match Prior).</li>
+<li><strong>Calibrate <code>m/u</code> with labels — and pin the prior.</strong> Supervised calibration improves F1 (98.44 vs 97.64) and precision (→100%); the pitfall is the EM route's free prior, which underperforms unless anchored. Re-validate prior + <code>τ</code> + weights together (Appendix — Tuning the Match Prior).</li>
 <li><strong><code>τ</code> encodes business cost.</strong> <code>τ* = C_FP/(C_FP+C_FN)</code>; exposed via <code>--threshold</code> / <code>--tau</code> and the F1 sweep. Raise <code>τ</code> for fewer wrong links, lower it for recall-first (Appendix — Deriving τ).</li>
 <li><strong>Tune the prior properly.</strong> Anchor <code>λ</code>, fit with the prior pinned, tune <code>τ</code> jointly, watch the score-shift guard (Appendix — Tuning the Match Prior).</li>
 </ul>
@@ -385,12 +388,12 @@ Store     : add / update / delete / save / load (no re-embed on load)
 <h1 id="where-the-details-live">Where the details live</h1>
 <p>Whitepaper: <code>docs/entity_resolution_whitepaper.pdf</code> (source: <code>.tex</code>).</p>
 <ul>
-<li><strong>§3 Two-Stage</strong> — blocking/linkage contract and costs.</li>
+<li><strong>§3 Two-Stage</strong> — blocking/linkage contract and costs; <strong>Address volatility &amp; temporal decay</strong> (§3.5) consolidates why address evidence changes, the continuous retrieval-time decay and the bucketed comparison-level alternative, and their measured impact.</li>
 <li><strong>§7 Evaluation</strong> — recall, thresholds, latency, ablations.</li>
 <li><strong>§8, 8.1, 8.2, 8.3</strong> — headline results and the &quot;don't retune alone&quot; evidence.</li>
 <li><strong>§9 NC-voter</strong> — real schema, mutation model, <code>k</code> scaling.</li>
 <li><strong>Appendix: Deriving τ</strong> — cost / F1 / GMM / transitivity methods.</li>
-<li><strong>Appendix: Tuning the Match Prior</strong> — anchor <code>λ</code>, then tune <code>(λ, τ)</code> jointly (the calibration-paradox fix).</li>
+<li><strong>Appendix: Tuning the Match Prior</strong> — anchor <code>λ</code>, then tune <code>(λ, τ)</code> jointly (keep the prior coherent across retraining).</li>
 <li><strong>Use of AI</strong> — disclosure and verification.</li>
 </ul>
 <footer>Entity Resolution with FAISS + Splink</footer>
@@ -399,7 +402,7 @@ Store     : add / update / delete / save / load (no re-embed on load)
 <h1 id="checklist-before-you-leave">Checklist before you leave</h1>
 <ol>
 <li>Run <code>scripts/experiment_confusion_matrix.py --count 5000</code> and read the JSON.</li>
-<li>Reproduce the paradox: <code>scripts/experiment_mu_tau_interaction.py --base-count 5000</code>.</li>
+<li>Reproduce the stable calibration result: <code>scripts/experiment_mu_tau_interaction.py --base-count 5000</code>.</li>
 <li>Swap <code>--input-records &lt;your file&gt;</code> into a population-based experiment.</li>
 <li>Find where <strong>blocking recall</strong> caps your F1 — then plan linkage work.</li>
 </ol>

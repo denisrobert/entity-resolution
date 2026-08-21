@@ -1,0 +1,313 @@
+{
+  "parameters": {
+    "base_records": 5000,
+    "duplicate_pairs": 75,
+    "reference_records": 5150,
+    "total_queries": 150,
+    "match_rate": 0.03,
+    "missing_rate": 0.3,
+    "blocking_k": 20,
+    "close_variation_rate": 0.15,
+    "seed": 42,
+    "mu_prior_em": 0.007167382864426498,
+    "untrained_prior": 0.0001
+  },
+  "timing": {
+    "index_build_seconds": 51.46987179998541,
+    "blocking_seconds": 3.186449399974663
+  },
+  "variants": {
+    "untrained": {
+      "f1_by_tau": [
+        {
+          "tau": 0.5,
+          "accuracy": 0.9866666666666667,
+          "precision": 0.974025974025974,
+          "recall": 1.0,
+          "specificity": 0.9733333333333334,
+          "f1": 0.9868421052631579
+        },
+        {
+          "tau": 0.7,
+          "accuracy": 0.9866666666666667,
+          "precision": 0.974025974025974,
+          "recall": 1.0,
+          "specificity": 0.9733333333333334,
+          "f1": 0.9868421052631579
+        },
+        {
+          "tau": 0.8,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.85,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.9,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.95,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.98,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.99,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        }
+      ],
+      "best_tau": 0.8,
+      "best_f1": 1.0,
+      "mean_match_prob_pos": 0.9997,
+      "mean_match_prob_neg": 0.027,
+      "score_seconds": 1.3907877000165172
+    },
+    "supervised": {
+      "f1_by_tau": [
+        {
+          "tau": 0.5,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.7,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.8,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.85,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.9,
+          "accuracy": 0.9933333333333333,
+          "precision": 1.0,
+          "recall": 0.9866666666666667,
+          "specificity": 1.0,
+          "f1": 0.9932885906040269
+        },
+        {
+          "tau": 0.95,
+          "accuracy": 0.9933333333333333,
+          "precision": 1.0,
+          "recall": 0.9866666666666667,
+          "specificity": 1.0,
+          "f1": 0.9932885906040269
+        },
+        {
+          "tau": 0.98,
+          "accuracy": 0.98,
+          "precision": 1.0,
+          "recall": 0.96,
+          "specificity": 1.0,
+          "f1": 0.9795918367346939
+        },
+        {
+          "tau": 0.99,
+          "accuracy": 0.98,
+          "precision": 1.0,
+          "recall": 0.96,
+          "specificity": 1.0,
+          "f1": 0.9795918367346939
+        }
+      ],
+      "best_tau": 0.5,
+      "best_f1": 1.0,
+      "mean_match_prob_pos": 0.9971,
+      "mean_match_prob_neg": 0.0001,
+      "score_seconds": 1.4638292000163347
+    },
+    "em": {
+      "f1_by_tau": [
+        {
+          "tau": 0.5,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.7,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.8,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.85,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.9,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.95,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.98,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.99,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        }
+      ],
+      "best_tau": 0.5,
+      "best_f1": 1.0,
+      "mean_match_prob_pos": 1.0,
+      "mean_match_prob_neg": 0.0006,
+      "score_seconds": 1.4083184999763034
+    },
+    "em_prior0001": {
+      "f1_by_tau": [
+        {
+          "tau": 0.5,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.7,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.8,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.85,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.9,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.95,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.98,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        },
+        {
+          "tau": 0.99,
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 1.0,
+          "f1": 1.0
+        }
+      ],
+      "best_tau": 0.5,
+      "best_f1": 1.0,
+      "mean_match_prob_pos": 1.0,
+      "mean_match_prob_neg": 0.0,
+      "score_seconds": 1.3922875999705866
+    }
+  }
+}

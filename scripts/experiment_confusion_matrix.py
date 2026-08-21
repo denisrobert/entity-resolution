@@ -75,12 +75,18 @@ def predict_batch(
     threshold: float,
     address_strength: float = 1.0,
 ) -> tuple[set[str], dict[str, int], np.ndarray]:
-    """Run FAISS blocking and one batched Splink prediction for all queries.
+    """Run FAISS blocking and score all pairs with the lightweight scorer.
 
     Returns ``(matched_query_ids, candidate_indices)`` where
     ``candidate_indices[i]`` is the (row-major) neighbour index array for query
     ``i``, so callers can measure blocking recall on the same query set.
+    Inference uses the train-with-Splink, infer-with-custom-code scorer
+    (:class:`scorer.SplinkScorer`) over the configured comparisons --- no batched
+    Splink Linker is constructed.
     """
+    from scorer import SplinkScorer
+    from collections import defaultdict
+
     comparisons = default_comparisons()
     if address_strength < 1.0:
         comparisons = [*comparisons[:4], weaken_comparison(comparisons[4], strength=address_strength)]
@@ -113,25 +119,26 @@ def predict_batch(
             })
             candidate_records.append(candidate)
 
-    settings = {
-        "link_type": "link_only",
-        "unique_id_column_name": "unique_id",
-        "source_dataset_column_name": "source_dataset",
-        "comparisons": comparisons,
-        "blocking_rules_to_generate_predictions": [block_on("block_id")],
-        "probability_two_random_records_match": 0.0001,
-    }
-    linker = Linker(
-        [pd.DataFrame(query_records), pd.DataFrame(candidate_records)],
-        settings,
-        db_api=splink.DuckDBAPI(),
-        set_up_basic_logging=False,
-        input_table_aliases=["query", "candidate"],
-    )
-    predictions = linker.inference.predict(
-        threshold_match_probability=threshold
-    ).as_pandas_dataframe()
-    matched, best_position = decode_matched_positions(predictions, queries)
+    scorer = SplinkScorer.from_comparisons(comparisons, prior=0.0001, threshold=threshold)
+    by_block: dict[int, list[dict]] = defaultdict(list)
+    for cd in candidate_records:
+        by_block[cd["block_id"]].append(cd)
+
+    matched: set[str] = set()
+    best_position: dict[str, int] = {}
+    for qi, qd in enumerate(query_records):
+        cands = by_block.get(qi, [])
+        posteriors = scorer.score_batch(qd, cands)
+        best_prob = -1.0
+        for ci, cd in enumerate(cands):
+            prob = float(posteriors[ci])
+            if prob < threshold:
+                continue
+            matched.add(qd["unique_id"])
+            pos = int(cd["unique_id"].split("_")[-1])
+            if prob > best_prob:
+                best_prob = prob
+                best_position[qd["unique_id"]] = pos
     return matched, best_position, candidate_indices
 
 

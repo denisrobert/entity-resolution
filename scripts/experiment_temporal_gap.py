@@ -350,62 +350,50 @@ def linkage_f1(
     k: int,
     threshold: float,
 ) -> dict[str, Any]:
-    """End-to-end linkage F1 through Splink on the method's blocked candidates.
+    """End-to-end linkage F1 through the Splink-trained scorer on blocked candidates.
 
     For each query, the method's ``view_block`` retrieves its candidate set;
-    those (query frame + per-pair candidate frame) are then scored by a single
-    Splink prediction over all queries, and the match/no-match decisions are
-    compared to the ground truth. Returns the confusion counts and metrics.
+    those per-query candidates are then paired with the query and scored by a
+    single lightweight ``SplinkScorer`` (the train-with-Splink, infer-with-custom-
+    code mechanism) rather than a per-query Splink ``Linker``. The decision rule
+    is unchanged: any candidate at or above ``threshold`` marks the query as a
+    match. Returns the same confusion counts and metrics.
     """
-    import pandas as pd
-    import splink
-    from splink import DuckDBAPI, block_on
+    from collections import defaultdict
+
+    from scorer import SplinkScorer
 
     from common import UNTRAINED_PRIOR, default_comparisons
 
-    query_records: list[dict[str, Any]] = []
-    candidate_records: list[dict[str, Any]] = []
+    # Group each query's blocked candidates by query index (replicating the
+    # block_id pairing the Splink Linker used).
+    query_candidates: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for qi, (q, qage, pos, is_match) in enumerate(
         zip(queries, query_ages, query_base_positions, query_is_match)
     ):
-        qd = q.to_dict()
-        qd.update({"unique_id": f"Q_{qi}", "block_id": qi, "source_dataset": "query"})
-        query_records.append(qd)
         for cpos in view_block.search(q, qage, k):
-            cr = base[cpos].to_dict()
-            cr.update({
-                "unique_id": f"C_{qi}_{cpos}",
-                "block_id": qi,
-                "source_dataset": "candidate",
-            })
-            candidate_records.append(cr)
+            query_candidates[qi].append(base[cpos].to_dict())
 
+    comparisons = default_comparisons()
     settings = {
-        "link_type": "link_only",
-        "unique_id_column_name": "unique_id",
-        "source_dataset_column_name": "source_dataset",
-        "comparisons": default_comparisons(),
-        "blocking_rules_to_generate_predictions": [block_on("block_id")],
+        "comparisons": comparisons,
         "probability_two_random_records_match": UNTRAINED_PRIOR,
     }
-    linker = splink.Linker(
-        [pd.DataFrame(query_records), pd.DataFrame(candidate_records)],
+    scorer = SplinkScorer.from_settings(
         settings,
-        db_api=DuckDBAPI(),
-        set_up_basic_logging=False,
-        input_table_aliases=["query", "candidate"],
+        threshold=0.0,
+        fallback_comparisons=comparisons,
     )
-    predictions = linker.inference.predict(
-        threshold_match_probability=threshold
-    ).as_pandas_dataframe()
 
-    # query -> matched? (any prediction involving the query)
+    # query -> matched (any candidate scoring at or above the threshold)
     matched_queries: set[int] = set()
-    for _, row in predictions.iterrows():
-        for col in ("unique_id_l", "unique_id_r"):
-            uid = str(row[col])
-            if uid.startswith("Q_"):
-                matched_queries.add(int(uid.split("_")[1]))
+    for qi, q in enumerate(queries):
+        cands = query_candidates[qi]
+        if not cands:
+            continue
+        posteriors = scorer.score_batch(q.to_dict(), cands)
+        if any(prob >= threshold for prob in posteriors):
+            matched_queries.add(qi)
 
     tp = fp = tn = fn = 0
     for qi, is_match in enumerate(query_is_match):

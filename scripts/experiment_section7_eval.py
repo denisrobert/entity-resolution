@@ -167,13 +167,17 @@ def _candidate_position(row, query_id):
 
 
 def splink_scores(cases: list[dict[str, Any]], candidate_indices: np.ndarray, people: list[Person]) -> dict[str, float]:
-    """Score all blocked query/candidate pairs and return each query's max probability."""
-    query_records: list[dict[str, Any]] = []
+    """Score all blocked query/candidate pairs and return each query's max probability.
+
+    Uses the lightweight Splink-trained scorer over the default comparisons
+    (train-with-Splink, infer-with-custom-code); no batched Splink Linker.
+    """
+    from collections import defaultdict
+    from scorer import SplinkScorer
+
     candidate_records: list[dict[str, Any]] = []
+    by_block: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for query_number, case in enumerate(cases):
-        query = case["person"].to_dict()
-        query.update({"unique_id": case["id"], "block_id": query_number})
-        query_records.append(query)
         for candidate_number in candidate_indices[query_number]:
             if candidate_number < 0:
                 continue
@@ -183,33 +187,24 @@ def splink_scores(cases: list[dict[str, Any]], candidate_indices: np.ndarray, pe
                 "block_id": query_number,
             })
             candidate_records.append(candidate)
+            by_block[query_number].append(candidate)
 
-    settings = {
-        "link_type": "link_only",
-        "unique_id_column_name": "unique_id",
-        "source_dataset_column_name": "source_dataset",
-        "comparisons": default_comparisons(),
-        "blocking_rules_to_generate_predictions": [block_on("block_id")],
-        "probability_two_random_records_match": 0.0001,
-    }
-    linker = Linker(
-        [pd.DataFrame(query_records), pd.DataFrame(candidate_records)],
-        settings,
-        db_api=splink.DuckDBAPI(),
-        set_up_basic_logging=False,
-        input_table_aliases=["query", "candidate"],
-    )
-    predictions = linker.inference.predict(threshold_match_probability=0.0).as_pandas_dataframe()
+    scorer = SplinkScorer.from_comparisons(default_comparisons(), prior=0.0001)
     result = {case["id"]: 0.0 for case in cases}
     best_pos = {case["id"]: None for case in cases}
-    if predictions.empty:
-        return result, best_pos
-    for _, row in predictions.iterrows():
-        query_id = row["unique_id_l"] if row["unique_id_l"] in result else row["unique_id_r"]
-        prob = float(row["match_probability"])
-        if prob > result[query_id]:
-            result[query_id] = prob
-            best_pos[query_id] = _candidate_position(row, query_id)
+    for query_number, case in enumerate(cases):
+        qid = case["id"]
+        cands = by_block.get(query_number, [])
+        qd = case["person"].to_dict()
+        posteriors = scorer.score_batch(qd, cands)
+        for ci, cand in enumerate(cands):
+            prob = float(posteriors[ci])
+            if prob > result[qid]:
+                result[qid] = prob
+                try:
+                    best_pos[qid] = int(cand["unique_id"].split("_")[-1])
+                except (ValueError, IndexError):
+                    best_pos[qid] = None
     return result, best_pos
 
 

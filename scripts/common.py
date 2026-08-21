@@ -29,6 +29,7 @@ import pandas as pd  # noqa: E402
 import splink  # noqa: E402
 from splink import Linker, block_on  # noqa: E402
 
+from scorer import SplinkScorer  # noqa: E402
 from entity_pipeline import Blocker, default_comparisons  # noqa: E402
 from generate_data import Person, generate_people, introduce_variations  # noqa: E402
 
@@ -290,7 +291,13 @@ def score_batch(
     threshold: float,
     return_best: bool = False,
 ) -> set[str] | tuple[set[str], dict[str, int]]:
-    """Run one batched Splink prediction and return matched query ids.
+    """Score a batch of (query, candidate) pairs and return matched query ids.
+
+    Uses the lightweight Splink-trained scorer (:class:`scorer.SplinkScorer`)
+    built from ``settings`` --- the "train with Splink, infer with custom code"
+    mechanism --- rather than constructing a batched Splink ``Linker``. The
+    scorer reuses Splink's exact comparison ``sql_condition`` strings, so level
+    mapping matches Splink's by construction.
 
     When ``return_best=True``, also return ``best_position`` mapping each matched
     query id to the reference index of its highest-probability candidate. Callers
@@ -299,43 +306,59 @@ def score_batch(
     ids are ``C_{query_index}_{candidate_index}`` (or ``CAND_{index}``), so the
     trailing field is the reference position.
     """
-    linker = Linker(
-        [pd.DataFrame(query_records), pd.DataFrame(candidate_records)],
+    scorer = SplinkScorer.from_settings(
         settings,
-        db_api=splink.DuckDBAPI(),
-        set_up_basic_logging=False,
-        input_table_aliases=["query", "candidate"],
+        threshold=threshold,
+        fallback_comparisons=default_comparisons(),
     )
-    predictions = linker.inference.predict(
-        threshold_match_probability=threshold
-    ).as_pandas_dataframe()
-    matched = set(predictions["unique_id_l"])
-    matched.update(predictions["unique_id_r"])
-    query_ids = {query_id for query_id in matched if query_id.startswith("Q_")}
-    if not return_best:
-        return query_ids
+    from collections import defaultdict
+
+    by_block: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for cd in candidate_records:
+        block = cd.get("block_id")
+        if block is None:
+            block = _block_from_candidate_id(cd.get("unique_id"))
+        by_block[int(block)].append(cd)
+
+    matched: set[str] = set()
     best_prob: dict[str, float] = {}
     best_position: dict[str, int] = {}
-    for _, row in predictions.iterrows():
-        prob = float(row["match_probability"])
-        for field in ("unique_id_l", "unique_id_r"):
-            val = row[field]
-            if not isinstance(val, str):
+    for qi, qd in enumerate(query_records):
+        qid = qd["unique_id"]
+        cands = by_block.get(qi, [])
+        posteriors = scorer.score_batch(qd, cands)
+        if len(posteriors) != len(cands):
+            post_by_id = {
+                cid: float(prob) for cid, prob in zip(
+                    (c.get("unique_id") for c in cands), posteriors
+                )
+            }
+        else:
+            post_by_id = dict(zip((c.get("unique_id") for c in cands), posteriors))
+        for cd in cands:
+            prob = float(post_by_id[cd["unique_id"]])
+            if prob < threshold:
                 continue
-            if val.startswith("Q_"):
-                query_id = val
-                other = row["unique_id_r"] if field == "unique_id_l" else row["unique_id_l"]
-            else:
+            matched.add(qid)
+            other = cd.get("unique_id") or ""
+            try:
+                pos = int(other.split("_")[-1])
+            except (ValueError, IndexError):
                 continue
-            if isinstance(other, str) and (other.startswith("C_") or other.startswith("CAND_")):
-                try:
-                    pos = int(other.split("_")[-1])
-                except (ValueError, IndexError):
-                    continue
-                if prob > best_prob.get(query_id, -1.0):
-                    best_prob[query_id] = prob
-                    best_position[query_id] = pos
-    return query_ids, best_position
+            if prob > best_prob.get(qid, -1.0):
+                best_prob[qid] = prob
+                best_position[qid] = pos
+    if not return_best:
+        return matched
+    return matched, best_position
+
+
+def _block_from_candidate_id(candidate_id: Any) -> int:
+    """Recover the query index from a ``C_{qi}_{pos}`` candidate id."""
+    try:
+        return int(str(candidate_id).split("_")[1])
+    except (ValueError, IndexError):
+        return -1
 
 
 # ---------------------------------------------------------------------------

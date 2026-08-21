@@ -1,0 +1,121 @@
+{
+  "parameters": {
+    "base_records": 2000,
+    "match_rate": 0.03,
+    "duplicate_pairs": 30,
+    "reference_records": 2060,
+    "total_queries": 60,
+    "positive_queries": 30,
+    "negative_queries": 30,
+    "missing_rate": 0.3,
+    "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+    "blocking_k": 20,
+    "match_threshold": 0.85,
+    "close_variation_rate": 0.15,
+    "seed": 42,
+    "evaluation": {
+      "mode": "entity_disjoint_held_out",
+      "train_match_fraction": 0.5,
+      "train_pair_bases": 30,
+      "eval_query_bases": 30,
+      "note": "supervised training pairs and positive evaluation queries are generated from disjoint base records"
+    }
+  },
+  "timing": {
+    "dataset_seconds": 1.1240814999910071,
+    "index_build_seconds": 35.7504889999982,
+    "blocking_seconds": 1.382714200008195,
+    "untrained_seconds": 0.929214800009504,
+    "supervised_seconds": 1.0048784000100568,
+    "em_seconds": 1.0555156000191346
+  },
+  "m_u": {
+    "em_prior": 0.0070446111553822445,
+    "supervised_prior": 0.0001,
+    "untrained_prior": 0.0001
+  },
+  "variants": {
+    "untrained": {
+      "confusion_matrix": {
+        "TP": 29,
+        "FN": 1,
+        "FP": 0,
+        "TN": 30
+      },
+      "metrics": {
+        "accuracy": 0.9833333333333333,
+        "precision": 1.0,
+        "recall": 0.9666666666666667,
+        "specificity": 1.0,
+        "f1": 0.9830508474576272
+      }
+    },
+    "supervised": {
+      "confusion_matrix": {
+        "TP": 28,
+        "FN": 2,
+        "FP": 0,
+        "TN": 30
+      },
+      "metrics": {
+        "accuracy": 0.9666666666666667,
+        "precision": 1.0,
+        "recall": 0.9333333333333333,
+        "specificity": 1.0,
+        "f1": 0.9655172413793104
+      }
+    },
+    "em": {
+      "confusion_matrix": {
+        "TP": 29,
+        "FN": 1,
+        "FP": 0,
+        "TN": 30
+      },
+      "metrics": {
+        "accuracy": 0.9833333333333333,
+        "precision": 1.0,
+        "recall": 0.9666666666666667,
+        "specificity": 1.0,
+        "f1": 0.9830508474576272
+      }
+    }
+  },
+  "summary": {
+    "untrained": {
+      "accuracy": 0.9833,
+      "precision": 1.0,
+      "recall": 0.9667,
+      "specificity": 1.0,
+      "f1": 0.9831
+    },
+    "supervised": {
+      "accuracy": 0.9667,
+      "precision": 1.0,
+      "recall": 0.9333,
+      "specificity": 1.0,
+      "f1": 0.9655
+    },
+    "em": {
+      "accuracy": 0.9833,
+      "precision": 1.0,
+      "recall": 0.9667,
+      "specificity": 1.0,
+      "f1": 0.9831
+    }
+  },
+  "environment": {
+    "python": "3.13.1",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "cpu": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",
+    "threads": 8,
+    "libs": {
+      "pandas": "3.0.5",
+      "numpy": "2.4.6",
+      "faiss": "1.14.3",
+      "splink": "4.0.16",
+      "sentence_transformers": "5.6.1",
+      "torch": "2.13.0+cpu"
+    }
+  }
+}
