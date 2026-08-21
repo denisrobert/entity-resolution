@@ -16,6 +16,15 @@ from generate_data import Person
 from vector_store import FaissPersonStore
 
 
+def resolve_threshold(explicit: Optional[float], default: float) -> float:
+    """Resolve an explicit threshold, treating ``None`` as the default.
+
+    An explicit ``0.0`` is respected (it is a valid threshold and must not be
+    confused with a missing value).
+    """
+    return default if explicit is None else explicit
+
+
 class PersonEntityResolver:
     """Entity resolver using FAISS for blocking and Splink for probabilistic matching."""
     
@@ -102,7 +111,20 @@ class PersonEntityResolver:
             cand_dict['faiss_score'] = faiss_score
             records.append(cand_dict)
         
-        return pd.DataFrame(records)
+        df = pd.DataFrame(records)
+        # Force every comparison column to a pandas nullable string dtype so
+        # DuckDB registers it as VARCHAR. A plain object column that happens to
+        # be all-None in a single-query block is inferred by DuckDB as INTEGER
+        # (verified), which then breaks Splink''s string comparators
+        # (regexp_extract / jaro_winkler) with a "no function matches INTEGER"
+        # Binder error. Nullable-string keeps missing values as None while
+        # forcing VARCHAR registration.
+        if "unique_id" not in df.columns:
+            df["unique_id"] = None
+        for col in ("first_name", "last_name", "date_of_birth", "email", "address"):
+            if col in df.columns:
+                df[col] = df[col].astype("string")
+        return df
     
     def resolve(
         self,
@@ -116,7 +138,7 @@ class PersonEntityResolver:
             Dict with match info if found, None otherwise.
             Contains: matched_person, match_probability, faiss_score, all_scores
         """
-        threshold = threshold or self.match_threshold
+        threshold = resolve_threshold(threshold, self.match_threshold)
         
         # Step 1: Block using FAISS - get top 20 candidates
         candidates = self.store.search_by_person(input_person, k=self.blocking_k)

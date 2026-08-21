@@ -113,9 +113,12 @@ def run(args):
         "em_prior_fitted": em_trained.get("probability_two_random_records_match"),
         "data": "ncvoter (real) + synthetic mutations",
     }, "variants": {}}
+    true_positions = {f"Q_pos_{i}": i for i in range(len(positives))}
     for name, settings in variants.items():
-        matched = score_batch(qr, cr, settings, args.threshold)
-        results["variants"][name] = ncvoter_util.confusion_and_metrics(positives, negatives, matched)
+        matched, best_position = score_batch(qr, cr, settings, args.threshold, return_best=True)
+        results["variants"][name] = ncvoter_util.confusion_and_metrics(
+            positives, negatives, matched, best_position, true_positions
+        )
         m = results["variants"][name]["metrics"]
         print(f"{name}: F1={m['f1']:.4f} prec={m['precision']:.3f} rec={m['recall']:.3f} spec={m['specificity']:.3f}")
     return results

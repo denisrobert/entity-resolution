@@ -71,12 +71,12 @@ def score_all(query_records, candidate_records, settings) -> dict[str, float]:
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
     random.seed(args.seed)
-    base, reference, pairs, query_variants = build_dataset(
+    base, reference, pairs, query_variants, _eval_indexes, _twin_positions = build_dataset(
         args.base_count, args.match_rate, args.missing_rate,
         args.close_variation_rate, args.seed,
     )
     cases = build_cases(query_variants, args.missing_rate, args.seed)
-    queries = [(query_id, person) for query_id, _, person, _ in cases]
+    queries = [(query_id, person) for query_id, _, person, _, _ in cases]
 
     print(f"Building index from {len(reference):,} records "
           f"({len(base):,} base + {len(pairs):,} twins)...")

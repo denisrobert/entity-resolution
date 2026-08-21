@@ -1,0 +1,169 @@
+{
+  "parameters": {
+    "count": 2000,
+    "seeds": [
+      42,
+      43,
+      44,
+      45,
+      46
+    ],
+    "missing_rate": 0.3,
+    "model": "sentence-transformers/all-MiniLM-L6-v2",
+    "k": 20,
+    "tau": 0.85,
+    "note": "Repeated-seed aggregation of experiment_section7_eval.py. Mean +/- 1 SD and empirical 5%/95% percentiles across seeds. DuckDB parallel inference adds small run-to-run count noise."
+  },
+  "per_seed": [
+    {
+      "seed": 42,
+      "default": {
+        "r20": 99.675,
+        "f1": 99.762
+      },
+      "identity_first": {
+        "r20": 99.675,
+        "f1": 99.762
+      },
+      "compact": {
+        "r20": 99.875,
+        "f1": 99.862
+      }
+    },
+    {
+      "seed": 43,
+      "default": {
+        "r20": 99.725,
+        "f1": 99.812
+      },
+      "identity_first": {
+        "r20": 99.7,
+        "f1": 99.8
+      },
+      "compact": {
+        "r20": 99.9,
+        "f1": 99.9
+      }
+    },
+    {
+      "seed": 44,
+      "default": {
+        "r20": 99.825,
+        "f1": 99.862
+      },
+      "identity_first": {
+        "r20": 99.825,
+        "f1": 99.862
+      },
+      "compact": {
+        "r20": 99.9,
+        "f1": 99.9
+      }
+    },
+    {
+      "seed": 45,
+      "default": {
+        "r20": 99.8,
+        "f1": 99.85
+      },
+      "identity_first": {
+        "r20": 99.825,
+        "f1": 99.862
+      },
+      "compact": {
+        "r20": 99.925,
+        "f1": 99.912
+      }
+    },
+    {
+      "seed": 46,
+      "default": {
+        "r20": 99.675,
+        "f1": 99.812
+      },
+      "identity_first": {
+        "r20": 99.65,
+        "f1": 99.8
+      },
+      "compact": {
+        "r20": 99.875,
+        "f1": 99.912
+      }
+    }
+  ],
+  "aggregated": {
+    "default": {
+      "r20": {
+        "mean": 99.74,
+        "sd": 0.07,
+        "min": 99.675,
+        "max": 99.825,
+        "p2.5": 99.675,
+        "p97.5": 99.825
+      },
+      "f1": {
+        "mean": 99.82,
+        "sd": 0.039,
+        "min": 99.762,
+        "max": 99.862,
+        "p2.5": 99.762,
+        "p97.5": 99.862
+      }
+    },
+    "identity_first": {
+      "r20": {
+        "mean": 99.735,
+        "sd": 0.084,
+        "min": 99.65,
+        "max": 99.825,
+        "p2.5": 99.65,
+        "p97.5": 99.825
+      },
+      "f1": {
+        "mean": 99.817,
+        "sd": 0.044,
+        "min": 99.762,
+        "max": 99.862,
+        "p2.5": 99.762,
+        "p97.5": 99.862
+      }
+    },
+    "compact": {
+      "r20": {
+        "mean": 99.895,
+        "sd": 0.021,
+        "min": 99.875,
+        "max": 99.925,
+        "p2.5": 99.875,
+        "p97.5": 99.925
+      },
+      "f1": {
+        "mean": 99.897,
+        "sd": 0.021,
+        "min": 99.862,
+        "max": 99.912,
+        "p2.5": 99.862,
+        "p97.5": 99.912
+      }
+    }
+  },
+  "compact_minus_default": {
+    "r20_diff_mean": 0.155,
+    "f1_diff_mean": 0.078,
+    "note": "positive means compact > default on this population"
+  },
+  "environment": {
+    "python": "3.13.1",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "cpu": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",
+    "threads": 8,
+    "libs": {
+      "pandas": "3.0.5",
+      "numpy": "2.4.6",
+      "faiss": "1.14.3",
+      "splink": "4.0.16",
+      "sentence_transformers": "5.6.1",
+      "torch": "2.13.0+cpu"
+    }
+  }
+}

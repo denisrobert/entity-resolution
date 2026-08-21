@@ -2,99 +2,120 @@
   "parameters": {
     "base_records": 100000,
     "match_rate": 0.03,
-    "duplicate_pairs": 3000,
+    "duplicate_pairs": 1500,
     "reference_records": 103000,
-    "total_queries": 6000,
-    "positive_queries": 3000,
-    "negative_queries": 3000,
+    "total_queries": 3000,
+    "positive_queries": 1500,
+    "negative_queries": 1500,
     "missing_rate": 0.3,
     "model_name": "sentence-transformers/all-MiniLM-L6-v2",
     "blocking_k": 20,
     "match_threshold": 0.85,
     "close_variation_rate": 0.15,
-    "seed": 42
+    "seed": 42,
+    "evaluation": {
+      "mode": "entity_disjoint_held_out",
+      "train_match_fraction": 0.5,
+      "train_pair_bases": 1500,
+      "eval_query_bases": 1500,
+      "note": "supervised training pairs and positive evaluation queries are generated from disjoint base records"
+    }
   },
   "timing": {
-    "dataset_seconds": 38.115406999975676,
-    "index_build_seconds": 1712.9372627999983,
-    "blocking_seconds": 346.1444618999958,
-    "untrained_seconds": 2.665453499997966,
-    "supervised_seconds": 2.5079094999819063,
-    "em_seconds": 3.0623275999969337
+    "dataset_seconds": 61.86359269998502,
+    "index_build_seconds": 829.2258718999801,
+    "blocking_seconds": 103.5463106999523,
+    "untrained_seconds": 1.5050762000028044,
+    "supervised_seconds": 1.523955599986948,
+    "em_seconds": 1.5723940000170842
   },
   "m_u": {
-    "em_prior": 0.007093798723844713,
+    "em_prior": 0.007049670533273024,
     "supervised_prior": 0.0001,
     "untrained_prior": 0.0001
   },
   "variants": {
     "untrained": {
       "confusion_matrix": {
-        "TP": 2920,
-        "FN": 80,
-        "FP": 320,
-        "TN": 2680
+        "TP": 1431,
+        "FN": 69,
+        "FP": 66,
+        "TN": 1434
       },
       "metrics": {
-        "accuracy": 0.9333333333333333,
-        "precision": 0.9012345679012346,
-        "recall": 0.9733333333333334,
-        "specificity": 0.8933333333333333,
-        "f1": 0.9358974358974359
+        "accuracy": 0.955,
+        "precision": 0.9559118236472945,
+        "recall": 0.954,
+        "specificity": 0.956,
+        "f1": 0.954954954954955
       }
     },
     "supervised": {
       "confusion_matrix": {
-        "TP": 2930,
-        "FN": 70,
-        "FP": 975,
-        "TN": 2025
+        "TP": 1438,
+        "FN": 62,
+        "FP": 216,
+        "TN": 1284
       },
       "metrics": {
-        "accuracy": 0.8258333333333333,
-        "precision": 0.7503201024327785,
-        "recall": 0.9766666666666667,
-        "specificity": 0.675,
-        "f1": 0.8486603910209993
+        "accuracy": 0.9073333333333333,
+        "precision": 0.8694074969770254,
+        "recall": 0.9586666666666667,
+        "specificity": 0.856,
+        "f1": 0.911857958148383
       }
     },
     "em": {
       "confusion_matrix": {
-        "TP": 2927,
-        "FN": 73,
-        "FP": 2236,
-        "TN": 764
+        "TP": 1437,
+        "FN": 63,
+        "FP": 0,
+        "TN": 1500
       },
       "metrics": {
-        "accuracy": 0.6151666666666666,
-        "precision": 0.5669184582607012,
-        "recall": 0.9756666666666667,
-        "specificity": 0.25466666666666665,
-        "f1": 0.7171383069949774
+        "accuracy": 0.979,
+        "precision": 1.0,
+        "recall": 0.958,
+        "specificity": 1.0,
+        "f1": 0.9785495403472931
       }
     }
   },
   "summary": {
     "untrained": {
-      "accuracy": 0.9333,
-      "precision": 0.9012,
-      "recall": 0.9733,
-      "specificity": 0.8933,
-      "f1": 0.9359
+      "accuracy": 0.955,
+      "precision": 0.9559,
+      "recall": 0.954,
+      "specificity": 0.956,
+      "f1": 0.955
     },
     "supervised": {
-      "accuracy": 0.8258,
-      "precision": 0.7503,
-      "recall": 0.9767,
-      "specificity": 0.675,
-      "f1": 0.8487
+      "accuracy": 0.9073,
+      "precision": 0.8694,
+      "recall": 0.9587,
+      "specificity": 0.856,
+      "f1": 0.9119
     },
     "em": {
-      "accuracy": 0.6152,
-      "precision": 0.5669,
-      "recall": 0.9757,
-      "specificity": 0.2547,
-      "f1": 0.7171
+      "accuracy": 0.979,
+      "precision": 1.0,
+      "recall": 0.958,
+      "specificity": 1.0,
+      "f1": 0.9785
+    }
+  },
+  "environment": {
+    "python": "3.13.1",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "cpu": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",
+    "threads": 8,
+    "libs": {
+      "pandas": "3.0.5",
+      "numpy": "2.4.6",
+      "faiss": "1.14.3",
+      "splink": "4.0.16",
+      "sentence_transformers": "5.6.1",
+      "torch": "2.13.0+cpu"
     }
   }
 }

@@ -142,6 +142,30 @@ def search_candidates(
     return np.asarray(scores), np.asarray(indices), latencies
 
 
+def _candidate_position(row, query_id):
+    """Return the reference index of the candidate Splink matched to ``query_id``.
+
+    Candidate ids are candidate_{query_number}_{candidate_index}; the trailing
+    field is the reference position. Returns None if it cannot be decoded.
+    """
+    for field in ("unique_id_l", "unique_id_r"):
+        val = row[field]
+        if not isinstance(val, str):
+            continue
+        if field == "unique_id_l" and val == query_id:
+            other = row["unique_id_r"]
+        elif field == "unique_id_r" and val == query_id:
+            other = row["unique_id_l"]
+        else:
+            continue
+        if isinstance(other, str) and other.startswith("candidate_"):
+            try:
+                return int(other.split("_")[-1])
+            except (ValueError, IndexError):
+                return None
+    return None
+
+
 def splink_scores(cases: list[dict[str, Any]], candidate_indices: np.ndarray, people: list[Person]) -> dict[str, float]:
     """Score all blocked query/candidate pairs and return each query's max probability."""
     query_records: list[dict[str, Any]] = []
@@ -177,22 +201,32 @@ def splink_scores(cases: list[dict[str, Any]], candidate_indices: np.ndarray, pe
     )
     predictions = linker.inference.predict(threshold_match_probability=0.0).as_pandas_dataframe()
     result = {case["id"]: 0.0 for case in cases}
+    best_pos = {case["id"]: None for case in cases}
     if predictions.empty:
-        return result
+        return result, best_pos
     for _, row in predictions.iterrows():
         query_id = row["unique_id_l"] if row["unique_id_l"] in result else row["unique_id_r"]
-        result[query_id] = max(result[query_id], float(row["match_probability"]))
-    return result
+        prob = float(row["match_probability"])
+        if prob > result[query_id]:
+            result[query_id] = prob
+            best_pos[query_id] = _candidate_position(row, query_id)
+    return result, best_pos
 
 
 def percentile(values: list[float], fraction: float) -> float:
     return float(np.percentile(values, fraction * 100)) if values else 0.0
 
 
-def classification_metrics(cases: list[dict[str, Any]], probabilities: dict[str, float], threshold: float) -> dict[str, float | int]:
+def classification_metrics(cases: list[dict[str, Any]], probabilities: dict[str, float], threshold: float,
+                             best_pos: dict[str, int | None] | None = None) -> dict[str, float | int]:
+    """Confusion metrics. When ``best_pos`` is provided (strict mode), a positive
+    case counts as TP only if its best-matched candidate is the *true* reference
+    row (case["true_index"]); matching any other row counts as FN."""
     counts = {"tp": 0, "tn": 0, "fp": 0, "fn": 0}
     for case in cases:
         predicted = probabilities[case["id"]] >= threshold
+        if predicted and best_pos is not None and case.get("true_index") is not None:
+            predicted = best_pos.get(case["id"]) == case["true_index"]
         if case["label"] and predicted:
             counts["tp"] += 1
         elif case["label"] and not predicted:
@@ -253,14 +287,14 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
         _, candidate_indices, latencies = search_candidates(cases, embedding, index, strategy, max_k)
         splink_start = time.perf_counter()
         scoring_k = min(DEFAULT_SCORING_K, candidate_indices.shape[1])
-        probabilities = splink_scores(cases, candidate_indices[:, :scoring_k], people)
+        probabilities, best_pos = splink_scores(cases, candidate_indices[:, :scoring_k], people)
         splink_batch_seconds = time.perf_counter() - splink_start
         blocking = {}
         for k in args.k_values:
             hits = [case for case, row in zip(cases, candidate_indices) if case["true_index"] is not None and case["true_index"] in row[:k]]
             positives = [case for case in cases if case["true_index"] is not None]
             blocking[str(k)] = {"hits": len(hits), "positives": len(positives), "recall": len(hits) / len(positives)}
-        thresholds = {str(threshold): classification_metrics(cases, probabilities, threshold) for threshold in args.thresholds}
+        thresholds = {str(threshold): classification_metrics(cases, probabilities, threshold, best_pos) for threshold in args.thresholds}
         with tempfile.TemporaryDirectory(prefix="entity_eval_") as temp_dir:
             index_dir = Path(temp_dir)
             faiss.write_index(index, str(index_dir / "people.faiss"))
@@ -311,11 +345,11 @@ def run_ablations(people: list[Person], embedding: Any, index: Any, strategy: st
         variant_cases = [{"id": f"{name}_{i}", "category": name, "person": person, "true_index": i, "label": 1} for i, person in enumerate(variant_people)]
         _, candidate_indices, _ = search_candidates(variant_cases, embedding, index, strategy, max(args.k_values))
         scoring_k = min(DEFAULT_SCORING_K, candidate_indices.shape[1])
-        probabilities = splink_scores(variant_cases, candidate_indices[:, :scoring_k], people)
+        probabilities, best_pos = splink_scores(variant_cases, candidate_indices[:, :scoring_k], people)
         output[name] = {
             "count": len(variant_cases),
             "blocking_recall": {str(k): sum(case["true_index"] in row[:k] for case, row in zip(variant_cases, candidate_indices)) / len(variant_cases) for k in args.k_values},
-            "threshold_metrics": {str(t): classification_metrics(variant_cases, probabilities, t) for t in args.thresholds},
+            "threshold_metrics": {str(t): classification_metrics(variant_cases, probabilities, t, best_pos) for t in args.thresholds},
         }
     return output
 

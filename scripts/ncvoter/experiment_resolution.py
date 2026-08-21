@@ -96,10 +96,19 @@ def run(args: argparse.Namespace) -> dict:
 
     print("Scoring with Splink...")
     start = time.perf_counter()
-    matched = score_batch(query_records, candidate_records, build_settings(args.address_strength), args.threshold)
+    matched, best_position = score_batch(
+        query_records, candidate_records,
+        build_settings(args.address_strength), args.threshold,
+        return_best=True,
+    )
     query_seconds = time.perf_counter() - start
 
-    evaluation = ncvoter_util.confusion_and_metrics(positives, negatives, matched)
+    # Strict: a positive Q_pos_{i} is a TP only if it matched its own base at
+    # reference position i.
+    true_positions = {f"Q_pos_{i}": i for i in range(len(positives))}
+    evaluation = ncvoter_util.confusion_and_metrics(
+        positives, negatives, matched, best_position, true_positions
+    )
     return {
         "parameters": {
             "records_in_index": len(index_persons),

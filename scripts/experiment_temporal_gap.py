@@ -78,6 +78,7 @@ from experiment_small_k_recall import (  # noqa: E402
 VIEWS = dict(VIEWS)
 VIEWS["address"] = ["address"]
 from generate_data import CanadianAddressProvider  # noqa: E402  (for moved addresses)
+from common import environment_block  # noqa: E402
 
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 DEFAULT_MISSING_RATE = 0.3
@@ -438,10 +439,18 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "missing_rate": args.missing_rate,
             "k_values": args.k,
             "views": args.views,
+            "seed": args.seed,
             "gap_weight_decay": f"exp(-gap_years/{RESIDENCY_YEARS})",
             "two_tier_cutoff": f"address if gap<={RESIDENCY_YEARS} else identity",
             "linkage": args.linkage,
             "linkage_threshold": args.threshold,
+            "experiment": (
+                "python scripts/experiment_temporal_gap.py --base-count "
+                f"{args.base_count} --match-rate {args.match_rate} "
+                f"--gap {args.gap} --k {' '.join(map(str, args.k))} "
+                f"--views {' '.join(args.views)} --seed {args.seed}"
+            ),
+            "environment": environment_block(),
         },
         "blocking_recall": {},
         "linkage_f1": {},

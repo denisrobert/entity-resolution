@@ -40,8 +40,9 @@ from common import (  # noqa: E402
     build_batch,
     build_case_queries,
     build_labelled_pairs,
-    confusion_matrix,
+    environment_block,
     score_batch,
+    strict_confusion_matrix,
     to_link_settings,
     untrained_settings,
 )
@@ -70,7 +71,25 @@ def run_comparison(args: argparse.Namespace) -> dict[str, Any]:
     people = [Person.from_dict(store.record_at(i)) for i in range(len(store))]
     print(f"Loaded {len(people):,} reference records in {load_seconds:.2f}s")
 
-    cases = build_case_queries(people, args.query_count, args.close_variation_rate, args.seed)
+    # Entity-disjoint evaluation: labelled calibration pairs and evaluation
+    # queries must come from disjoint reference entities so the comparison is a
+    # held-out evaluation. By default calibration uses people[0:train_rows) and
+    # evaluation uses people[train_rows:train_rows+query_count).
+    if args.train_rows + args.query_count > len(people):
+        parser_error = SystemExit(
+            f"--train-rows ({args.train_rows}) + --query-count ({args.query_count}) "
+            f"exceeds the {len(people):,} reference records; the split must be "
+            f"entity-disjoint"
+        )
+        raise parser_error
+    train_slice = (0, args.train_rows)
+    eval_slice = (args.train_rows, args.train_rows + args.query_count)
+
+    train_people = people[train_slice[0]:train_slice[1]]
+    eval_people = people[eval_slice[0]:eval_slice[1]]
+    cases = build_case_queries(
+        eval_people, args.query_count, args.close_variation_rate, args.seed
+    )
     queries = [(query_id, query) for query_id, _, query, _ in cases]
 
     blocker = Blocker(store, k=args.blocking_k)
@@ -81,7 +100,7 @@ def run_comparison(args: argparse.Namespace) -> dict[str, Any]:
 
     if args.train_method == "supervised":
         pair_df = build_labelled_pairs(
-            people, args.train_rows, args.close_variation_rate, args.seed
+            train_people, args.train_rows, args.close_variation_rate, args.seed
         )
         trained_comparisons = calibrate_comparisons_from_pairs(
             pair_df,
@@ -129,6 +148,13 @@ def run_comparison(args: argparse.Namespace) -> dict[str, Any]:
             "match_threshold": args.threshold,
             "close_variation_rate": args.close_variation_rate,
             "seed": args.seed,
+            "evaluation": {
+                "mode": "entity_disjoint_held_out",
+                "train_people_slice": list(train_slice),
+                "eval_people_slice": list(eval_slice),
+                "note": "calibration pairs and evaluation queries are generated "
+                        "from disjoint reference entities",
+            },
         },
         "timing": {
             "load_seconds": load_seconds,
@@ -150,10 +176,22 @@ def run_comparison(args: argparse.Namespace) -> dict[str, Any]:
     for name, settings in variants.items():
         print(f"Scoring under {name} m/u...")
         start = time.perf_counter()
-        matched = score_batch(query_records, candidate_records, settings, args.threshold)
+        matched, best_position = score_batch(
+            query_records, candidate_records, settings, args.threshold, return_best=True
+        )
         query_ms = (time.perf_counter() - start) * 1000
         results["timing"]["query_total_ms"][name] = query_ms
-        matrix, by_category, metrics = confusion_matrix(cases, matched)
+        # build_case_queries emits Q_{r}_very closely related to row r of eval_people
+        # whose global store position is eval_slice[0] + r.
+        import re as _re
+        true_position = {
+            query_id: eval_slice[0] + int(_re.match(r"Q_(\d+)", query_id).group(1))
+            for query_id, _, _, _ in cases
+            if _re.match(r"Q_(\d+)", query_id)
+        }
+        matrix, by_category, metrics = strict_confusion_matrix(
+            cases, matched, best_position, true_position
+        )
         results["variants"][name] = {
             "confusion_matrix": matrix,
             "by_category": by_category,
@@ -161,6 +199,7 @@ def run_comparison(args: argparse.Namespace) -> dict[str, Any]:
         }
         print(f"  {name}: {json.dumps(metrics)}")
 
+    results["environment"] = environment_block()
     return results
 
 

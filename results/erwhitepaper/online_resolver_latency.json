@@ -1,0 +1,44 @@
+{
+  "parameters": {
+    "index_dir": "data",
+    "reference_records": 50000,
+    "query_count": 30,
+    "match_threshold": 0.85,
+    "blocking_k": 20,
+    "missing_rate": 0.3,
+    "seed": 42,
+    "close_variation_rate": 0.15
+  },
+  "latency": {
+    "count": 30,
+    "mean_ms": 394.62296333901276,
+    "median_ms": 380.85850002244115,
+    "p50_ms": 380.85850002244115,
+    "p75_ms": 395.4991999780759,
+    "p90_ms": 412.7269000164233,
+    "p95_ms": 453.9702000329271,
+    "p99_ms": 683.339600043837,
+    "min_ms": 354.36990001471713,
+    "max_ms": 683.339600043837,
+    "stdev_ms": 58.51426414565416,
+    "scope": "cold per-query end-to-end PersonEntityResolver.resolve: FAISS blocking + per-query candidate DataFrame + Splink Linker construction + predict",
+    "blocking_mean_ms": 25.52216666129728,
+    "linker_construction_mean_ms": 167.3257866622104,
+    "predict_mean_ms": 189.5295566665785,
+    "breakdown_scope": "independently timed: search_by_person (FAISS), _prepare_candidate_data + _create_linker (Splink Linker object), predict (Splink score)"
+  },
+  "environment": {
+    "python": "3.13.1",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "cpu": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",
+    "threads": 8,
+    "libs": {
+      "pandas": "3.0.5",
+      "numpy": "2.4.6",
+      "faiss": "1.14.3",
+      "splink": "4.0.16",
+      "sentence_transformers": "5.6.1",
+      "torch": "2.13.0+cpu"
+    }
+  }
+}

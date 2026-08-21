@@ -41,6 +41,36 @@ UNTRAINED_PRIOR = 0.0001
 COMPARISON_FIELDS = ["first_name", "last_name", "date_of_birth", "email", "address"]
 
 
+def environment_block() -> dict[str, Any]:
+    """Record the interpreter and key library versions plus CPU/thread hints.
+
+    Included in experiment artifacts so reproducibility is environment-aware,
+    not only seed-aware. Versions that cannot be imported are omitted rather
+    than failing the experiment.
+    """
+    import importlib
+    import os
+    import platform
+    import sys
+
+    libs = ["pandas", "numpy", "faiss", "splink", "sentence_transformers", "torch"]
+    versions: dict[str, str] = {}
+    for name in libs:
+        try:
+            mod = importlib.import_module(name)
+            versions[name] = getattr(mod, "__version__", "unknown")
+        except Exception:
+            pass  # optional dependency not installed
+
+    return {
+        "python": sys.version.split()[0],
+        "platform": platform.platform(),
+        "cpu": platform.processor(),
+        "threads": os.cpu_count(),
+        "libs": versions,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Dataset loading
 # ---------------------------------------------------------------------------
@@ -134,6 +164,34 @@ def build_case_queries(
             (f"Q_{index}_unrelated", "unrelated", unrelated[index], False),
         ])
     return cases
+
+
+def identity_collisions(
+    cases: list[tuple[str, str, Any, bool]],
+) -> list[tuple[str, str, int]]:
+    """Return unrelated queries that share all identity fields with one reference.
+
+    Each entry is ``(query_id, category, reference_index)`` for an unrelated
+    query whose first/last name and date of birth coincide with the reference
+    person at ``reference_index`` (i.e. a hard negative: FAISS and Splink have
+    no identity evidence to separate it). The synthetic Faker space makes this
+    rare, but the count should be reported so readers know the negatives are
+    not all trivially separable.
+    """
+    reference_by_key: dict[tuple[str, str, str], list[int]] = {}
+    hits: list[tuple[str, str, int]] = []
+    for query_id, category, person, _ in cases:
+        if category != "unrelated":
+            idx = int(query_id.split("_")[1]) if query_id.startswith("Q_") else -1
+            if idx >= 0:
+                key = (person.first_name, person.last_name, person.date_of_birth)
+                reference_by_key.setdefault(key, []).append(idx)
+    for query_id, category, person, _ in cases:
+        if category == "unrelated":
+            key = (person.first_name, person.last_name, person.date_of_birth)
+            for idx in reference_by_key.get(key, []):
+                hits.append((query_id, category, idx))
+    return hits
 
 
 def build_labelled_pairs(
@@ -230,8 +288,17 @@ def score_batch(
     candidate_records: list[dict[str, Any]],
     settings: dict[str, Any],
     threshold: float,
-) -> set[str]:
-    """Run one batched Splink prediction and return matched query ids."""
+    return_best: bool = False,
+) -> set[str] | tuple[set[str], dict[str, int]]:
+    """Run one batched Splink prediction and return matched query ids.
+
+    When ``return_best=True``, also return ``best_position`` mapping each matched
+    query id to the reference index of its highest-probability candidate. Callers
+    evaluating recall should use this to require that a positive query was matched
+    to its *own* reference row (strict matching), not merely to any row. Candidate
+    ids are ``C_{query_index}_{candidate_index}`` (or ``CAND_{index}``), so the
+    trailing field is the reference position.
+    """
     linker = Linker(
         [pd.DataFrame(query_records), pd.DataFrame(candidate_records)],
         settings,
@@ -244,8 +311,31 @@ def score_batch(
     ).as_pandas_dataframe()
     matched = set(predictions["unique_id_l"])
     matched.update(predictions["unique_id_r"])
-    # Query ids are prefixed "Q_"; candidate ids are prefixed "C_".
-    return {query_id for query_id in matched if query_id.startswith("Q_")}
+    query_ids = {query_id for query_id in matched if query_id.startswith("Q_")}
+    if not return_best:
+        return query_ids
+    best_prob: dict[str, float] = {}
+    best_position: dict[str, int] = {}
+    for _, row in predictions.iterrows():
+        prob = float(row["match_probability"])
+        for field in ("unique_id_l", "unique_id_r"):
+            val = row[field]
+            if not isinstance(val, str):
+                continue
+            if val.startswith("Q_"):
+                query_id = val
+                other = row["unique_id_r"] if field == "unique_id_l" else row["unique_id_l"]
+            else:
+                continue
+            if isinstance(other, str) and (other.startswith("C_") or other.startswith("CAND_")):
+                try:
+                    pos = int(other.split("_")[-1])
+                except (ValueError, IndexError):
+                    continue
+                if prob > best_prob.get(query_id, -1.0):
+                    best_prob[query_id] = prob
+                    best_position[query_id] = pos
+    return query_ids, best_position
 
 
 # ---------------------------------------------------------------------------
@@ -286,6 +376,56 @@ def confusion_matrix(
     tp, fp, fn, tn = matrix["TP"], matrix["FP"], matrix["FN"], matrix["TN"]
     metrics = {
         "accuracy": (tp + tn) / total,
+        "precision": tp / (tp + fp) if tp + fp else 0.0,
+        "recall": tp / positive if positive else 0.0,
+        "specificity": tn / negative if negative else 0.0,
+        "f1": 2 * tp / (2 * tp + fp + fn) if 2 * tp + fp + fn else 0.0,
+    }
+    return matrix, by_category, metrics
+
+
+def strict_confusion_matrix(
+    cases: list[tuple[str, str, Any, bool]],
+    matched_query_ids: set[str],
+    best_position: dict[str, int],
+    true_position_of: dict[str, int],
+) -> Tuple[dict[str, int], dict[str, int], dict[str, float]]:
+    """Strict confusion matrix: a positive query counts as TP only if Splink
+    matched it to its *own* reference row (best_position == true_position_of).
+
+    ``true_position_of`` maps each positive query id to its true reference-index;
+    negatives have no true row, so any match is a false positive. This is the
+    identity-aware recall that the lenient :func:`confusion_matrix` does not
+    enforce (it marks TP whenever the query matched *any* row).
+    """
+    matrix = {"TP": 0, "FN": 0, "FP": 0, "TN": 0}
+    by_category: dict[str, dict[str, int]] = {
+        "identical": {"TP": 0, "FN": 0},
+        "close_same_entity": {"TP": 0, "FN": 0},
+        "unrelated": {"FP": 0, "TN": 0},
+    }
+    for query_id, category, _, expected in cases:
+        if not expected:
+            if query_id in matched_query_ids:
+                matrix["FP"] += 1
+                by_category.get(category, by_category["unrelated"])["FP"] += 1
+            else:
+                matrix["TN"] += 1
+                by_category.get(category, by_category["unrelated"])["TN"] += 1
+        else:
+            correct = best_position.get(query_id) == true_position_of.get(query_id)
+            if correct:
+                matrix["TP"] += 1
+                by_category[category]["TP"] += 1
+            else:
+                matrix["FN"] += 1
+                by_category[category]["FN"] += 1
+    total = len(cases)
+    positive = matrix["TP"] + matrix["FN"]
+    negative = matrix["TN"] + matrix["FP"]
+    tp, fp, fn, tn = matrix["TP"], matrix["FP"], matrix["FN"], matrix["TN"]
+    metrics = {
+        "accuracy": (tp + tn) / total if total else 0.0,
         "precision": tp / (tp + fp) if tp + fp else 0.0,
         "recall": tp / positive if positive else 0.0,
         "specificity": tn / negative if negative else 0.0,

@@ -13,15 +13,15 @@
     "address_strength": 1.0
   },
   "timing": {
-    "index_build_seconds": 40.230297200003406,
-    "query_seconds": 112.19705719998456,
-    "mean_query_milliseconds": 7.479803813332303
+    "index_build_seconds": 46.03629550000187,
+    "query_seconds": 135.40424699999858,
+    "mean_query_milliseconds": 9.026949799999906
   },
   "confusion_matrix": {
-    "TP": 9941,
-    "FN": 59,
-    "FP": 49,
-    "TN": 4951
+    "TP": 9886,
+    "FN": 114,
+    "FP": 23,
+    "TN": 4977
   },
   "by_category": {
     "identical": {
@@ -31,20 +31,58 @@
     },
     "close_same_entity": {
       "expected_match": true,
-      "TP": 4941,
-      "FN": 59
+      "TP": 4886,
+      "FN": 114
     },
     "unrelated": {
       "expected_match": false,
-      "FP": 49,
-      "TN": 4951
+      "FP": 23,
+      "TN": 4977
     }
   },
+  "blocking_recall": {
+    "k": 20,
+    "by_category": {
+      "identical": {
+        "blocked": 5000,
+        "positives": 5000,
+        "recall": 1.0
+      },
+      "close_same_entity": {
+        "blocked": 4889,
+        "positives": 5000,
+        "recall": 0.9778
+      }
+    },
+    "blocked_in_but_rejected": {
+      "identical": 0,
+      "close_same_entity": 3
+    },
+    "overall_recall": 0.9889
+  },
+  "identity_collisions": {
+    "count": 0,
+    "note": "unrelated queries sharing first/last name and date of birth with their reference record (hard negatives)"
+  },
   "metrics": {
-    "accuracy": 0.9928,
-    "precision": 0.9950950950950951,
-    "recall": 0.9941,
-    "specificity": 0.9902,
-    "f1": 0.9945972986493247
+    "accuracy": 0.9908666666666667,
+    "precision": 0.9976788777878696,
+    "recall": 0.9886,
+    "specificity": 0.9954,
+    "f1": 0.9931186900396806
+  },
+  "environment": {
+    "python": "3.13.1",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "cpu": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",
+    "threads": 8,
+    "libs": {
+      "pandas": "3.0.5",
+      "numpy": "2.4.6",
+      "faiss": "1.14.3",
+      "splink": "4.0.16",
+      "sentence_transformers": "5.6.1",
+      "torch": "2.13.0+cpu"
+    }
   }
 }

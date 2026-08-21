@@ -1,0 +1,118 @@
+{
+  "metadata": {
+    "model": "sentence-transformers/all-MiniLM-L6-v2",
+    "gap": "all",
+    "residency_years": 10,
+    "base_records": 6000,
+    "match_rate": 0.03,
+    "missing_rate": 0.3,
+    "k_values": [
+      1,
+      5,
+      10
+    ],
+    "views": [
+      "full",
+      "identity",
+      "contact",
+      "multi_union",
+      "gap_weighted",
+      "two_tier"
+    ],
+    "seed": 42,
+    "gap_weight_decay": "exp(-gap_years/10)",
+    "two_tier_cutoff": "address if gap<=10 else identity",
+    "linkage": false,
+    "linkage_threshold": 0.85,
+    "experiment": "python scripts/experiment_temporal_gap.py --base-count 6000 --match-rate 0.03 --gap all --k 1 5 10 --views full identity contact multi_union gap_weighted two_tier --seed 42",
+    "environment": {
+      "python": "3.13.1",
+      "platform": "Windows-11-10.0.26200-SP0",
+      "cpu": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",
+      "threads": 8,
+      "libs": {
+        "pandas": "3.0.5",
+        "numpy": "2.4.6",
+        "faiss": "1.14.3",
+        "splink": "4.0.16",
+        "sentence_transformers": "5.6.1",
+        "torch": "2.13.0+cpu"
+      }
+    }
+  },
+  "blocking_recall": {
+    "full": {
+      "k": {
+        "1": 0.9722,
+        "5": 0.9944,
+        "10": 0.9944
+      },
+      "recall_by_cohort": {
+        "short": 1.0,
+        "long": 0.9444
+      },
+      "avg_ms_query": 23.168
+    },
+    "identity": {
+      "k": {
+        "1": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "recall_by_cohort": {
+        "short": 1.0,
+        "long": 1.0
+      },
+      "avg_ms_query": 19.55
+    },
+    "contact": {
+      "k": {
+        "1": 0.5333,
+        "5": 0.5389,
+        "10": 0.5444
+      },
+      "recall_by_cohort": {
+        "short": 0.8556,
+        "long": 0.2111
+      },
+      "avg_ms_query": 18.652
+    },
+    "multi_union": {
+      "k": {
+        "1": 1.0,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "recall_by_cohort": {
+        "short": 1.0,
+        "long": 1.0
+      },
+      "avg_ms_query": 53.158
+    },
+    "gap_weighted": {
+      "k": {
+        "1": 0.9111,
+        "5": 1.0,
+        "10": 1.0
+      },
+      "recall_by_cohort": {
+        "short": 0.8556,
+        "long": 0.9667
+      },
+      "avg_ms_query": 33.936
+    },
+    "two_tier": {
+      "k": {
+        "1": 0.8333,
+        "5": 0.8444,
+        "10": 0.8444
+      },
+      "recall_by_cohort": {
+        "short": 0.6778,
+        "long": 0.9889
+      },
+      "avg_ms_query": 33.225
+    }
+  },
+  "linkage_f1": {}
+}

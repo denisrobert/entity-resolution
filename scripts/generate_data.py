@@ -17,17 +17,59 @@ class CanadianAddressProvider(BaseProvider):
         ('NU', 'Nunavut'), ('ON', 'Ontario'), ('PE', 'Prince Edward Island'),
         ('QC', 'Quebec'), ('SK', 'Saskatchewan'), ('YT', 'Yukon')
     ]
+
+    # Resident population by province/territory from the 2021 Census of
+    # Population (Statistics Canada), used to weight province selection so the
+    # synthetic population mirrors the real provincial distribution.
+    POPULATION_2021 = {
+        'AB': 4_262_635, 'BC': 5_000_879, 'MB': 1_342_153, 'NB': 775_610,
+        'NL': 510_550, 'NS': 969_383, 'NT': 41_070, 'NU': 36_858,
+        'ON': 14_223_942, 'PE': 154_331, 'QC': 8_604_495, 'SK': 1_132_505,
+        'YT': 40_232,
+    }
+    
+    # Canada Post forward-sortation-area prefix letters, by province/territory.
+    # The first letter of a Canadian postal code is determined entirely by the
+    # province or territory (NT and NU share the X prefix).
+    POSTAL_PREFIX_BY_PROVINCE = {
+        'NL': ['A'],
+        'NS': ['B'],
+        'PE': ['C'],
+        'NB': ['E'],
+        'QC': ['G', 'H', 'J'],
+        'ON': ['K', 'L', 'M', 'N', 'P'],
+        'MB': ['R'],
+        'SK': ['S'],
+        'AB': ['T'],
+        'BC': ['V'],
+        'NT': ['X'],
+        'NU': ['X'],
+        'YT': ['Y'],
+    }
     
     STREET_TYPES = ['Street', 'Avenue', 'Road', 'Boulevard', 'Drive', 'Lane', 'Court', 'Place', 'Way', 'Crescent']
     
     def canadian_province(self) -> tuple:
-        return random.choice(self.CANADIAN_PROVINCES)
+        """Return a province/territory weighted by its 2021 Census population."""
+        weights = [self.POPULATION_2021[code] for code, _ in self.CANADIAN_PROVINCES]
+        return random.choices(self.CANADIAN_PROVINCES, weights=weights, k=1)[0]
     
-    def canadian_postal_code(self) -> str:
-        """Generate a valid Canadian postal code format (A1A 1A1)."""
-        letters = 'ABCEGHJKLMNPRSTVXY'
+    def canadian_postal_code(self, prov_code: Optional[str] = None) -> str:
+        """Generate a valid Canadian postal code (A1A 1A1) whose FSA prefix
+        letter is consistent with the given province/territory code.
+
+        When ``prov_code`` is omitted a province is chosen uniformly at random,
+        so the returned code is always valid for *some* province. The prefix is
+        drawn from :attr:`POSTAL_PREFIX_BY_PROVINCE`, enforcing the real-world
+        correspondence between region and prefix letter.
+        """
+        if prov_code is None:
+            prov_code = self.canadian_province()[0]
+        prefix_letters = self.POSTAL_PREFIX_BY_PROVINCE[prov_code]
+        valid = 'ABCEGHJKLMNPRSTVXY'
         numbers = '0123456789'
-        return f"{random.choice(letters)}{random.choice(numbers)}{random.choice(letters)} {random.choice(numbers)}{random.choice(letters)}{random.choice(numbers)}"
+        return (f"{random.choice(prefix_letters)}{random.choice(numbers)}{random.choice(valid)} "
+                f"{random.choice(numbers)}{random.choice(valid)}{random.choice(numbers)}")
     
     def canadian_address(self) -> str:
         street_num = random.randint(1, 9999)
@@ -35,7 +77,7 @@ class CanadianAddressProvider(BaseProvider):
         street_type = random.choice(self.STREET_TYPES)
         city = self.generator.city()
         prov_code, prov_name = self.canadian_province()
-        postal = self.canadian_postal_code()
+        postal = self.canadian_postal_code(prov_code)
         return f"{street_num} {street_name} {street_type}, {city}, {prov_code} {postal}"
 
 
@@ -70,9 +112,19 @@ class Person:
         return cls(**data)
 
 
+# Share of the Canadian population that is male (Statistics Canada, 2021 Census:
+# 49.8% male). First names are drawn gender-consistently with this probability so
+# the synthetic population is not gender-imbalanced relative to the real one.
+MALE_FRACTION = 0.498
+
+
 def generate_person(fake: Faker, missing_rate: float = 0.3) -> Person:
     """Generate a single person with optional missing fields."""
-    first_name = fake.first_name()
+    # Gender-correlated given names: ~49.8% of records are male, and each
+    # person's first name is drawn from the gender-appropriate name list so the
+    # male/female name mix stays close to the real 49.8/50.2 split.
+    is_male = random.random() < MALE_FRACTION
+    first_name = fake.first_name_male() if is_male else fake.first_name_female()
     last_name = fake.last_name()
     # Generate DOB between 1930 and 2010
     dob = fake.date_of_birth(minimum_age=14, maximum_age=94).strftime('%Y-%m-%d')
@@ -85,8 +137,8 @@ def generate_person(fake: Faker, missing_rate: float = 0.3) -> Person:
         address = fake.canadian_address()
     
     if random.random() > missing_rate:
-        # Generate email based on name
-        email = f"{first_name.lower()}.{last_name.lower()}{random.randint(1, 999)}@{fake.free_email_domain()}"
+        # Realistic, varied email addresses (Faker internet provider).
+        email = fake.ascii_safe_email()
     
     return Person(
         first_name=first_name,

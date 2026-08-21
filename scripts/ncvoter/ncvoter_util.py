@@ -96,9 +96,20 @@ def confusion_and_metrics(
     positives: list[tuple[str, Any]],
     negatives: list[tuple[str, Any]],
     matched_ids: set[str],
+    best_position: dict[str, int] | None = None,
+    true_positions: dict[str, int] | None = None,
 ) -> dict[str, dict[str, float] | dict[str, int]]:
-    """Confusion matrix + metrics for self-match (pos) vs held-out (neg) queries."""
-    tp = sum(1 for query_id, _ in positives if query_id in matched_ids)
+    """Confusion matrix + metrics for self-match (pos) vs held-out (neg) queries.
+
+    When ``best_position`` and ``true_positions`` are given (strict mode), a
+    positive query counts as TP only if its best-matched candidate is its own
+    reference row; otherwise it is a false negative even if it matched another row.
+    """
+    def _tp(query_id):
+        if best_position is not None and true_positions is not None:
+            return best_position.get(query_id) == true_positions.get(query_id)
+        return query_id in matched_ids
+    tp = sum(1 for query_id, _ in positives if _tp(query_id))
     fn = len(positives) - tp
     fp = sum(1 for query_id, _ in negatives if query_id in matched_ids)
     tn = len(negatives) - fp

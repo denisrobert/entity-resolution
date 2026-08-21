@@ -9,15 +9,27 @@
     "blocking_k": 20,
     "match_threshold": 0.85,
     "close_variation_rate": 0.15,
-    "seed": 42
+    "seed": 42,
+    "evaluation": {
+      "mode": "entity_disjoint_held_out",
+      "train_people_slice": [
+        0,
+        2000
+      ],
+      "eval_people_slice": [
+        2000,
+        4000
+      ],
+      "note": "calibration pairs and evaluation queries are generated from disjoint reference entities"
+    }
   },
   "timing": {
-    "load_seconds": 37.81068550000782,
-    "training_seconds": 27.795380499999737,
-    "blocking_seconds": 733.7872099000087,
+    "load_seconds": 15.5625519999885,
+    "training_seconds": 8.472734800016042,
+    "blocking_seconds": 182.93838080001296,
     "query_total_ms": {
-      "untrained": 4760.554500011494,
-      "trained": 4624.511700007133
+      "untrained": 3484.6635999856517,
+      "trained": 3339.065399952233
     }
   },
   "m_u": {
@@ -29,10 +41,10 @@
   "variants": {
     "untrained": {
       "confusion_matrix": {
-        "TP": 3966,
-        "FN": 34,
-        "FP": 116,
-        "TN": 1884
+        "TP": 3875,
+        "FN": 125,
+        "FP": 64,
+        "TN": 1936
       },
       "by_category": {
         "identical": {
@@ -40,28 +52,28 @@
           "FN": 0
         },
         "close_same_entity": {
-          "TP": 1966,
-          "FN": 34
+          "TP": 1875,
+          "FN": 125
         },
         "unrelated": {
-          "FP": 116,
-          "TN": 1884
+          "FP": 64,
+          "TN": 1936
         }
       },
       "metrics": {
-        "accuracy": 0.975,
-        "precision": 0.9715825575698187,
-        "recall": 0.9915,
-        "specificity": 0.942,
-        "f1": 0.9814402375649591
+        "accuracy": 0.9685,
+        "precision": 0.9837522213759837,
+        "recall": 0.96875,
+        "specificity": 0.968,
+        "f1": 0.9761934752487719
       }
     },
     "trained": {
       "confusion_matrix": {
-        "TP": 3968,
-        "FN": 32,
-        "FP": 469,
-        "TN": 1531
+        "TP": 3877,
+        "FN": 123,
+        "FP": 236,
+        "TN": 1764
       },
       "by_category": {
         "identical": {
@@ -69,21 +81,35 @@
           "FN": 0
         },
         "close_same_entity": {
-          "TP": 1968,
-          "FN": 32
+          "TP": 1877,
+          "FN": 123
         },
         "unrelated": {
-          "FP": 469,
-          "TN": 1531
+          "FP": 236,
+          "TN": 1764
         }
       },
       "metrics": {
-        "accuracy": 0.9165,
-        "precision": 0.8942979490646833,
-        "recall": 0.992,
-        "specificity": 0.7655,
-        "f1": 0.9406187033305677
+        "accuracy": 0.9401666666666667,
+        "precision": 0.9426209579382446,
+        "recall": 0.96925,
+        "specificity": 0.882,
+        "f1": 0.9557500308147417
       }
+    }
+  },
+  "environment": {
+    "python": "3.13.1",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "cpu": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",
+    "threads": 8,
+    "libs": {
+      "pandas": "3.0.5",
+      "numpy": "2.4.6",
+      "faiss": "1.14.3",
+      "splink": "4.0.16",
+      "sentence_transformers": "5.6.1",
+      "torch": "2.13.0+cpu"
     }
   }
 }

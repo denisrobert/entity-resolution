@@ -47,6 +47,7 @@ from common import (  # noqa: E402
     COMPARISON_FIELDS,
     UNTRAINED_PRIOR,
     build_batch,
+    environment_block,
     load_records,
     make_non_identical_close_person,
     score_batch,
@@ -78,6 +79,7 @@ def build_dataset(
     close_variation_rate: float,
     seed: int,
     base: list[Any] | None = None,
+    train_match_fraction: float = 0.5,
 ) -> tuple[list[Any], list[Any], list[tuple[Any, Any]], list[Any]]:
     """Return ``(base, reference, pairs, query_variants)``.
 
@@ -89,6 +91,12 @@ def build_dataset(
     (not verbatim in the index) that match a base record -- these make the
     positive queries non-trivial. If ``base`` is provided (e.g. loaded from an
     external data set), it is used instead of generating a synthetic population.
+
+    Evaluation is a held-out test: the ``train_match_fraction``-fraction of
+    matched bases contributes to ``pairs`` (supervised training), and the
+    remaining matched bases contribute to ``query_variants`` (positive
+    evaluation queries). No base record appears in both, so supervised
+    calibration is entity-disjoint from the evaluated positives.
     """
     random.seed(seed)
     if base is None:
@@ -96,32 +104,53 @@ def build_dataset(
     base_count = len(base)
     match_count = int(round(base_count * match_rate))
     matched_indexes = random.sample(range(base_count), match_count)
+    random.shuffle(matched_indexes)
+    train_count = int(round(match_count * train_match_fraction))
+    train_indexes = matched_indexes[:train_count]
+    eval_indexes = matched_indexes[train_count:]
     reference = list(base)
     pairs: list[tuple[Any, Any]] = []
     query_variants: list[Any] = []
-    for index in matched_indexes:
+    for index in train_indexes:
         base_person = base[index]
         twin = make_non_identical_close_person(base_person, close_variation_rate)
         reference.append(twin)
         pairs.append((base_person, twin))
+    for index in eval_indexes:
+        base_person = base[index]
+        twin = make_non_identical_close_person(base_person, close_variation_rate)
+        reference.append(twin)
         query_variants.append(
             make_non_identical_close_person(base_person, close_variation_rate)
         )
-    return base, reference, pairs, query_variants
+    # Twin (reference) position of the i-th eval base = len(base) + len(train_indexes) + i
+    twin_positions = {i: base_count + train_count + i for i, _ in enumerate(eval_indexes)}
+    return base, reference, pairs, query_variants, eval_indexes, twin_positions
 
 
 def build_cases(
     query_variants: list[Any],
     missing_rate: float,
     seed: int,
-) -> list[tuple[str, str, Any, bool]]:
+    eval_indexes: list[int] | None = None,
+    twin_positions: dict[int, int] | None = None,
+) -> list[tuple[str, str, Any, bool, set[int]]]:
     """Build balanced positive (small-difference variant, expects match) and
-    negative (unrelated person, expects no match) queries."""
+    negative (unrelated person, expects no match) queries.
+
+    Each case is ``(query_id, category, person, expected, true_positions)`` where
+    ``true_positions`` is the set of reference positions of the same entity as a
+    positive query (its base record and its twin). The resolver must match one of
+    these for a true positive.
+    """
     unrelated = generate_people(len(query_variants), missing_rate=missing_rate, seed=seed + 1)
-    cases: list[tuple[str, str, Any, bool]] = []
+    cases: list[tuple[str, str, Any, bool, set[int]]] = []
     for index, variant in enumerate(query_variants):
-        cases.append((f"Q_pos_{index}", "match", variant, True))
-        cases.append((f"Q_neg_{index}", "nonmatch", unrelated[index], False))
+        positions = {eval_indexes[index] if eval_indexes else index}
+        if twin_positions:
+            positions.add(twin_positions[index])
+        cases.append((f"Q_pos_{index}", "match", variant, True, positions))
+        cases.append((f"Q_neg_{index}", "nonmatch", unrelated[index], False, set()))
     return cases
 
 
@@ -155,10 +184,20 @@ def build_index(reference: list[Any]) -> MemoryVectorDatabase:
     return store
 
 
-def evaluate(cases: list[tuple[str, str, Any, bool]], matched_ids: set[str]) -> dict[str, Any]:
+def evaluate(cases: list[tuple[str, str, Any, bool, int]], matched_ids: set[str],
+             best_position: dict[str, int] | None = None) -> dict[str, Any]:
+    """Confusion metrics. When ``best_position`` is provided (strict mode), a
+    positive query (true_index >= 0) is a TP only if its best-matched candidate is
+    its own reference row; matching any other row counts as FN. Without it, a
+    positive query is TP if it matched any row (lenient)."""
     matrix = {"TP": 0, "FN": 0, "FP": 0, "TN": 0}
-    for query_id, _, _, expected in cases:
-        predicted = query_id in matched_ids
+    for query_id, _, _, expected, true_positions in cases:
+        if not expected:
+            predicted = query_id in matched_ids
+        else:
+            predicted = query_id in matched_ids
+            if best_position is not None and predicted:
+                predicted = best_position.get(query_id) in true_positions
         if expected and predicted:
             matrix["TP"] += 1
         elif expected and not predicted:
@@ -171,7 +210,7 @@ def evaluate(cases: list[tuple[str, str, Any, bool]], matched_ids: set[str]) -> 
     positive = tp + fn
     negative = tn + fp
     metrics = {
-        "accuracy": (tp + tn) / len(cases),
+        "accuracy": (tp + tn) / len(cases) if cases else 0.0,
         "precision": tp / (tp + fp) if tp + fp else 0.0,
         "recall": tp / positive if positive else 0.0,
         "specificity": tn / negative if negative else 0.0,
@@ -188,13 +227,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         if args.input_records
         else None
     )
-    base, reference, pairs, query_variants = build_dataset(
+    base, reference, pairs, query_variants, eval_indexes, twin_positions = build_dataset(
         args.base_count, args.match_rate, args.missing_rate,
         args.close_variation_rate, args.seed, base=external_base,
+        train_match_fraction=args.train_match_fraction,
     )
     args.base_count = len(base)
-    cases = build_cases(query_variants, args.missing_rate, args.seed)
-    query_tuples = [(query_id, person) for query_id, _, person, _ in cases]
+    cases = build_cases(query_variants, args.missing_rate, args.seed, eval_indexes, twin_positions)
+    query_tuples = [(query_id, person) for query_id, _, person, _, _ in cases]
     dataset_seconds = time.perf_counter() - param_start
 
     print(f"Building reference index of {len(reference):,} records "
@@ -240,14 +280,22 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "duplicate_pairs": len(pairs),
             "reference_records": len(reference),
             "total_queries": len(cases),
-            "positive_queries": args.base_count and sum(1 for _, _, _, e in cases if e),
-            "negative_queries": sum(1 for _, _, _, e in cases if not e),
+            "positive_queries": args.base_count and sum(1 for _, _, _, e, _ in cases if e),
+            "negative_queries": sum(1 for _, _, _, e, _ in cases if not e),
             "missing_rate": args.missing_rate,
             "model_name": DEFAULT_MODEL,
             "blocking_k": args.k,
             "match_threshold": args.threshold,
             "close_variation_rate": args.close_variation_rate,
             "seed": args.seed,
+            "evaluation": {
+                "mode": "entity_disjoint_held_out",
+                "train_match_fraction": args.train_match_fraction,
+                "train_pair_bases": len(pairs),
+                "eval_query_bases": len(query_variants),
+                "note": "supervised training pairs and positive evaluation "
+                        "queries are generated from disjoint base records",
+            },
         },
         "timing": {
             "dataset_seconds": dataset_seconds,
@@ -266,14 +314,18 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     for name, settings in {"untrained": untrained, "supervised": supervised, "em": em}.items():
         print(f"Scoring under {name} m/u...")
         score_start = time.perf_counter()
-        matched = score_batch(query_records, candidate_records, settings, args.threshold)
+        matched, best_position = score_batch(
+            query_records, candidate_records, settings, args.threshold,
+            return_best=True,
+        )
         results["timing"][f"{name}_seconds"] = time.perf_counter() - score_start
-        evaluation = evaluate(cases, matched)
+        evaluation = evaluate(cases, matched, best_position)
         results["variants"][name] = evaluation
         summary = {k: round(v, 4) for k, v in evaluation["metrics"].items()}
         results["summary"][name] = summary
         print(f"  {name}: {json.dumps(summary)}")
 
+    results["environment"] = environment_block()
     return results
 
 
@@ -291,6 +343,9 @@ def main() -> None:
     parser.add_argument("--max-iterations", type=int, default=20)
     parser.add_argument("--em-convergence", type=float, default=0.001)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--train-match-fraction", type=float, default=0.5,
+                        help="Fraction of matched base records used for supervised training "
+                             "pairs; the rest generate the positive evaluation queries")
     parser.add_argument("--input-records", type=Path, default=None,
                         help="JSON/CSV file of person records to use as the base population (duplicates are then injected)")
     parser.add_argument("--output", default="training_results.json")

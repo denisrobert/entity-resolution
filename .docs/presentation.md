@@ -102,7 +102,7 @@ Query ──► [embed] ──► [FAISS top-k]
 # What it delivers
 
 - **99.5% F1** on the synthetic test corpus (15,000 labelled queries).
-- **~7.5 ms/query** — *amortized batched* processing (batched embedding + blocking + one Splink run); the per-query online resolver path is slower.
+- **~7.5 ms/query amortized** *batched* throughput; the honest **online** per-query path is slower (~seconds, dominated by per-query Splink construction).
 - **Persisted and reusable**: the index reloads without re-embedding the population.
 - **Defensible numbers**: every result reproduces by re-running the code.
 
@@ -157,7 +157,7 @@ Around **7–14 M records** (or when you need replicated, multi-region durabilit
 - Sponsor a short **proof-on-real-data** phase: a representative, labelled sample of the population we must link (with access/privacy).
 - We then commit to an F1 on *that* data, not the synthetic one.
 
-**Value in one line:** near-perfect, explainable identity resolution at ~7.5 ms, with a priceable path to scale.
+**Value in one line:** near-perfect, explainable identity resolution with batched throughput ~7.5 ms/query, and a path to scale -- but online per-query latency is seconds (Splink rebuild per call), which the paper is honest about and gives a future direction for.
 
 ---
 
@@ -184,9 +184,9 @@ Query ──► MiniLM embed ──► FAISS top-k ──► Splink ──► p(
 
 **Blocking recall is the ceiling; Splink is where F1 is won or lost.**
 
-- On the confusion-matrix query set (15k queries): top-20 blocking recall **99.46%** → end-to-end recall **99.40%** — the linkage stage rejects only 6 of the 9,946 retrieved positives.
-- A "perfect" blocker buys at most ~**0.3 more F1 points** (99.45 → ~99.73% ceiling), computed from the same artifact.
-- (Section 7, a different query construction: blocking recall 99.88%; compact serialization raises it to 99.95%.)
+- On the confusion-matrix query set (15k queries): top-20 blocking recall **98.89%** → end-to-end recall **98.86%** — the linkage stage rejects only 3 of the 9,889 retrieved positives; blocking is the binding constraint.
+- A "perfect" blocker would take F1 from **99.31 → ~99.87%**, since 111 positives were missed at top-20; retrieval now has real headroom.
+- (Section 7, a different query construction: blocking recall 99.75%; compact raises it to 99.88%.)
 
 > Design implication: improving the embedding/blocking engine is **not** the lever today; linkage configuration is.
 
@@ -196,11 +196,11 @@ Query ──► MiniLM embed ──► FAISS top-k ──► Splink ──► p(
 
 | Lever | Effect | Verdict |
 |---|---|---|
-| **Threshold τ** | 0.85→0.95 lifts F1 99.45→99.63% | Yes — cheap precision knob |
-| **Serialization** | single seed: recall 99.95%, F1 99.73%; five-seed mean diff only 0.005 F1 pts | Not confirmable (recheck on your data) |
+| **Threshold τ** | 0.85→0.95: F1 barely moves (99.31→99.35%); recall scarce | Small—retrieval is the lever now |
+| **Serialization** | single seed: recall 99.88%, F1 99.83%; five-seed mean F1 99.90 vs 99.82 (+0.08) | Yes—small, reproducible |
 | **Blocking size k** | 20→100: +recall, 2.4× Splink time | Diminishing returns |
 | **Weaken address** | never beat full-strength | No (this data) |
-| **Retrain m/u** | untrained F1 97.9% vs supervised 93.8% (entity-disjoint) | Keep defaults |
+| **Retrain m/u** | §8.1: untrained 97.6% vs supervised 95.6%; §8.2 100k: EM at default prior is best (97.9%) | Prior and data-dependent |
 
 ---
 
@@ -213,7 +213,7 @@ Splink's decision rule: classify as *match* when `P(M|γ) ≥ τ` (range ~[0.5, 
 
 Decision-theoretic setting: `τ* = C_FP / (C_FP + C_FN)` — presumes a calibrated posterior, zero cost for correct decisions, and per-pair decisions (whitepaper Appendix — Deriving τ).
 
-- Measured: `τ` 0.85 → 0.95 lifted F1 99.45% → 99.63% (precision 99.51→99.94%, FP 49→6); recall slipped only 99.40→99.33%.
+- Measured: `τ` 0.85 → 0.95 moved F1 barely (99.31% → 99.35%; FP 23→6) because recall — not threshold — is the scarce resource.
 - With recall headroom, raising `τ` is the cheapest precision lever — the mechanism to encode FP/FN business costs. (Methods: whitepaper **Appendix — Deriving τ**.)
 
 ---
@@ -222,8 +222,8 @@ Decision-theoretic setting: `τ* = C_FP / (C_FP + C_FN)` — presumes a calibrat
 
 Retraining the match model (`m/u`) made results **worse**, not better.
 
-1. **Prior coupling (dominant):** EM's fitted prior (0.0071 vs 0.0001) shifts all scores up → mass false positives. Pinning the prior recovers EM's F1 (entity-disjoint: with a pinned prior the best EM F1 rises from ~0.82 to ~0.97).
-2. **A genuine residual:** even with the prior pinned, trained `m/u` stay below defaults at equal prior (supervised 93.8% vs untrained 97.9% in §8.1; EM optimum 96.8% vs 100% on the small duplicate-bearing set) by over-weighting partial matches.
+1. **Prior coupling (dominant):** EM's *free* prior (0.0071 vs 0.0001) shifted scores up -> mass false positives in earlier data. **Pin the prior and EM becomes the best variant** on the 100k duplicate benchmark (97.85% F1, 100% precision/specificity).
+2. **The residual shrinks with realistic data:** supervised still trails untrained in 8.1 (95.6% vs 97.6%) at the inherited prior/threshold, but EM at the default prior now wins on the duplicate-bearing set -- the residual is data- and prior-dependent.
 
 > EM training generates candidate pairs by exact-equality blocking on two keys: `first_name` and `date_of_birth` (`block_on("first_name")`, `block_on("date_of_birth")`).
 
@@ -276,9 +276,9 @@ Store     : add / update / delete / save / load (no re-embed on load)
 
 # Scorecard to remember
 
-- Confusion matrix (5k refs / 15k queries): **F1 99.45%**, recall 99.40%, precision 99.51%.
-- Same-set blocking recall: **99.46%** @k=20 (Section 7's different query set: 99.88%; compact 99.95%).
-- **~7.5 ms/query amortized batched** (embed + block + one Splink run); online per-query path is slower (~0.9 s incl. per-query Linker construction).
+- Confusion matrix (5k refs / 15k queries): **F1 99.31%**, recall 98.86%, precision 99.77%.
+- Same-set blocking recall: **98.89%** @k=20 (Section 7's query set: 99.75%; compact 99.88%).
+- **~7.5 ms/query amortized batched** (embed + block + one Splink run); **cold per-query online path median ~0.4 s on a quiet run** (per-query Linker construction ~0.17 s + predict ~0.19 s; can exceed ~1 s under load).
 - NC-voter (real schema, synthetic mutations): **F1 92–94%**; blocking is the binding constraint at the default `k=20` (Splink becomes binding at `k=100`).
 
 > Baseline engineering numbers — config, hardware, and data shape all move them.

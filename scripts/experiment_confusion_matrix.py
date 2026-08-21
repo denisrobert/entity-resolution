@@ -20,7 +20,7 @@ import pandas as pd
 import splink
 from splink import Linker, block_on
 
-from common import classify, load_records, make_non_identical_close_person
+from common import classify, identity_collisions, load_records, make_non_identical_close_person, environment_block
 from entity_pipeline import default_comparisons, weaken_comparison
 from generate_data import Person, generate_people
 from vector_store import build_person_store
@@ -32,6 +32,41 @@ DEFAULT_BLOCKING_K = 20
 DEFAULT_THRESHOLD = 0.85
 DEFAULT_CLOSE_VARIATION_RATE = 0.15
 
+def decode_matched_positions(
+    predictions: pd.DataFrame,
+    queries: list,
+) -> tuple:
+    """Map each query to its best (max-probability) matched candidate position.
+
+    Returns ``(matched_query_ids, best_position)`` where ``best_position[query_id]``
+    is the reference-index of the highest-probability candidate Splink matched to
+    that query. A positive query counts as a true positive only if it is matched
+    to its *own* reference row; matching any other row is not a hit. Candidate ids
+    are ``C_{query_index}_{candidate_index}``, so the trailing field is the
+    reference position.
+    """
+    best_prob = {}
+    best_position = {}
+    for _, row in predictions.iterrows():
+        prob = float(row["match_probability"])
+        for candidate_field in ("unique_id_l", "unique_id_r"):
+            val = row[candidate_field]
+            if not isinstance(val, str) or not val.startswith("C_"):
+                continue
+            try:
+                _, q_index_s, cand_pos_s = val.split("_")
+                q_index = int(q_index_s)
+                cand_pos = int(cand_pos_s)
+            except (ValueError, IndexError):
+                continue
+            if not (0 <= q_index < len(queries)):
+                continue
+            query_id = queries[q_index][0]
+            if prob > best_prob.get(query_id, -1.0):
+                best_prob[query_id] = prob
+                best_position[query_id] = cand_pos
+    return set(best_prob), best_position
+
 
 def predict_batch(
     queries: list[tuple[str, Person]],
@@ -39,8 +74,13 @@ def predict_batch(
     blocking_k: int,
     threshold: float,
     address_strength: float = 1.0,
-) -> set[str]:
-    """Run FAISS blocking and one batched Splink prediction for all queries."""
+) -> tuple[set[str], dict[str, int], np.ndarray]:
+    """Run FAISS blocking and one batched Splink prediction for all queries.
+
+    Returns ``(matched_query_ids, candidate_indices)`` where
+    ``candidate_indices[i]`` is the (row-major) neighbour index array for query
+    ``i``, so callers can measure blocking recall on the same query set.
+    """
     comparisons = default_comparisons()
     if address_strength < 1.0:
         comparisons = [*comparisons[:4], weaken_comparison(comparisons[4], strength=address_strength)]
@@ -91,9 +131,8 @@ def predict_batch(
     predictions = linker.inference.predict(
         threshold_match_probability=threshold
     ).as_pandas_dataframe()
-    matched_query_ids = set(predictions["unique_id_l"])
-    matched_query_ids.update(predictions["unique_id_r"])
-    return {query_id for query_id, _ in queries if query_id in matched_query_ids}
+    matched, best_position = decode_matched_positions(predictions, queries)
+    return matched, best_position, candidate_indices
 
 
 def run_test(
@@ -143,7 +182,7 @@ def run_test(
 
     print(f"Running batched FAISS blocking and Splink scoring for {total_queries:,} queries...")
     start = time.perf_counter()
-    matched_query_ids = predict_batch(
+    matched_query_ids, best_position, candidate_indices = predict_batch(
         [(query_id, query) for query_id, _, query, _ in test_cases],
         store,
         blocking_k,
@@ -152,11 +191,48 @@ def run_test(
     )
     query_seconds = time.perf_counter() - start
 
-    for query_id, category, _, expected_match in test_cases:
-        result = {} if query_id in matched_query_ids else None
-        cell = classify(expected_match, result)
+    # Strict classification: a positive (identical/close) query is a true
+    # positive only when Splink matched it to its OWN reference row. Matching any
+    # other row is not a hit and counts as FN. Unrelated queries are FP if matched
+    # to anything (any match is spurious).
+
+    for query_index, (query_id, category, _, expected_match) in enumerate(test_cases):
+        if not expected_match:
+            result = {} if query_id in matched_query_ids else None
+            cell = classify(expected_match, result)
+        else:
+            ref_pos = query_index // 3
+            matched_correct_row = best_position.get(query_id) == ref_pos
+            cell = 'TP' if matched_correct_row else 'FN'
         matrix[cell] += 1
         category_counts[category][cell] += 1
+
+
+    # Blocking recall measured on the *same* query set and index: a positive
+    # (identical / close) query is "blocked" if its true reference position is
+    # among the top-k neighbours, independent of the Splink decision.
+    blocking = {
+        "k": blocking_k,
+        "by_category": {"identical": {"blocked": 0, "positives": 0, "recall": 0.0},
+                        "close_same_entity": {"blocked": 0, "positives": 0, "recall": 0.0}},
+        "blocked_in_but_rejected": {"identical": 0, "close_same_entity": 0},
+    }
+    for query_index, (query_id, category, person, expected_match) in enumerate(test_cases):
+        if category not in blocking["by_category"]:
+            continue  # only positive categories contribute to blocking recall
+        ref_pos = query_index // 3  # identical/close share the base index of the row
+        blocked = ref_pos in candidate_indices[query_index][:blocking_k]
+        cat = blocking["by_category"][category]
+        cat["positives"] += 1
+        if blocked:
+            cat["blocked"] += 1
+            if query_id not in matched_query_ids:
+                blocking["blocked_in_but_rejected"][category] += 1
+    for cat in blocking["by_category"].values():
+        cat["recall"] = cat["blocked"] / cat["positives"] if cat["positives"] else 0.0
+    pos_blocked = blocking["by_category"]["identical"]["blocked"] + blocking["by_category"]["close_same_entity"]["blocked"]
+    pos_total = blocking["by_category"]["identical"]["positives"] + blocking["by_category"]["close_same_entity"]["positives"]
+    blocking["overall_recall"] = pos_blocked / pos_total if pos_total else 0.0
 
     positive_total = matrix["TP"] + matrix["FN"]
     negative_total = matrix["TN"] + matrix["FP"]
@@ -190,7 +266,14 @@ def run_test(
         },
         "confusion_matrix": matrix,
         "by_category": category_counts,
+        "blocking_recall": blocking,
+        "identity_collisions": {
+            "count": len(identity_collisions(test_cases)),
+            "note": "unrelated queries sharing first/last name and date of birth "
+                    "with their reference record (hard negatives)",
+        },
         "metrics": metrics,
+        "environment": environment_block(),
     }
 
 
@@ -230,3 +313,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+
+
