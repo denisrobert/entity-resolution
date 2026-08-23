@@ -1,0 +1,62 @@
+{
+  "metadata": {
+    "model": [
+      "sentence-transformers/all-MiniLM-L6-v2"
+    ],
+    "views": [
+      "full",
+      "identity",
+      "contact",
+      "multi_union"
+    ],
+    "k_values": [
+      1,
+      5,
+      10,
+      20
+    ],
+    "base_records": 8000,
+    "queries": 160,
+    "missing_rate": 0.3,
+    "close_variation_rate": 0.15,
+    "seed": 42
+  },
+  "table": {
+    "sentence-transformers/all-MiniLM-L6-v2|full": {
+      "k": {
+        "1": 0.9375,
+        "5": 0.9875,
+        "10": 0.9938,
+        "20": 0.9938
+      },
+      "avg_ms_query": 22.358
+    },
+    "sentence-transformers/all-MiniLM-L6-v2|identity": {
+      "k": {
+        "1": 0.4062,
+        "5": 0.6813,
+        "10": 0.75,
+        "20": 0.85
+      },
+      "avg_ms_query": 16.85
+    },
+    "sentence-transformers/all-MiniLM-L6-v2|contact": {
+      "k": {
+        "1": 0.8688,
+        "5": 0.8688,
+        "10": 0.8688,
+        "20": 0.8688
+      },
+      "avg_ms_query": 17.306
+    },
+    "sentence-transformers/all-MiniLM-L6-v2|multi_union": {
+      "k": {
+        "1": 0.9187,
+        "5": 0.9688,
+        "10": 0.975,
+        "20": 0.9812
+      },
+      "avg_ms_query": 35.252
+    }
+  }
+}

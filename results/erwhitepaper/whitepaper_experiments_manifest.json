@@ -1,0 +1,346 @@
+{
+  "generated_by": "whitepaper-experiments.py",
+  "generated_at": "2026-08-21T17:54:44",
+  "experiments": [
+    {
+      "name": "generate_index",
+      "description": "Build the persisted 50,000-record FAISS index (precedent for the data-dependent experiments)",
+      "command": [
+        "C:\\src\\books\\llm-playbooks\\.venv\\Scripts\\python.exe",
+        "C:\\src\\experiments\\entity\\scripts\\generate_data.py",
+        "--count",
+        "50000",
+        "--missing-rate",
+        "0.3",
+        "--output-dir",
+        "data"
+      ],
+      "outputs": [
+        "data/people.faiss",
+        "data/people.json"
+      ],
+      "status": "ok",
+      "elapsed_seconds": 383.6
+    },
+    {
+      "name": "confusion_matrix",
+      "description": "Headline confusion matrix: 5,000 reference rows x 3 queries = 15,000 queries at tau=0.85, k=20",
+      "command": [
+        "C:\\src\\books\\llm-playbooks\\.venv\\Scripts\\python.exe",
+        "C:\\src\\experiments\\entity\\scripts\\experiment_confusion_matrix.py",
+        "--count",
+        "5000",
+        "--seed",
+        "42",
+        "--output",
+        "results/erwhitepaper/confusion_matrix_results.json"
+      ],
+      "outputs": [
+        "results/erwhitepaper/confusion_matrix_results.json"
+      ],
+      "status": "ok",
+      "elapsed_seconds": 330.5
+    },
+    {
+      "name": "mu_calibration",
+      "description": "Supervised m/u calibration on the persisted 50k index (entity-disjoint, 6,000 queries)",
+      "command": [
+        "C:\\src\\books\\llm-playbooks\\.venv\\Scripts\\python.exe",
+        "C:\\src\\experiments\\entity\\scripts\\experiment_mu_calibration.py",
+        "--index-dir",
+        "data",
+        "--query-count",
+        "2000",
+        "--train-method",
+        "supervised",
+        "--output",
+        "results/erwhitepaper/mu_calibration_results.json"
+      ],
+      "outputs": [
+        "results/erwhitepaper/mu_calibration_results.json"
+      ],
+      "status": "ok",
+      "elapsed_seconds": 333.6
+    },
+    {
+      "name": "duplicate_benchmark",
+      "description": "100k-record duplicate-bearing benchmark (3% twins, 3,000 queries, three m/u schemes)",
+      "command": [
+        "C:\\src\\books\\llm-playbooks\\.venv\\Scripts\\python.exe",
+        "C:\\src\\experiments\\entity\\scripts\\experiment_duplicate_benchmark.py",
+        "--base-count",
+        "100000",
+        "--match-rate",
+        "0.03",
+        "--output",
+        "results/erwhitepaper/training_results.json"
+      ],
+      "outputs": [
+        "results/erwhitepaper/training_results.json"
+      ],
+      "status": "ok",
+      "elapsed_seconds": 1181.9
+    },
+    {
+      "name": "f1_sweep",
+      "description": "Decision-threshold x address-weight sweep on the 5,000/c15,000-query confusion population",
+      "command": [
+        "C:\\src\\books\\llm-playbooks\\.venv\\Scripts\\python.exe",
+        "C:\\src\\experiments\\entity\\scripts\\experiment_f1_sweep.py",
+        "--count",
+        "5000",
+        "--seed",
+        "42",
+        "--output",
+        "results/erwhitepaper/f1_sweep_results.json"
+      ],
+      "outputs": [
+        "results/erwhitepaper/f1_sweep_results.json"
+      ],
+      "status": "ok",
+      "elapsed_seconds": 803.7
+    },
+    {
+      "name": "mu_tau_interaction",
+      "description": "Calibration-robustness (m/u variants x tau) on the duplicate-bearing population",
+      "command": [
+        "C:\\src\\books\\llm-playbooks\\.venv\\Scripts\\python.exe",
+        "C:\\src\\experiments\\entity\\scripts\\experiment_mu_tau_interaction.py",
+        "--base-count",
+        "5000",
+        "--match-rate",
+        "0.03",
+        "--output",
+        "results/erwhitepaper/mu_tau_interaction.json"
+      ],
+      "outputs": [
+        "results/erwhitepaper/mu_tau_interaction.json"
+      ],
+      "status": "ok",
+      "elapsed_seconds": 71.0
+    },
+    {
+      "name": "mu_prior_tau_surface",
+      "description": "Joint prior x threshold F1 surface for untrained vs EM m/u",
+      "command": [
+        "C:\\src\\books\\llm-playbooks\\.venv\\Scripts\\python.exe",
+        "C:\\src\\experiments\\entity\\scripts\\experiment_mu_prior_tau_surface.py",
+        "--base-count",
+        "5000",
+        "--match-rate",
+        "0.03",
+        "--output",
+        "results/erwhitepaper/mu_prior_tau_surface.json"
+      ],
+      "outputs": [
+        "results/erwhitepaper/mu_prior_tau_surface.json"
+      ],
+      "status": "ok",
+      "elapsed_seconds": 87.0
+    },
+    {
+      "name": "online_latency",
+      "description": "Cold online resolver per-query latency on the persisted 50k index (30 queries, breakdown)",
+      "command": [
+        "C:\\src\\books\\llm-playbooks\\.venv\\Scripts\\python.exe",
+        "C:\\src\\experiments\\entity\\scripts\\experiment_online_latency.py",
+        "--index-dir",
+        "data",
+        "--query-count",
+        "30",
+        "--breakdown",
+        "--output",
+        "results/erwhitepaper/online_resolver_latency.json"
+      ],
+      "outputs": [
+        "results/erwhitepaper/online_resolver_latency.json"
+      ],
+      "status": "ok",
+      "elapsed_seconds": 22.5
+    },
+    {
+      "name": "section7_eval",
+      "description": "Measured Section 7 benchmark: row-serialization ablations (default/identity_first/compact) over 5,000 records",
+      "command": [
+        "C:\\src\\books\\llm-playbooks\\.venv\\Scripts\\python.exe",
+        "C:\\src\\experiments\\entity\\scripts\\experiment_section7_eval.py",
+        "--count",
+        "5000",
+        "--seed",
+        "42",
+        "--output",
+        "results/erwhitepaper/section7_results.json",
+        "--csv-output",
+        "results/erwhitepaper/section7_metrics.csv"
+      ],
+      "outputs": [
+        "results/erwhitepaper/section7_results.json",
+        "results/erwhitepaper/section7_metrics.csv"
+      ],
+      "status": "ok",
+      "elapsed_seconds": 1571.8
+    },
+    {
+      "name": "section7_repeated",
+      "description": "Repeated-seed aggregation of the serialization result (seeds 42..46)",
+      "command": [
+        "C:\\src\\books\\llm-playbooks\\.venv\\Scripts\\python.exe",
+        "C:\\src\\experiments\\entity\\scripts\\experiment_section7_repeated.py",
+        "--count",
+        "1500",
+        "--seeds",
+        "42",
+        "43",
+        "44",
+        "45",
+        "46",
+        "--output",
+        "results/erwhitepaper/section7_repeated_results.json"
+      ],
+      "outputs": [
+        "results/erwhitepaper/section7_repeated_results.json"
+      ],
+      "status": "ok",
+      "elapsed_seconds": 2413.9
+    },
+    {
+      "name": "temporal_gap",
+      "description": "Temporal-decay stress test: 6,000-record index, 180 duplicate pairs, gap cohorts and views incl. gap_weighted",
+      "command": [
+        "C:\\src\\books\\llm-playbooks\\.venv\\Scripts\\python.exe",
+        "C:\\src\\experiments\\entity\\scripts\\experiment_temporal_gap.py",
+        "--base-count",
+        "6000",
+        "--match-rate",
+        "0.03",
+        "--linkage",
+        "--output",
+        "results/erwhitepaper/temporal_gap_results.json"
+      ],
+      "outputs": [
+        "results/erwhitepaper/temporal_gap_results.json"
+      ],
+      "status": "ok",
+      "elapsed_seconds": 359.3
+    },
+    {
+      "name": "ncvoter_resolution_k20",
+      "description": "NC-voter mutated-duplicate resolution at k=20",
+      "command": [
+        "C:\\src\\books\\llm-playbooks\\.venv\\Scripts\\python.exe",
+        "C:\\src\\experiments\\entity\\scripts\\ncvoter\\experiment_resolution.py",
+        "--sample",
+        "datasets/ncvoter/sample_5000.csv",
+        "--in-index",
+        "3000",
+        "--pos-queries",
+        "1500",
+        "--neg-queries",
+        "1500",
+        "--k",
+        "20",
+        "--output",
+        "results/erwhitepaper/ncvoter/results_resolution.json"
+      ],
+      "outputs": [
+        "results/erwhitepaper/ncvoter/results_resolution.json"
+      ],
+      "status": "ok",
+      "elapsed_seconds": 116.7
+    },
+    {
+      "name": "ncvoter_resolution_k50",
+      "description": "NC-voter resolution at k=50",
+      "command": [
+        "C:\\src\\books\\llm-playbooks\\.venv\\Scripts\\python.exe",
+        "C:\\src\\experiments\\entity\\scripts\\ncvoter\\experiment_resolution.py",
+        "--sample",
+        "datasets/ncvoter/sample_5000.csv",
+        "--in-index",
+        "3000",
+        "--pos-queries",
+        "1500",
+        "--neg-queries",
+        "1500",
+        "--k",
+        "50",
+        "--output",
+        "results/erwhitepaper/ncvoter/results_resolution_k50.json"
+      ],
+      "outputs": [
+        "results/erwhitepaper/ncvoter/results_resolution_k50.json"
+      ],
+      "status": "ok",
+      "elapsed_seconds": 113.9
+    },
+    {
+      "name": "ncvoter_resolution_k100",
+      "description": "NC-voter resolution at k=100",
+      "command": [
+        "C:\\src\\books\\llm-playbooks\\.venv\\Scripts\\python.exe",
+        "C:\\src\\experiments\\entity\\scripts\\ncvoter\\experiment_resolution.py",
+        "--sample",
+        "datasets/ncvoter/sample_5000.csv",
+        "--in-index",
+        "3000",
+        "--pos-queries",
+        "1500",
+        "--neg-queries",
+        "1500",
+        "--k",
+        "100",
+        "--output",
+        "results/erwhitepaper/ncvoter/results_resolution_k100.json"
+      ],
+      "outputs": [
+        "results/erwhitepaper/ncvoter/results_resolution_k100.json"
+      ],
+      "status": "ok",
+      "elapsed_seconds": 115.7
+    },
+    {
+      "name": "ncvoter_blocking_recall",
+      "description": "NC-voter blocking recall across k=5..100 on 1,000 mutated queries",
+      "command": [
+        "C:\\src\\books\\llm-playbooks\\.venv\\Scripts\\python.exe",
+        "C:\\src\\experiments\\entity\\scripts\\ncvoter\\experiment_blocking_recall.py",
+        "--sample",
+        "datasets/ncvoter/sample_5000.csv",
+        "--query-count",
+        "1000",
+        "--mutation-seed",
+        "7",
+        "--output",
+        "results/erwhitepaper/ncvoter/results_blocking_recall.json"
+      ],
+      "outputs": [
+        "results/erwhitepaper/ncvoter/results_blocking_recall.json"
+      ],
+      "status": "ok",
+      "elapsed_seconds": 65.8
+    },
+    {
+      "name": "ncvoter_f1_sweep",
+      "description": "NC-voter threshold/address sweep (full-strength vs weakened 0.8)",
+      "command": [
+        "C:\\src\\books\\llm-playbooks\\.venv\\Scripts\\python.exe",
+        "C:\\src\\experiments\\entity\\scripts\\ncvoter\\experiment_f1_sweep.py",
+        "--sample",
+        "datasets/ncvoter/sample_5000.csv",
+        "--in-index",
+        "3000",
+        "--pos-queries",
+        "1500",
+        "--neg-queries",
+        "1500",
+        "--output",
+        "results/erwhitepaper/ncvoter/results_f1_sweep.json"
+      ],
+      "outputs": [
+        "results/erwhitepaper/ncvoter/results_f1_sweep.json"
+      ],
+      "status": "ok",
+      "elapsed_seconds": 93.7
+    }
+  ]
+}

@@ -32,10 +32,16 @@ Query person -> MiniLM embedding -> FAISS top-k blocking -> Splink matching
 ## Installation
 
 ```bash
-pip install -r requirements.txt
+# Python 3.13.x, pinned exactly by requires-python in pyproject.toml.
+pip install -e .
+# Optional: example REST service deps, or the Splink RFC-decay extension
+pip install -e ".[rest]"        # fastapi/uvicorn/pydantic for examples/rest_service
+pip install -e ".[rfc-decay]"   # pinned SplinkRFCDecay extension (optional decay experiments)
 ```
 
-Run commands from the repository root. Python 3.10 or newer is required.
+Run commands from the repository root. All Python dependencies and the
+interpreters' minor version (3.13) are pinned exactly in `pyproject.toml`
+(which replaces the former `requirements.txt`).
 
 ## Usage
 
@@ -70,6 +76,49 @@ python scripts/experiment_section7_eval.py --count 5000 --ablation-count 500 \
 python scripts/experiment_mu_calibration.py --index-dir data --query-count 2000 \
   --output mu_calibration_results.json
 ```
+
+## Reproduce all whitepaper experiments
+
+`whitepaper-experiments.py` re-runs the full experiment suite reported in the
+whitepaper (the artifacts referenced as `results/erwhitepaper/*.json` in
+`.docs/entity_resolution_whitepaper.tex`). Each entry runs with the exact CLI
+above; the registry is the single place to update when a script or its
+parameters change.
+
+```bash
+# Preview the suite (16 experiments across the whitepaper sections)
+python whitepaper-experiments.py --list
+python whitepaper-experiments.py --list-sections
+
+# Dry-run the exact commands
+python whitepaper-experiments.py --dry-run
+
+# Run everything (paper scale; requires the persisted `data/` index and the
+# NC-voter sample `datasets/ncvoter/sample_5000.csv`; many hours)
+python whitepaper-experiments.py
+
+# Run a subset / section, or a quick smoke validation
+python whitepaper-experiments.py --only confusion_matrix,temporal_gap
+python whitepaper-experiments.py --by-section calibration
+python whitepaper-experiments.py --smoke    # small counts, verifies plumbing
+
+# NOTE: --smoke writes to the same artifact paths as full runs (the registry's
+# canonical --output values), so it overwrites paper-scale artifacts with
+# small-count results. Use --dry-run first, or run smoke in a scratch checkout,
+# if you need to preserve the canonical results/erwhitepaper/*.json files.
+```
+
+Every run writes a manifest (`results/erwhitepaper/whitepaper_experiments_manifest.json`)
+recording each experiment's status, exact command, elapsed time, and output
+artifact paths.
+
+**Results convention:** all whitepaper experiment *results* live under
+`results/erwhitepaper/`. The driver validates this before running and refuses to
+start if any result output would land elsewhere; the experiment scripts'
+`--output`/`--csv-output` defaults are also set to `results/erwhitepaper/**`, so
+running a script directly (without the driver) still writes there. The only
+non-result artifacts are data prerequisites (e.g. the persisted FAISS index in
+`data/`) and input samples (`datasets/`).
 
 
 The Section 7 evaluator reports blocking recall at `k=10,20,50,100`, threshold
@@ -221,12 +270,29 @@ Two self-contained example projects search a persisted index (defaulting to
   ```
 - **REST service** — `examples/rest_service/` (FastAPI):
   ```bash
-  pip install -r requirements.txt fastapi "uvicorn[standard]" pydantic
+  pip install -e ".[rest]"
   python examples/rest_service/app.py
   curl -s http://127.0.0.1:8000/health
   ```
   `POST /search` accepts a JSON person body (plus optional `k`/`threshold`) and
   returns ranked matches with probabilities.
+- **OpenVINO on-device embedding** — optional Intel-accelerated embedding for
+  the same model (no PyTorch inference):
+  ```bash
+  pip install -e ".[openvino]"
+  python test_openvino_gpu.py --device GPU
+  ```
+  `test_openvino_gpu.py` reports the OpenVINO version, the devices OpenVINO sees,
+  per-device 384-d embed timing, and a cosine sanity check. Note:
+  sentence-transformers 5.6's `backend="openvino"` has a bug where the container
+  passes the OpenVINO device string ("GPU") to a torch `nn.Module.to()`; the
+  probe works around it by constructing with `device="cpu"` and then moving the
+  OpenVINO sub-model to the requested device.
+- **OpenVINO dependency note** — `optimum-intel` caps
+  `transformers < 5.6`, `huggingface-hub < 1.22`, `safetensors < 0.8.0`, so the
+  base pins for those three are the OpenVINO-compatible exact versions
+  (5.5.4 / 1.21.0 / 0.7.0). The embedding model itself is revision-pinned
+  (`model_pins.py`), so results are unaffected.
 
 Each has its own `README.md` with full usage.
 
@@ -234,11 +300,15 @@ Each has its own `README.md` with full usage.
 
 This section gives a reviewer everything needed to re-run every experiment
 reported in `.docs/entity_resolution_whitepaper.pdf`. Run all commands from the
-repository root after `pip install -r requirements.txt`. Every experiment script
+repository root after `pip install -e .`. Every experiment script
 supports `--help`; the defaults reproduce the numbers reported in the paper.
 
 The embedding model (`sentence-transformers/all-MiniLM-L6-v2`) is downloaded
 from Hugging Face on first use; set `HF_HOME`/`HF_TOKEN` if you run offline. The
+**revision is pinned** to commit `1110a243fdf4706b3f48f1d95db1a4f5529b4d41`
+(see `model_pins.py`): every embedding construction passes `revision=` to the
+model loader, so re-runs embed with the exact snapshot used for the reported
+results regardless of later model uploads. The
 **synthetic** experiments are fully self-contained and deterministic by seed
 (default 42). Only the NC Voter replication requires downloading an external
 export first (see below).
@@ -248,6 +318,7 @@ export first (see below).
 | Paper section | Script | Command |
 |---|---|---|
 | §7 benchmark suite | `scripts/experiment_section7_eval.py` | `python scripts/experiment_section7_eval.py --count 5000 --ablation-count 500 --output results/erwhitepaper/section7_results.json --csv-output results/erwhitepaper/section7_metrics.csv` |
+| Blocking recall under clerical perturbations | `scripts/experiment_recall_perturbed.py` | `python scripts/experiment_recall_perturbed.py --index-dir data --per-kind 500 --k 20 --output results/erwhitepaper/recall_perturbed_results.json` |
 | §8 confusion matrix | `scripts/experiment_confusion_matrix.py` | `python scripts/experiment_confusion_matrix.py --count 5000 --output results/erwhitepaper/confusion_matrix_results.json` (add `--address-strength 0.8` for the weakened-address run) |
 | §8.1 m/u (supervised/EM vs untrained) | `scripts/experiment_mu_calibration.py` | `python scripts/experiment_mu_calibration.py --index-dir data --query-count 2000 --output results/erwhitepaper/mu_calibration_results.json` |
 | §8.2 duplicate-bearing benchmark | `scripts/experiment_duplicate_benchmark.py` | `python scripts/experiment_duplicate_benchmark.py --base-count 100000 --match-rate 0.03 --output results/erwhitepaper/training_results.json` |

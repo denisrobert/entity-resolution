@@ -32,8 +32,9 @@ from splink import Linker, block_on  # noqa: E402
 from scorer import SplinkScorer  # noqa: E402
 from entity_pipeline import Blocker, default_comparisons  # noqa: E402
 from generate_data import Person, generate_people, introduce_variations  # noqa: E402
+from model_pins import EMBEDDING_MODEL_ID
 
-DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_MODEL = EMBEDDING_MODEL_ID
 DEFAULT_MISSING_RATE = 0.3
 DEFAULT_BLOCKING_K = 20
 DEFAULT_THRESHOLD = 0.85
@@ -167,6 +168,73 @@ def build_case_queries(
     return cases
 
 
+def perturbed_case_tuples(
+    people: Sequence[Person],
+    count: int,
+    seed: int,
+    close_variation_rate: float,
+    include_identical: bool = True,
+    include_close: bool = True,
+) -> list[tuple[str, str, Any, bool, int]]:
+    """Option B deck: identical + all six clerical perturbations + close + unrelated.
+
+    Returns 5-tuples ``(query_id, category, person, expected_match, ref_index)``
+    so downstream scoring can attribute a hit/block to the exact reference row
+    without assuming a fixed queries-per-row layout. A positive query is emitted
+    for every :class:`person_perturbation.Perturbation` kind whose required
+    fields the base record actually carries (e.g. a record with no email has no
+    ``typo_email`` query); kinds whose target is absent are skipped rather than
+    producing an unchanged no-op positive. The ``close`` fallback of the old
+    deck is retained (from ``introduce_variations``) so the harder perturbed
+    deck can still be compared to the pre-perturbation protocol.
+    """
+    from person_perturbation import PersonPerturbator, Perturbation
+
+    perturber = PersonPerturbator(seed=seed)
+    unrelated = generate_people(count, missing_rate=DEFAULT_MISSING_RATE, seed=seed + 1)
+    required = {
+        Perturbation.INITIAL_FIRST_NAME: ("first_name",),
+        Perturbation.TYPO_IDENTITY: ("first_name", "last_name", "date_of_birth"),
+        Perturbation.TYPO_ADDRESS: ("address",),
+        Perturbation.DENORMALIZE_ADDRESS: ("address",),
+        Perturbation.TYPO_EMAIL: ("email",),
+        Perturbation.MISSING_OPTIONAL: ("address", "email"),
+    }
+    cases: list[tuple[str, str, Any, bool, int]] = []
+    for index in range(count):
+        person = people[index]
+        if include_identical:
+            cases.append((f"Q_{index}_identical", "identical", person, True, index))
+        for kind in Perturbation:
+            if not any(getattr(person, field, None) for field in required[kind]):
+                continue
+            try:
+                _, perturbed = perturber.perturb_different(person, kind)
+            except ValueError:
+                continue
+            if perturbed.to_dict() == person.to_dict():
+                continue
+            cases.append((f"Q_{index}_{kind.value}", kind.value, perturbed, True, index))
+        if include_close:
+            close = make_non_identical_close_person(person, close_variation_rate)
+            cases.append((f"Q_{index}_close", "close_same_entity", close, True, index))
+        cases.append((f"Q_{index}_unrelated", "unrelated", unrelated[index], False, index))
+    return cases
+
+
+def _case_reduced(case: tuple) -> tuple[str, str, Any, bool]:
+    """Return ``(query_id, category, person, expected)`` from 4- or 5-tuple cases."""
+    if len(case) >= 4:
+        return case[0], case[1], case[2], case[3]
+    raise ValueError(f"cannot reduce case tuple of length {len(case)}: {case!r}")
+
+
+def unpack_case_identity(case: tuple) -> tuple[str, str, Person]:
+    """Return ``(query_id, category, person)`` from either a 4- or 5-tuple case."""
+    query_id, category, person, *_ = case
+    return query_id, category, person
+
+
 def identity_collisions(
     cases: list[tuple[str, str, Any, bool]],
 ) -> list[tuple[str, str, int]]:
@@ -181,13 +249,15 @@ def identity_collisions(
     """
     reference_by_key: dict[tuple[str, str, str], list[int]] = {}
     hits: list[tuple[str, str, int]] = []
-    for query_id, category, person, _ in cases:
+    for case in cases:
+        query_id, category, person = unpack_case_identity(case)
         if category != "unrelated":
             idx = int(query_id.split("_")[1]) if query_id.startswith("Q_") else -1
             if idx >= 0:
                 key = (person.first_name, person.last_name, person.date_of_birth)
                 reference_by_key.setdefault(key, []).append(idx)
-    for query_id, category, person, _ in cases:
+    for case in cases:
+        query_id, category, person = unpack_case_identity(case)
         if category == "unrelated":
             key = (person.first_name, person.last_name, person.date_of_birth)
             for idx in reference_by_key.get(key, []):
@@ -204,11 +274,17 @@ def build_labelled_pairs(
     """Build labelled match/non-match pairs for supervised m/u calibration.
 
     For each of the first ``rows`` reference people this emits: an identical
-    pair (match), a close-variant pair (match), and a cross-pair to an unrelated
-    person (non-match). Columns are ``<field>_l``/``<field>_r`` per comparison
-    field plus ``is_match``.
+    pair (match), a close-variant pair (match), one match pair for every
+    clerical perturbation the record supports (``PersonPerturbator`` kinds), and
+    a cross-pair to an unrelated person (non-match) --- so the calibration
+    labels exercise exactly the noise types the evaluation deck now injects.
+    Columns are ``<field>_l``/``<field>_r`` per comparison field plus
+    ``is_match``.
     """
+    from person_perturbation import PersonPerturbator, Perturbation
+
     random.seed(seed)
+    perturber = PersonPerturbator(seed=seed)
     unrelated = generate_people(rows, missing_rate=DEFAULT_MISSING_RATE, seed=seed + 2)
     records: list[tuple[Any, Any, int]] = []
     for index in range(rows):
@@ -216,6 +292,14 @@ def build_labelled_pairs(
         close = make_non_identical_close_person(person, close_variation_rate)
         records.append((person, person, 1))
         records.append((person, close, 1))
+        for kind in Perturbation:
+            try:
+                _, perturbed = perturber.perturb_different(person, kind)
+            except ValueError:
+                continue
+            if perturbed.to_dict() == person.to_dict():
+                continue
+            records.append((person, perturbed, 1))
         records.append((person, unrelated[index], 0))
     output = []
     for left, right, label in records:
@@ -290,6 +374,7 @@ def score_batch(
     settings: dict[str, Any],
     threshold: float,
     return_best: bool = False,
+    base_records: Optional[list[dict[str, Any]]] = None,
 ) -> set[str] | tuple[set[str], dict[str, int]]:
     """Score a batch of (query, candidate) pairs and return matched query ids.
 
@@ -310,6 +395,7 @@ def score_batch(
         settings,
         threshold=threshold,
         fallback_comparisons=default_comparisons(),
+        base_records=base_records,
     )
     from collections import defaultdict
 
@@ -379,17 +465,18 @@ def classify(expected_match: bool, result: dict[str, Any] | None) -> str:
 
 
 def confusion_matrix(
-    cases: list[tuple[str, str, Any, bool]],
+    cases: list[tuple],
     matched_query_ids: set[str],
 ) -> Tuple[dict[str, int], dict[str, int], dict[str, float]]:
     matrix = {"TP": 0, "FN": 0, "FP": 0, "TN": 0}
+    categories = _case_categories(cases)
     by_category: dict[str, dict[str, int]] = {
-        "identical": {"TP": 0, "FN": 0},
-        "close_same_entity": {"TP": 0, "FN": 0},
-        "unrelated": {"FP": 0, "TN": 0},
+        cat: {"TP": 0, "FN": 0} if cat != "unrelated" else {"FP": 0, "TN": 0}
+        for cat in categories
     }
     total = len(cases)
-    for query_id, category, _, expected in cases:
+    for case in cases:
+        query_id, category, _, expected = _case_reduced(case)
         result = {} if query_id in matched_query_ids else None
         cell = classify(expected, result)
         matrix[cell] += 1
@@ -408,7 +495,7 @@ def confusion_matrix(
 
 
 def strict_confusion_matrix(
-    cases: list[tuple[str, str, Any, bool]],
+    cases: list,
     matched_query_ids: set[str],
     best_position: dict[str, int],
     true_position_of: dict[str, int],
@@ -422,19 +509,20 @@ def strict_confusion_matrix(
     enforce (it marks TP whenever the query matched *any* row).
     """
     matrix = {"TP": 0, "FN": 0, "FP": 0, "TN": 0}
+    categories = _case_categories(cases)
     by_category: dict[str, dict[str, int]] = {
-        "identical": {"TP": 0, "FN": 0},
-        "close_same_entity": {"TP": 0, "FN": 0},
-        "unrelated": {"FP": 0, "TN": 0},
+        cat: {"TP": 0, "FN": 0} if cat != "unrelated" else {"FP": 0, "TN": 0}
+        for cat in categories
     }
-    for query_id, category, _, expected in cases:
+    for case in cases:
+        query_id, category, _, expected = _case_reduced(case)
         if not expected:
             if query_id in matched_query_ids:
                 matrix["FP"] += 1
-                by_category.get(category, by_category["unrelated"])["FP"] += 1
+                by_category[category]["FP"] += 1
             else:
                 matrix["TN"] += 1
-                by_category.get(category, by_category["unrelated"])["TN"] += 1
+                by_category[category]["TN"] += 1
         else:
             correct = best_position.get(query_id) == true_position_of.get(query_id)
             if correct:
@@ -455,3 +543,13 @@ def strict_confusion_matrix(
         "f1": 2 * tp / (2 * tp + fp + fn) if 2 * tp + fp + fn else 0.0,
     }
     return matrix, by_category, metrics
+
+
+def _case_categories(cases) -> list[str]:
+    """The distinct categories across ``cases``, in first-appearance order."""
+    seen: list[str] = []
+    for case in cases:
+        query_id, category, _ = unpack_case_identity(case)
+        if category not in seen:
+            seen.append(category)
+    return seen

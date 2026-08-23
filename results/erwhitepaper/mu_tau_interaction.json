@@ -9,55 +9,55 @@
     "blocking_k": 20,
     "close_variation_rate": 0.15,
     "seed": 42,
-    "mu_prior_em": 0.007120082296523381,
+    "mu_prior_em": 0.007167382864426498,
     "untrained_prior": 0.0001
   },
   "timing": {
-    "index_build_seconds": 105.22218240000075,
-    "blocking_seconds": 20.413149300031364
+    "index_build_seconds": 51.89943549997406,
+    "blocking_seconds": 3.389545999991242
   },
   "variants": {
     "untrained": {
       "f1_by_tau": [
         {
           "tau": 0.5,
-          "accuracy": 0.9666666666666667,
-          "precision": 0.9375,
+          "accuracy": 0.9866666666666667,
+          "precision": 0.974025974025974,
           "recall": 1.0,
-          "specificity": 0.9333333333333333,
-          "f1": 0.967741935483871
+          "specificity": 0.9733333333333334,
+          "f1": 0.9868421052631579
         },
         {
           "tau": 0.7,
-          "accuracy": 0.9666666666666667,
-          "precision": 0.9375,
+          "accuracy": 0.9866666666666667,
+          "precision": 0.974025974025974,
           "recall": 1.0,
-          "specificity": 0.9333333333333333,
-          "f1": 0.967741935483871
+          "specificity": 0.9733333333333334,
+          "f1": 0.9868421052631579
         },
         {
           "tau": 0.8,
-          "accuracy": 0.98,
-          "precision": 0.9615384615384616,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.96,
-          "f1": 0.9803921568627451
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.85,
-          "accuracy": 0.9866666666666667,
-          "precision": 0.974025974025974,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.9733333333333334,
-          "f1": 0.9868421052631579
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.9,
-          "accuracy": 0.9866666666666667,
-          "precision": 0.974025974025974,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.9733333333333334,
-          "f1": 0.9868421052631579
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.95,
@@ -84,230 +84,230 @@
           "f1": 1.0
         }
       ],
-      "best_tau": 0.95,
+      "best_tau": 0.8,
       "best_f1": 1.0,
-      "mean_match_prob_pos": 1.0,
-      "mean_match_prob_neg": 0.0596,
-      "score_seconds": 1.0688062999979593
+      "mean_match_prob_pos": 0.9997,
+      "mean_match_prob_neg": 0.027,
+      "score_seconds": 1.6723839999758638
     },
     "supervised": {
       "f1_by_tau": [
         {
           "tau": 0.5,
-          "accuracy": 0.88,
-          "precision": 0.8064516129032258,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.76,
-          "f1": 0.8928571428571429
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.7,
-          "accuracy": 0.92,
-          "precision": 0.8620689655172413,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.84,
-          "f1": 0.9259259259259259
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.8,
-          "accuracy": 0.9266666666666666,
-          "precision": 0.872093023255814,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.8533333333333334,
-          "f1": 0.9316770186335404
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.85,
-          "accuracy": 0.9333333333333333,
-          "precision": 0.8823529411764706,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.8666666666666667,
-          "f1": 0.9375
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.9,
-          "accuracy": 0.9466666666666667,
-          "precision": 0.9036144578313253,
-          "recall": 1.0,
-          "specificity": 0.8933333333333333,
-          "f1": 0.9493670886075949
+          "accuracy": 0.9933333333333333,
+          "precision": 1.0,
+          "recall": 0.9866666666666667,
+          "specificity": 1.0,
+          "f1": 0.9932885906040269
         },
         {
           "tau": 0.95,
-          "accuracy": 0.9466666666666667,
-          "precision": 0.9036144578313253,
-          "recall": 1.0,
-          "specificity": 0.8933333333333333,
-          "f1": 0.9493670886075949
+          "accuracy": 0.9933333333333333,
+          "precision": 1.0,
+          "recall": 0.9866666666666667,
+          "specificity": 1.0,
+          "f1": 0.9932885906040269
         },
         {
           "tau": 0.98,
-          "accuracy": 0.96,
-          "precision": 0.9259259259259259,
-          "recall": 1.0,
-          "specificity": 0.92,
-          "f1": 0.9615384615384616
+          "accuracy": 0.98,
+          "precision": 1.0,
+          "recall": 0.96,
+          "specificity": 1.0,
+          "f1": 0.9795918367346939
         },
         {
           "tau": 0.99,
-          "accuracy": 0.96,
-          "precision": 0.9259259259259259,
-          "recall": 1.0,
-          "specificity": 0.92,
-          "f1": 0.9615384615384616
+          "accuracy": 0.98,
+          "precision": 1.0,
+          "recall": 0.96,
+          "specificity": 1.0,
+          "f1": 0.9795918367346939
         }
       ],
-      "best_tau": 0.98,
-      "best_f1": 0.9615384615384616,
-      "mean_match_prob_pos": 1.0,
-      "mean_match_prob_neg": 0.2861,
-      "score_seconds": 0.9554647000040859
+      "best_tau": 0.5,
+      "best_f1": 1.0,
+      "mean_match_prob_pos": 0.9971,
+      "mean_match_prob_neg": 0.0001,
+      "score_seconds": 1.5913978000171483
     },
     "em": {
       "f1_by_tau": [
         {
           "tau": 0.5,
-          "accuracy": 0.7466666666666667,
-          "precision": 0.6637168141592921,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.49333333333333335,
-          "f1": 0.7978723404255319
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.7,
-          "accuracy": 0.7533333333333333,
-          "precision": 0.6696428571428571,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.5066666666666667,
-          "f1": 0.8021390374331551
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.8,
-          "accuracy": 0.7533333333333333,
-          "precision": 0.6696428571428571,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.5066666666666667,
-          "f1": 0.8021390374331551
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.85,
-          "accuracy": 0.7533333333333333,
-          "precision": 0.6696428571428571,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.5066666666666667,
-          "f1": 0.8021390374331551
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.9,
-          "accuracy": 0.7533333333333333,
-          "precision": 0.6696428571428571,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.5066666666666667,
-          "f1": 0.8021390374331551
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.95,
-          "accuracy": 0.76,
-          "precision": 0.6756756756756757,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.52,
-          "f1": 0.8064516129032258
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.98,
-          "accuracy": 0.76,
-          "precision": 0.6756756756756757,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.52,
-          "f1": 0.8064516129032258
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.99,
-          "accuracy": 0.7733333333333333,
-          "precision": 0.6880733944954128,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.5466666666666666,
-          "f1": 0.8152173913043478
+          "specificity": 1.0,
+          "f1": 1.0
         }
       ],
-      "best_tau": 0.99,
-      "best_f1": 0.8152173913043478,
+      "best_tau": 0.5,
+      "best_f1": 1.0,
       "mean_match_prob_pos": 1.0,
-      "mean_match_prob_neg": 0.5951,
-      "score_seconds": 1.0341085999971256
+      "mean_match_prob_neg": 0.0006,
+      "score_seconds": 1.6904032000456937
     },
     "em_prior0001": {
       "f1_by_tau": [
         {
           "tau": 0.5,
-          "accuracy": 0.76,
-          "precision": 0.6756756756756757,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.52,
-          "f1": 0.8064516129032258
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.7,
-          "accuracy": 0.7933333333333333,
-          "precision": 0.7075471698113207,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.5866666666666667,
-          "f1": 0.8287292817679558
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.8,
-          "accuracy": 0.8933333333333333,
-          "precision": 0.8241758241758241,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.7866666666666666,
-          "f1": 0.9036144578313253
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.85,
-          "accuracy": 0.9,
-          "precision": 0.8333333333333334,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.8,
-          "f1": 0.9090909090909091
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.9,
-          "accuracy": 0.9466666666666667,
-          "precision": 0.9036144578313253,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.8933333333333333,
-          "f1": 0.9493670886075949
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.95,
-          "accuracy": 0.9533333333333334,
-          "precision": 0.9146341463414634,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.9066666666666666,
-          "f1": 0.9554140127388535
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.98,
-          "accuracy": 0.9666666666666667,
-          "precision": 0.9375,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.9333333333333333,
-          "f1": 0.967741935483871
+          "specificity": 1.0,
+          "f1": 1.0
         },
         {
           "tau": 0.99,
-          "accuracy": 0.9666666666666667,
-          "precision": 0.9375,
+          "accuracy": 1.0,
+          "precision": 1.0,
           "recall": 1.0,
-          "specificity": 0.9333333333333333,
-          "f1": 0.967741935483871
+          "specificity": 1.0,
+          "f1": 1.0
         }
       ],
-      "best_tau": 0.98,
-      "best_f1": 0.967741935483871,
-      "mean_match_prob_pos": 0.9999,
-      "mean_match_prob_neg": 0.3991,
-      "score_seconds": 0.9732549999607727
+      "best_tau": 0.5,
+      "best_f1": 1.0,
+      "mean_match_prob_pos": 1.0,
+      "mean_match_prob_neg": 0.0,
+      "score_seconds": 1.4226447000401095
     }
   }
 }

@@ -3,7 +3,7 @@
     "reference_records": 50000,
     "query_rows": 2000,
     "queries_per_row": 3,
-    "total_queries": 6000,
+    "total_queries": 15996,
     "missing_rate": 0.3,
     "model_name": "sentence-transformers/all-MiniLM-L6-v2",
     "blocking_k": 20,
@@ -24,12 +24,12 @@
     }
   },
   "timing": {
-    "load_seconds": 10.297632700006943,
-    "training_seconds": 4.52482739998959,
-    "blocking_seconds": 149.22510799998417,
+    "load_seconds": 14.167640500003472,
+    "training_seconds": 9.256091799936257,
+    "blocking_seconds": 517.386767799966,
     "query_total_ms": {
-      "untrained": 48875.11630001245,
-      "trained": 48407.13230002439
+      "untrained": 1000327.9767000349,
+      "trained": 193380.58450003155
     }
   },
   "m_u": {
@@ -41,37 +41,168 @@
   "variants": {
     "untrained": {
       "confusion_matrix": {
-        "TP": 3875,
-        "FN": 125,
-        "FP": 62,
-        "TN": 1938
+        "TP": 13519,
+        "FN": 477,
+        "FP": 60,
+        "TN": 1940
       },
       "by_category": {
         "identical": {
           "TP": 2000,
           "FN": 0
         },
+        "initial_first_name": {
+          "TP": 1757,
+          "FN": 243
+        },
+        "typo_identity": {
+          "TP": 1948,
+          "FN": 52
+        },
+        "typo_address": {
+          "TP": 1403,
+          "FN": 0
+        },
+        "denormalize_address": {
+          "TP": 1403,
+          "FN": 0
+        },
+        "typo_email": {
+          "TP": 1378,
+          "FN": 0
+        },
+        "missing_optional": {
+          "TP": 1757,
+          "FN": 55
+        },
         "close_same_entity": {
-          "TP": 1875,
-          "FN": 125
+          "TP": 1873,
+          "FN": 127
         },
         "unrelated": {
-          "FP": 62,
-          "TN": 1938
+          "FP": 60,
+          "TN": 1940
+        }
+      },
+      "category_metrics": {
+        "identical": {
+          "counts": {
+            "TP": 2000,
+            "FN": 0
+          },
+          "queries": 2000,
+          "TP": 2000,
+          "FN": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "initial_first_name": {
+          "counts": {
+            "TP": 1757,
+            "FN": 243
+          },
+          "queries": 2000,
+          "TP": 1757,
+          "FN": 243,
+          "precision": 1.0,
+          "recall": 0.8785,
+          "f1": 0.9353207346286931
+        },
+        "typo_identity": {
+          "counts": {
+            "TP": 1948,
+            "FN": 52
+          },
+          "queries": 2000,
+          "TP": 1948,
+          "FN": 52,
+          "precision": 1.0,
+          "recall": 0.974,
+          "f1": 0.9868287740628167
+        },
+        "typo_address": {
+          "counts": {
+            "TP": 1403,
+            "FN": 0
+          },
+          "queries": 1403,
+          "TP": 1403,
+          "FN": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "denormalize_address": {
+          "counts": {
+            "TP": 1403,
+            "FN": 0
+          },
+          "queries": 1403,
+          "TP": 1403,
+          "FN": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "typo_email": {
+          "counts": {
+            "TP": 1378,
+            "FN": 0
+          },
+          "queries": 1378,
+          "TP": 1378,
+          "FN": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "missing_optional": {
+          "counts": {
+            "TP": 1757,
+            "FN": 55
+          },
+          "queries": 1812,
+          "TP": 1757,
+          "FN": 55,
+          "precision": 1.0,
+          "recall": 0.9696467991169978,
+          "f1": 0.9845895208741945
+        },
+        "close_same_entity": {
+          "counts": {
+            "TP": 1873,
+            "FN": 127
+          },
+          "queries": 2000,
+          "TP": 1873,
+          "FN": 127,
+          "precision": 1.0,
+          "recall": 0.9365,
+          "f1": 0.9672088820036148
+        },
+        "unrelated": {
+          "counts": {
+            "FP": 60,
+            "TN": 1940
+          },
+          "queries": 2000,
+          "FP": 60,
+          "TN": 1940
         }
       },
       "metrics": {
-        "accuracy": 0.9688333333333333,
-        "precision": 0.984251968503937,
-        "recall": 0.96875,
-        "specificity": 0.969,
-        "f1": 0.9764394607534332
+        "accuracy": 0.9664291072768192,
+        "precision": 0.9955814124751454,
+        "recall": 0.9659188339525578,
+        "specificity": 0.97,
+        "f1": 0.9805258386219402
       }
     },
     "trained": {
       "confusion_matrix": {
-        "TP": 3877,
-        "FN": 123,
+        "TP": 13661,
+        "FN": 335,
         "FP": 0,
         "TN": 2000
       },
@@ -80,21 +211,152 @@
           "TP": 2000,
           "FN": 0
         },
+        "initial_first_name": {
+          "TP": 1931,
+          "FN": 69
+        },
+        "typo_identity": {
+          "TP": 1915,
+          "FN": 85
+        },
+        "typo_address": {
+          "TP": 1403,
+          "FN": 0
+        },
+        "denormalize_address": {
+          "TP": 1403,
+          "FN": 0
+        },
+        "typo_email": {
+          "TP": 1378,
+          "FN": 0
+        },
+        "missing_optional": {
+          "TP": 1757,
+          "FN": 55
+        },
         "close_same_entity": {
-          "TP": 1877,
-          "FN": 123
+          "TP": 1874,
+          "FN": 126
         },
         "unrelated": {
           "FP": 0,
           "TN": 2000
         }
       },
+      "category_metrics": {
+        "identical": {
+          "counts": {
+            "TP": 2000,
+            "FN": 0
+          },
+          "queries": 2000,
+          "TP": 2000,
+          "FN": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "initial_first_name": {
+          "counts": {
+            "TP": 1931,
+            "FN": 69
+          },
+          "queries": 2000,
+          "TP": 1931,
+          "FN": 69,
+          "precision": 1.0,
+          "recall": 0.9655,
+          "f1": 0.9824472144492495
+        },
+        "typo_identity": {
+          "counts": {
+            "TP": 1915,
+            "FN": 85
+          },
+          "queries": 2000,
+          "TP": 1915,
+          "FN": 85,
+          "precision": 1.0,
+          "recall": 0.9575,
+          "f1": 0.9782886334610472
+        },
+        "typo_address": {
+          "counts": {
+            "TP": 1403,
+            "FN": 0
+          },
+          "queries": 1403,
+          "TP": 1403,
+          "FN": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "denormalize_address": {
+          "counts": {
+            "TP": 1403,
+            "FN": 0
+          },
+          "queries": 1403,
+          "TP": 1403,
+          "FN": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "typo_email": {
+          "counts": {
+            "TP": 1378,
+            "FN": 0
+          },
+          "queries": 1378,
+          "TP": 1378,
+          "FN": 0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "f1": 1.0
+        },
+        "missing_optional": {
+          "counts": {
+            "TP": 1757,
+            "FN": 55
+          },
+          "queries": 1812,
+          "TP": 1757,
+          "FN": 55,
+          "precision": 1.0,
+          "recall": 0.9696467991169978,
+          "f1": 0.9845895208741945
+        },
+        "close_same_entity": {
+          "counts": {
+            "TP": 1874,
+            "FN": 126
+          },
+          "queries": 2000,
+          "TP": 1874,
+          "FN": 126,
+          "precision": 1.0,
+          "recall": 0.937,
+          "f1": 0.9674754775425917
+        },
+        "unrelated": {
+          "counts": {
+            "FP": 0,
+            "TN": 2000
+          },
+          "queries": 2000,
+          "FP": 0,
+          "TN": 2000
+        }
+      },
       "metrics": {
-        "accuracy": 0.9795,
+        "accuracy": 0.979057264316079,
         "precision": 1.0,
-        "recall": 0.96925,
+        "recall": 0.9760645898828236,
         "specificity": 1.0,
-        "f1": 0.984384918116034
+        "f1": 0.987887334128792
       }
     }
   },

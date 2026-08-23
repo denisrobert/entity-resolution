@@ -3,7 +3,7 @@
     "model": "sentence-transformers/all-MiniLM-L6-v2",
     "gap": "all",
     "residency_years": 10,
-    "base_records": 4000,
+    "base_records": 6000,
     "match_rate": 0.03,
     "missing_rate": 0.3,
     "k_values": [
@@ -24,7 +24,7 @@
     "two_tier_cutoff": "address if gap<=10 else identity",
     "linkage": true,
     "linkage_threshold": 0.85,
-    "experiment": "python scripts/experiment_temporal_gap.py --base-count 4000 --match-rate 0.03 --gap all --k 1 5 10 20 --views full identity contact gap_weighted two_tier --seed 42",
+    "experiment": "python scripts/experiment_temporal_gap.py --base-count 6000 --match-rate 0.03 --gap all --k 1 5 10 20 --views full identity contact gap_weighted two_tier --seed 42",
     "environment": {
       "python": "3.13.1",
       "platform": "Windows-11-10.0.26200-SP0",
@@ -43,16 +43,16 @@
   "blocking_recall": {
     "full": {
       "k": {
-        "1": 0.9667,
-        "5": 1.0,
+        "1": 0.9611,
+        "5": 0.9944,
         "10": 1.0,
         "20": 1.0
       },
       "recall_by_cohort": {
         "short": 1.0,
-        "long": 0.9333
+        "long": 0.9222
       },
-      "avg_ms_query": 31.23
+      "avg_ms_query": 20.426
     },
     "identity": {
       "k": {
@@ -65,93 +65,93 @@
         "short": 1.0,
         "long": 1.0
       },
-      "avg_ms_query": 21.894
+      "avg_ms_query": 17.32
     },
     "contact": {
       "k": {
-        "1": 0.5583,
-        "5": 0.5667,
-        "10": 0.5917,
-        "20": 0.6
+        "1": 0.65,
+        "5": 0.65,
+        "10": 0.65,
+        "20": 0.65
       },
       "recall_by_cohort": {
-        "short": 0.9,
-        "long": 0.2167
+        "short": 0.9667,
+        "long": 0.3333
       },
-      "avg_ms_query": 21.586
+      "avg_ms_query": 15.245
     },
     "gap_weighted": {
       "k": {
-        "1": 0.9083,
+        "1": 0.9611,
         "5": 1.0,
         "10": 1.0,
         "20": 1.0
       },
       "recall_by_cohort": {
-        "short": 0.85,
-        "long": 0.9667
+        "short": 0.9333,
+        "long": 0.9889
       },
-      "avg_ms_query": 37.614
+      "avg_ms_query": 29.163
     },
     "two_tier": {
       "k": {
-        "1": 0.8917,
-        "5": 0.8917,
-        "10": 0.8917,
-        "20": 0.8917
+        "1": 0.8889,
+        "5": 0.8889,
+        "10": 0.8889,
+        "20": 0.8889
       },
       "recall_by_cohort": {
-        "short": 0.7833,
+        "short": 0.7778,
         "long": 1.0
       },
-      "avg_ms_query": 47.377
+      "avg_ms_query": 31.13
     }
   },
   "linkage_f1": {
     "full": {
-      "tp": 116,
+      "tp": 173,
       "fp": 0,
-      "fn": 4,
-      "tn": 120,
+      "fn": 7,
+      "tn": 180,
       "precision": 1.0,
-      "recall": 0.9667,
-      "f1": 0.9831
+      "recall": 0.9611,
+      "f1": 0.9802
     },
     "identity": {
-      "tp": 120,
-      "fp": 1,
+      "tp": 180,
+      "fp": 2,
       "fn": 0,
-      "tn": 119,
-      "precision": 0.9917,
+      "tn": 178,
+      "precision": 0.989,
       "recall": 1.0,
-      "f1": 0.9959
+      "f1": 0.9945
     },
     "contact": {
-      "tp": 67,
+      "tp": 117,
       "fp": 0,
-      "fn": 53,
-      "tn": 120,
+      "fn": 63,
+      "tn": 180,
       "precision": 1.0,
-      "recall": 0.5583,
-      "f1": 0.7166
+      "recall": 0.65,
+      "f1": 0.7879
     },
     "gap_weighted": {
-      "tp": 109,
+      "tp": 173,
       "fp": 1,
-      "fn": 11,
-      "tn": 119,
-      "precision": 0.9909,
-      "recall": 0.9083,
-      "f1": 0.9478
+      "fn": 7,
+      "tn": 179,
+      "precision": 0.9943,
+      "recall": 0.9611,
+      "f1": 0.9774
     },
     "two_tier": {
-      "tp": 107,
+      "tp": 160,
       "fp": 1,
-      "fn": 13,
-      "tn": 119,
-      "precision": 0.9907,
-      "recall": 0.8917,
-      "f1": 0.9386
+      "fn": 20,
+      "tn": 179,
+      "precision": 0.9938,
+      "recall": 0.8889,
+      "f1": 0.9384
     }
   }
 }

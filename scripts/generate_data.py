@@ -221,6 +221,7 @@ def introduce_variations(person: Person, variation_rate: float = 0.1) -> Person:
 if __name__ == '__main__':
     import argparse
     from vector_store import build_person_store
+    from model_pins import EMBEDDING_MODEL_ID
 
     parser = argparse.ArgumentParser(
         description="Generate people and persist their FAISS index."
@@ -230,7 +231,7 @@ if __name__ == '__main__':
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--model",
-        default="sentence-transformers/all-MiniLM-L6-v2",
+        default=EMBEDDING_MODEL_ID,
     )
     parser.add_argument("--output-dir", default="data")
     args = parser.parse_args()

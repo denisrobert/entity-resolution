@@ -35,7 +35,13 @@ from splink import block_on
 from scorer import DEFAULT_THRESHOLD as SCORER_DEFAULT_TAU
 from scorer import SplinkScorer, WeightTable, UNTRAINED_PRIOR as SCORER_UNTR_PRIOR
 
-DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+from model_pins import (
+    EMBEDDING_MODEL_ID,
+    EMBEDDING_MODEL_REVISION,
+    embedding_model_kwargs,
+)
+
+DEFAULT_MODEL = EMBEDDING_MODEL_ID
 DEFAULT_K = 20
 DEFAULT_TAU = 0.85
 
@@ -188,13 +194,26 @@ class PersistableVectorDatabase(VectorDatabase[T], abc.ABC):
 
 
 class HuggingFaceEmbeddingModel(EmbeddingModel):
-    """Embedding model backed by sentence-transformers via Hugging Face."""
+    """Embedding model backed by sentence-transformers via Hugging Face.
 
-    def __init__(self, model_name: str = DEFAULT_MODEL) -> None:
+    The model revision is pinned to ``EMBEDDING_MODEL_REVISION`` so every run
+    embeds with the exact weights used for the reported results.
+    """
+
+    def __init__(
+        self,
+        model_name: str = DEFAULT_MODEL,
+        model_revision: Optional[str] = EMBEDDING_MODEL_REVISION,
+    ) -> None:
         from langchain_huggingface import HuggingFaceEmbeddings
 
         self.model_name = model_name
-        self._embedder = HuggingFaceEmbeddings(model_name=model_name)
+        self._embedder = HuggingFaceEmbeddings(
+            model_name=model_name,
+            model_kwargs=embedding_model_kwargs(
+                {"revision": model_revision} if model_revision else None
+            ),
+        )
 
     def embed(self, text: str) -> Vector:
         return list(self._embedder.embed_query(text))
@@ -515,11 +534,15 @@ class Linker:
         tau: float = DEFAULT_TAU,
         blocking_k: int = DEFAULT_K,
         extra_settings: Optional[dict] = None,
+        base_records: Optional[Sequence[dict]] = None,
     ) -> None:
         self.comparisons = list(comparisons)
         self.tau = float(tau)
         self.blocking_k = int(blocking_k)
         self.extra_settings = dict(extra_settings or {})
+        # Reference population as dicts; enables term-frequency adjustments in
+        # the scorer for TF-adjusted comparison levels (e.g. email exact match).
+        self._base_records = list(base_records) if base_records is not None else None
         # Trained Splink model (settings dict with fitted m/u and prior). When
         # set, link() uses these parameters instead of the untrained defaults.
         self._trained_settings: Optional[dict] = None
@@ -549,10 +572,12 @@ class Linker:
                 settings,
                 threshold=tau,
                 fallback_comparisons=self.comparisons,
+                base_records=self._base_records,
             )
         elif self._trained_settings is None and self._scorer is None:
             self._scorer = SplinkScorer.from_comparisons(
-                self.comparisons, prior=SCORER_UNTR_PRIOR, threshold=tau
+                self.comparisons, prior=SCORER_UNTR_PRIOR, threshold=tau,
+                base_records=self._base_records,
             )
         return self._scorer
 

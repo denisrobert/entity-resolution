@@ -23,6 +23,7 @@ mapping is identical by construction and the scorer can be validated against
 
 from __future__ import annotations
 
+import collections
 from typing import Any, Optional, Sequence
 
 import numpy as np
@@ -32,9 +33,25 @@ DEFAULT_THRESHOLD = 0.85
 
 
 class LevelSpec:
-    """One comparison level: Splink's exact sql condition + m/u."""
+    """One comparison level: Splink's exact sql condition + m/u + (optional) TF.
 
-    __slots__ = ("sql_condition", "m", "u", "is_null", "is_else")
+    When a level carries a term-frequency adjustment (Splink's
+    ``tf_adjustment_column``), the exact-match ``u`` is replaced by
+    ``(u_exact / max(tf_l, tf_r))^w`` so that a rare exact value (low tf) is much
+    stronger evidence than the plain ``m/u`` and a common one is discounted.
+    """
+
+    __slots__ = (
+        "sql_condition",
+        "m",
+        "u",
+        "is_null",
+        "is_else",
+        "tf_column",
+        "tf_weight",
+        "tf_min_u",
+        "u_exact",
+    )
 
     def __init__(
         self,
@@ -42,10 +59,17 @@ class LevelSpec:
         m: Optional[float],
         u: Optional[float],
         is_null: bool,
+        tf_column: Optional[str] = None,
+        tf_weight: float = 1.0,
+        tf_min_u: float = 0.0,
     ) -> None:
         self.sql_condition = sql_condition.strip()
         self.is_null = bool(is_null)
         self.is_else = self.sql_condition.upper() == "ELSE"
+        self.tf_column = tf_column
+        self.tf_weight = float(tf_weight)
+        self.tf_min_u = float(tf_min_u)
+        self.u_exact = None
         if self.is_null:
             self.m = self.u = None
         else:
@@ -53,7 +77,10 @@ class LevelSpec:
             self.u = u
 
     def bayes_factor(self) -> float:
-        """Splink's per-level BF: m/u for agreement, 1 for null levels."""
+        """Splink's per-level BF: m/u for agreement, 1 for null levels.
+
+        For a TF-adjusted exact-match level the *plain* BF is still ``m/u``; the
+        TF multiplier is separate (see :meth:`tf_bayes_factor_expr`). """
         if self.is_null:
             return 1.0
         if self.u in (None, 0.0):
@@ -103,6 +130,58 @@ def _m_or_u(level: Any, key: str) -> Optional[float]:
     return float(value)
 
 
+def _tf_value(level: Any, key: str):
+    """Read a TF attribute (tf_adjustment_column/weight/minimum_u), handling
+    both ComparisonLevel objects and resolved level dicts. Returns None where
+    absent."""
+    try:
+        if isinstance(level, dict):
+            return level.get(key)
+        v = getattr(level, key, None)
+        # boolean for has_tf adjustment
+        return v
+    except Exception:
+        return None
+
+
+def _extract_tf_spec(level: Any) -> tuple[Optional[str], float, float]:
+    """Return ``(tf_column, tf_weight, tf_min_u)`` for ``level``.
+
+    Splink stores TF metadata on the exact-match level under
+    ``_tf_adjustment_column`` / ``_tf_adjustment_weight`` /
+    ``_tf_minimum_u_value``; resolved settings dicts carry the same keys without
+    the leading underscore.
+    """
+    col = None
+    for attr in ("_tf_adjustment_column", "tf_adjustment_column"):
+        v = _tf_value(level, attr)
+        if v is not None:
+            # InputColumn object -> its input_name; or plain str/dict key
+            col = getattr(v, "input_name", v)
+            if isinstance(col, str) and col.startswith(("__", "_")):
+                col = None
+            break
+    weight = 1.0
+    for attr in ("_tf_adjustment_weight", "tf_adjustment_weight"):
+        v = _tf_value(level, attr)
+        if v is not None:
+            try:
+                weight = float(v)
+            except (TypeError, ValueError):
+                pass
+            break
+    min_u = 0.0
+    for attr in ("_tf_minimum_u_value", "tf_minimum_u_value"):
+        v = _tf_value(level, attr)
+        if v is not None:
+            try:
+                min_u = float(v)
+            except (TypeError, ValueError):
+                pass
+            break
+    return col, weight, min_u
+
+
 class WeightTable:
     """Per-field ordered level specs built from Splink comparisons or settings.
 
@@ -116,17 +195,31 @@ class WeightTable:
         self,
         comparisons: Sequence[Any],
         prior: float = UNTRAINED_PRIOR,
+        base_records: Optional[Sequence[dict]] = None,
     ) -> None:
+        """Build the weight table.
+
+        ``base_records`` is the reference population as a list of record dicts
+        (``Person.to_dict()`` or similar). It is used to compute per-value term
+        frequencies for any TF-adjusted comparison level, matching Splink's
+        ``count(value) / count(non-null)``. When ``None`` and a level carries TF
+        adjustments, the TF multiplier degrades to a neutral ``1.0`` (matching
+        Splink's behaviour when the tf table is missing) and a warning is logged.
+        """
         self.prior = float(prior)
         self.fields: list[str] = []
         self.specs: dict[str, list[LevelSpec]] = {}
         self.case_exprs: dict[str, str] = {}
+        self.tf_mult_exprs: dict[str, Optional[str]] = {}
+        self._tf_tables: Optional[dict[str, Any]] = None
+        self._tf_cols: set[str] = set()
         for comparison in comparisons:
             name, levels = self._extract(comparison)
             specs = [self._make_spec(level) for level in levels]
             self.fields.append(name)
             self.specs[name] = specs
             self.case_exprs[name] = self._build_case(specs)
+            self.tf_mult_exprs[name] = self._build_tf_mult(specs, base_records)
 
     @staticmethod
     def _is_null(level: Any) -> bool:
@@ -153,11 +246,15 @@ class WeightTable:
 
     @classmethod
     def _make_spec(cls, level: Any) -> LevelSpec:
+        tf_col, tf_weight, tf_min_u = _extract_tf_spec(level)
         return LevelSpec(
             cls._sql(level),
             _m_or_u(level, "m_probability"),
             _m_or_u(level, "u_probability"),
             cls._is_null(level),
+            tf_column=tf_col,
+            tf_weight=tf_weight,
+            tf_min_u=tf_min_u,
         )
 
     @staticmethod
@@ -172,6 +269,104 @@ class WeightTable:
         if isinstance(level, dict):
             return str(level["sql_condition"])
         return str(level.sql_condition)
+
+    def _build_tf_mult(
+        self,
+        specs: list[LevelSpec],
+        base_records: Optional[Sequence[dict]],
+    ) -> Optional[str]:
+        """Build the term-frequency multiplier SQL for one comparison.
+
+        Returns ``None`` when no level of this comparison has TF adjustments.
+        Otherwise emits a single ``CASE`` that, when the *exact-match* level is
+        active and both side's tf values are available, evaluates Splink's
+        ``POW(u_exact / MAX(tf_l, tf_r), weight)``; all other levels -> 1.
+
+        The ``tf`` lookup values are computed from ``base_records`` exactly as
+        Splink does: ``count(value) / count(non-null)`` per field value, cached
+        in the WeightTable and registered as DuckDB tables reused across queries.
+        When ``base_records`` is None, no lookup is available and the multiplier
+        is ``1.0`` for every level (Splink's own fallback when a tf table is
+        absent for the column).
+        """
+        tf_specs = [s for s in specs if s.tf_column is not None and not s.is_null]
+        if not tf_specs:
+            return None
+        spec = tf_specs[0]
+        col = spec.tf_column
+
+        if base_records is None:
+            # No population to estimate the tf -> neutral multiplier (Splink's
+            # behaviour when a user passes no tf table).
+            return None
+
+        # Build tf tables keyed by field name; store on the table for reuse.
+        if self._tf_tables is None:
+            self._tf_tables = {}
+        if col not in self._tf_tables:
+            import pandas as pd
+
+            values = [r.get(col) for r in base_records if r.get(col) is not None]
+            if not values:
+                self._tf_tables[col] = None
+            else:
+                total = len(values)
+                counts: dict[str, int] = collections.Counter(values)
+                frame = pd.DataFrame(
+                    [
+                        {"value": v, "tf": c / total}
+                        for v, c in counts.items()
+                    ]
+                )
+                frame["value"] = frame["value"].astype("string")
+                self._tf_tables[col] = frame
+
+        tf_table = self._tf_tables.get(col)
+        if tf_table is None:
+            return None
+
+        self._tf_cols.add(col)
+
+        # The exact-match u (Splink's u_probability_corresponding_to_exact_match).
+        u_exact = spec.u
+        if u_exact is None:
+            return None
+        weight = spec.tf_weight
+
+        # Multiplier only applies to the exact-match level's sql condition.
+        exact_cond = spec.sql_condition
+
+        # The pair-frame columns holding each side's value for this field.
+        left_col = f"{col}_l"
+        right_col = f"{col}_r"
+        subq = (
+            f"(SELECT tf FROM _tf_{col} WHERE value = {{c}})"
+        )
+        subq_l = subq.format(c=left_col)
+        subq_r = subq.format(c=right_col)
+        coalesce_l = f"coalesce({subq_l}, {subq_r})"
+        coalesce_r = f"coalesce({subq_r}, {subq_l})"
+
+        exists = f"({subq_l}) IS NOT NULL AND ({subq_r}) IS NOT NULL"
+
+        if spec.tf_min_u == 0.0:
+            divisor = (
+                f"(CASE WHEN {coalesce_l} >= {coalesce_r} "
+                f"THEN {coalesce_l} "
+                f"ELSE {coalesce_r} END)"
+            )
+        else:
+            divisor = (
+                f"(CASE WHEN {coalesce_l} >= {coalesce_r} "
+                f"AND {coalesce_l} > {float(spec.tf_min_u)!r} THEN {coalesce_l} "
+                f"WHEN {coalesce_r} > {float(spec.tf_min_u)!r} THEN {coalesce_r} "
+                f"ELSE {float(spec.tf_min_u)!r} END)"
+            )
+
+        return (
+            f"CASE WHEN ({exact_cond}) AND {exists} "
+            f"THEN POW(cast({u_exact!r} as float8)/{divisor}, {weight!r}) ELSE 1.0 END"
+        )
 
     @staticmethod
     def _build_case(specs: list[LevelSpec]) -> str:
@@ -241,13 +436,23 @@ class SplinkScorer:
         self._prior_bf = (
             table.prior / (1.0 - table.prior) if table.prior != 1.0 else float("inf")
         )
-        self._select = (
-            "SELECT "
-            + ", ".join(
-                f"{expr} AS {name}" for name, expr in table.case_exprs.items()
-            )
-            + " FROM _pairs"
-        )
+        select_cols = []
+        for name in table.fields:
+            select_cols.append(f"{table.case_exprs[name]} AS {name}")
+            tf_expr = table.tf_mult_exprs.get(name)
+            if tf_expr is not None:
+                select_cols.append(f"{tf_expr} AS {name}_tf")
+        self._select = "SELECT " + ", ".join(select_cols) + " FROM _pairs"
+
+        # Register the per-field TF lookup tables for the connection.
+        for col in table._tf_cols:
+            tf_table = table._tf_tables.get(col)
+            if tf_table is None:
+                continue
+            try:
+                self._con.register(f"_tf_{col}", tf_table)
+            except Exception:
+                pass
 
     @classmethod
     def from_comparisons(
@@ -255,9 +460,17 @@ class SplinkScorer:
         comparisons: Sequence[Any],
         prior: float = UNTRAINED_PRIOR,
         threshold: float = DEFAULT_THRESHOLD,
+        base_records: Optional[Sequence[dict]] = None,
     ) -> "SplinkScorer":
-        """Build from Splink comparison objects (untrained/default m/u)."""
-        return cls(WeightTable(comparisons, prior=prior), threshold=threshold)
+        """Build from Splink comparison objects (untrained/default m/u).
+
+        ``base_records`` (reference population dicts) enables term-frequency
+        adjustments; without it any TF-adjusted level scores neutrally.
+        """
+        return cls(
+            WeightTable(comparisons, prior=prior, base_records=base_records),
+            threshold=threshold,
+        )
 
     @classmethod
     def from_settings(
@@ -265,6 +478,7 @@ class SplinkScorer:
         settings: dict,
         threshold: float = DEFAULT_THRESHOLD,
         fallback_comparisons: Optional[Sequence[Any]] = None,
+        base_records: Optional[Sequence[dict]] = None,
     ) -> "SplinkScorer":
         """Build from a resolved Splink settings dict (trained m/u).
 
@@ -273,12 +487,18 @@ class SplinkScorer:
         ``probability_two_random_records_match``. When a level carries no
         trained m/u and ``fallback_comparisons`` is supplied, default m/u are
         substituted so untrained/default comparisons still score.
+
+        ``base_records`` (reference population dicts) enables term-frequency
+        adjustments; without it any TF-adjusted level scores neutrally.
         """
         comparisons = settings.get("comparisons") or []
         prior = settings.get("probability_two_random_records_match", UNTRAINED_PRIOR)
         if fallback_comparisons is not None:
             comparisons = _merge_defaults(comparisons, fallback_comparisons)
-        return cls(WeightTable(comparisons, prior=prior), threshold=threshold)
+        return cls(
+            WeightTable(comparisons, prior=prior, base_records=base_records),
+            threshold=threshold,
+        )
 
     def score(self, left: dict, right: dict) -> float:
         """Return the match probability for one (query, candidate) pair."""
@@ -304,7 +524,11 @@ class SplinkScorer:
             self._con.unregister("_pairs")
         total = np.ones(len(bf), dtype="float64")
         for name in self.table.fields:
-            total *= bf[name].to_numpy(dtype="float64")
+            values = bf[name].to_numpy(dtype="float64")
+            total *= values
+            tf_mult = self.table.tf_mult_exprs.get(name)
+            if tf_mult is not None:
+                total *= bf[name + "_tf"].to_numpy(dtype="float64")
         combined = np.clip(self._prior_bf * total, 1e-300, 1e300)
         return bf, combined
 

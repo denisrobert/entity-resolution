@@ -135,7 +135,7 @@ def main() -> None:
     parser.add_argument("--close-variation-rate", type=float, default=0.15)
     parser.add_argument("--breakdown", action="store_true",
                         help="also record embedding / FAISS blocking / scorer phase times")
-    parser.add_argument("--output", default="online_resolver_latency.json")
+    parser.add_argument("--output", default="results/erwhitepaper/online_resolver_latency.json")
     args = parser.parse_args()
 
     store = FaissPersonStore.load(args.index_dir)
@@ -164,6 +164,7 @@ def main() -> None:
         "latency": stats,
         "environment": environment_block(),
     }
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(json.dumps(stats, indent=2))
     print(f"Saved results to {args.output}")

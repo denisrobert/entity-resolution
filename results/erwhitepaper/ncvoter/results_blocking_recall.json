@@ -5,9 +5,7 @@
     "blocking_k": [
       5,
       10,
-      20,
-      50,
-      100
+      20
     ],
     "model": "all-MiniLM-L6-v2",
     "data": "ncvoter (real) + synthetic mutations",
@@ -15,14 +13,12 @@
     "sample": "datasets\\ncvoter\\sample_5000.csv"
   },
   "timing": {
-    "index_build_seconds": 212.3328726000036,
-    "query_seconds": 129.83351100000436
+    "index_build_seconds": 45.537163999979384,
+    "query_seconds": 17.846718800021335
   },
   "recall_at_k": {
     "5": 0.826,
     "10": 0.856,
-    "20": 0.88,
-    "50": 0.909,
-    "100": 0.926
+    "20": 0.88
   }
 }

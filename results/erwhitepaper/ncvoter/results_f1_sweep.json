@@ -18,8 +18,8 @@
     "mutation_seed": 7
   },
   "timing": {
-    "index_build_seconds": 166.7091113999777,
-    "blocking_seconds": 333.6057922000182
+    "index_build_seconds": 32.438124100037385,
+    "blocking_seconds": 53.80364360002568
   },
   "grid": [
     {
@@ -38,7 +38,7 @@
         "specificity": 0.9106666666666666,
         "f1": 0.8937034529451591
       },
-      "score_seconds": 8.874256199982483
+      "score_seconds": 2.440971300005913
     },
     {
       "address_strength": 0.8,
@@ -56,7 +56,7 @@
         "specificity": 0.9106666666666666,
         "f1": 0.8738800827015851
       },
-      "score_seconds": 8.874256199982483
+      "score_seconds": 2.440971300005913
     },
     {
       "address_strength": 0.8,
@@ -74,7 +74,7 @@
         "specificity": 0.9106666666666666,
         "f1": 0.8738800827015851
       },
-      "score_seconds": 8.874256199982483
+      "score_seconds": 2.440971300005913
     },
     {
       "address_strength": 1.0,
@@ -92,7 +92,7 @@
         "specificity": 1.0,
         "f1": 0.9224137931034483
       },
-      "score_seconds": 8.572229899989907
+      "score_seconds": 2.5835057999938726
     },
     {
       "address_strength": 1.0,
@@ -110,7 +110,7 @@
         "specificity": 1.0,
         "f1": 0.88268156424581
       },
-      "score_seconds": 8.572229899989907
+      "score_seconds": 2.5835057999938726
     },
     {
       "address_strength": 1.0,
@@ -128,7 +128,7 @@
         "specificity": 1.0,
         "f1": 0.88268156424581
       },
-      "score_seconds": 8.572229899989907
+      "score_seconds": 2.5835057999938726
     }
   ],
   "best": {
@@ -147,6 +147,6 @@
       "specificity": 1.0,
       "f1": 0.9224137931034483
     },
-    "score_seconds": 8.572229899989907
+    "score_seconds": 2.5835057999938726
   }
 }

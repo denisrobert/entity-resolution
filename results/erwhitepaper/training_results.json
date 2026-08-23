@@ -4,8 +4,8 @@
     "match_rate": 0.03,
     "duplicate_pairs": 1500,
     "reference_records": 103000,
-    "total_queries": 3000,
-    "positive_queries": 1500,
+    "total_queries": 10545,
+    "positive_queries": 9045,
     "negative_queries": 1500,
     "missing_rate": 0.3,
     "model_name": "sentence-transformers/all-MiniLM-L6-v2",
@@ -18,16 +18,26 @@
       "train_match_fraction": 0.5,
       "train_pair_bases": 1500,
       "eval_query_bases": 1500,
+      "positive_kind": "perturbed",
+      "positive_by_category": {
+        "close": 1500,
+        "denormalize_address": 1061,
+        "initial_first_name": 1500,
+        "missing_optional": 1366,
+        "typo_address": 1061,
+        "typo_email": 1057,
+        "typo_identity": 1500
+      },
       "note": "supervised training pairs and positive evaluation queries are generated from disjoint base records"
     }
   },
   "timing": {
-    "dataset_seconds": 61.86359269998502,
-    "index_build_seconds": 829.2258718999801,
-    "blocking_seconds": 103.5463106999523,
-    "untrained_seconds": 1.5050762000028044,
-    "supervised_seconds": 1.523955599986948,
-    "em_seconds": 1.5723940000170842
+    "dataset_seconds": 55.91427820001263,
+    "index_build_seconds": 903.5395571000408,
+    "blocking_seconds": 391.0771911999909,
+    "untrained_seconds": 1087.0130185999442,
+    "supervised_seconds": 146.0337846999755,
+    "em_seconds": 1053.8791932000313
   },
   "m_u": {
     "em_prior": 0.007049670533273024,
@@ -37,71 +47,245 @@
   "variants": {
     "untrained": {
       "confusion_matrix": {
-        "TP": 1431,
-        "FN": 69,
-        "FP": 66,
-        "TN": 1434
+        "TP": 8692,
+        "FN": 353,
+        "FP": 64,
+        "TN": 1436
       },
       "metrics": {
-        "accuracy": 0.955,
-        "precision": 0.9559118236472945,
-        "recall": 0.954,
-        "specificity": 0.956,
-        "f1": 0.954954954954955
+        "accuracy": 0.9604551920341394,
+        "precision": 0.9926907263590681,
+        "recall": 0.9609729132117192,
+        "specificity": 0.9573333333333334,
+        "f1": 0.9765743497556317
+      },
+      "by_category": {
+        "close": {
+          "accuracy": 0.9446666666666667,
+          "precision": 1.0,
+          "recall": 0.9446666666666667,
+          "specificity": 0.0,
+          "f1": 0.9715461090161125
+        },
+        "denormalize_address": {
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "f1": 1.0
+        },
+        "initial_first_name": {
+          "accuracy": 0.8906666666666667,
+          "precision": 1.0,
+          "recall": 0.8906666666666667,
+          "specificity": 0.0,
+          "f1": 0.9421720733427362
+        },
+        "missing_optional": {
+          "accuracy": 0.9480234260614934,
+          "precision": 1.0,
+          "recall": 0.9480234260614934,
+          "specificity": 0.0,
+          "f1": 0.9733183013904547
+        },
+        "nonmatch": {
+          "accuracy": 0.9573333333333334,
+          "precision": 0.0,
+          "recall": 0.0,
+          "specificity": 0.9573333333333334,
+          "f1": 0.0
+        },
+        "typo_address": {
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "f1": 1.0
+        },
+        "typo_email": {
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "f1": 1.0
+        },
+        "typo_identity": {
+          "accuracy": 0.9766666666666667,
+          "precision": 1.0,
+          "recall": 0.9766666666666667,
+          "specificity": 0.0,
+          "f1": 0.9881956155143339
+        }
       }
     },
     "supervised": {
       "confusion_matrix": {
-        "TP": 1438,
-        "FN": 62,
-        "FP": 216,
-        "TN": 1284
-      },
-      "metrics": {
-        "accuracy": 0.9073333333333333,
-        "precision": 0.8694074969770254,
-        "recall": 0.9586666666666667,
-        "specificity": 0.856,
-        "f1": 0.911857958148383
-      }
-    },
-    "em": {
-      "confusion_matrix": {
-        "TP": 1437,
-        "FN": 63,
+        "TP": 8592,
+        "FN": 453,
         "FP": 0,
         "TN": 1500
       },
       "metrics": {
-        "accuracy": 0.979,
+        "accuracy": 0.9570412517780938,
         "precision": 1.0,
-        "recall": 0.958,
+        "recall": 0.9499170812603649,
         "specificity": 1.0,
-        "f1": 0.9785495403472931
+        "f1": 0.9743153597550603
+      },
+      "by_category": {
+        "close": {
+          "accuracy": 0.9473333333333334,
+          "precision": 1.0,
+          "recall": 0.9473333333333334,
+          "specificity": 0.0,
+          "f1": 0.9729544676480657
+        },
+        "denormalize_address": {
+          "accuracy": 0.9481621112158342,
+          "precision": 1.0,
+          "recall": 0.9481621112158342,
+          "specificity": 0.0,
+          "f1": 0.9733913884857281
+        },
+        "initial_first_name": {
+          "accuracy": 0.8906666666666667,
+          "precision": 1.0,
+          "recall": 0.8906666666666667,
+          "specificity": 0.0,
+          "f1": 0.9421720733427362
+        },
+        "missing_optional": {
+          "accuracy": 0.9480234260614934,
+          "precision": 1.0,
+          "recall": 0.9480234260614934,
+          "specificity": 0.0,
+          "f1": 0.9733183013904547
+        },
+        "nonmatch": {
+          "accuracy": 1.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "specificity": 1.0,
+          "f1": 0.0
+        },
+        "typo_address": {
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "f1": 1.0
+        },
+        "typo_email": {
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "f1": 1.0
+        },
+        "typo_identity": {
+          "accuracy": 0.944,
+          "precision": 1.0,
+          "recall": 0.944,
+          "specificity": 0.0,
+          "f1": 0.9711934156378601
+        }
+      }
+    },
+    "em": {
+      "confusion_matrix": {
+        "TP": 8160,
+        "FN": 885,
+        "FP": 0,
+        "TN": 1500
+      },
+      "metrics": {
+        "accuracy": 0.9160739687055477,
+        "precision": 1.0,
+        "recall": 0.9021558872305141,
+        "specificity": 1.0,
+        "f1": 0.948561464690497
+      },
+      "by_category": {
+        "close": {
+          "accuracy": 0.9493333333333334,
+          "precision": 1.0,
+          "recall": 0.9493333333333334,
+          "specificity": 0.0,
+          "f1": 0.9740082079343365
+        },
+        "denormalize_address": {
+          "accuracy": 0.7568331762488218,
+          "precision": 1.0,
+          "recall": 0.7568331762488218,
+          "specificity": 0.0,
+          "f1": 0.8615879828326181
+        },
+        "initial_first_name": {
+          "accuracy": 0.9673333333333334,
+          "precision": 1.0,
+          "recall": 0.9673333333333334,
+          "specificity": 0.0,
+          "f1": 0.9833954591663843
+        },
+        "missing_optional": {
+          "accuracy": 0.9480234260614934,
+          "precision": 1.0,
+          "recall": 0.9480234260614934,
+          "specificity": 0.0,
+          "f1": 0.9733183013904547
+        },
+        "nonmatch": {
+          "accuracy": 1.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "specificity": 1.0,
+          "f1": 0.0
+        },
+        "typo_address": {
+          "accuracy": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "specificity": 0.0,
+          "f1": 1.0
+        },
+        "typo_email": {
+          "accuracy": 0.6527909176915799,
+          "precision": 1.0,
+          "recall": 0.6527909176915799,
+          "specificity": 0.0,
+          "f1": 0.7899255867200916
+        },
+        "typo_identity": {
+          "accuracy": 0.9573333333333334,
+          "precision": 1.0,
+          "recall": 0.9573333333333334,
+          "specificity": 0.0,
+          "f1": 0.9782016348773842
+        }
       }
     }
   },
   "summary": {
     "untrained": {
-      "accuracy": 0.955,
-      "precision": 0.9559,
-      "recall": 0.954,
-      "specificity": 0.956,
-      "f1": 0.955
+      "accuracy": 0.9605,
+      "precision": 0.9927,
+      "recall": 0.961,
+      "specificity": 0.9573,
+      "f1": 0.9766
     },
     "supervised": {
-      "accuracy": 0.9073,
-      "precision": 0.8694,
-      "recall": 0.9587,
-      "specificity": 0.856,
-      "f1": 0.9119
+      "accuracy": 0.957,
+      "precision": 1.0,
+      "recall": 0.9499,
+      "specificity": 1.0,
+      "f1": 0.9743
     },
     "em": {
-      "accuracy": 0.979,
+      "accuracy": 0.9161,
       "precision": 1.0,
-      "recall": 0.958,
+      "recall": 0.9022,
       "specificity": 1.0,
-      "f1": 0.9785
+      "f1": 0.9486
     }
   },
   "environment": {

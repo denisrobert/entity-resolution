@@ -55,6 +55,7 @@ _PATH_CURRENT = Path(__file__).resolve().parent
 sys.path.insert(0, str(_PATH_CURRENT.parent))
 sys.path.insert(0, str(_PATH_CURRENT))
 
+from model_pins import EMBEDDING_MODEL_ID  # noqa: E402
 from common import UNTRAINED_PRIOR  # noqa: E402
 from scorer import SplinkScorer  # noqa: E402
 from entity_pipeline import (  # noqa: E402
@@ -68,7 +69,7 @@ from entity_pipeline import (  # noqa: E402
 from experiment_duplicate_benchmark import build_dataset as _build_duplicate_dataset  # noqa: E402
 from generate_data import Person, generate_people  # noqa: E402
 
-DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_MODEL = EMBEDDING_MODEL_ID
 DEFAULT_MISSING_RATE = 0.3
 DEFAULT_K = 20
 DEFAULT_THRESHOLD = 0.85

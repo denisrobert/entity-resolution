@@ -30,9 +30,9 @@ sys.path.insert(0, str(_PATH_CURRENT))
 from common import (  # noqa: E402
     UNTRAINED_PRIOR,
     build_batch,
-    build_case_queries,
     build_labelled_pairs,
     confusion_matrix,
+    perturbed_case_tuples,
     score_batch,
     to_link_settings,
     untrained_settings,
@@ -44,8 +44,9 @@ from entity_pipeline import (  # noqa: E402
     default_comparisons,
 )
 from generate_data import Person  # noqa: E402
+from model_pins import EMBEDDING_MODEL_ID  # noqa: E402
 
-DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_MODEL = EMBEDDING_MODEL_ID
 DEFAULT_SMOOTHS = (0.5, 5.0, 50.0)
 
 
@@ -59,8 +60,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     people = [Person.from_dict(store.record_at(i)) for i in range(len(store))]
     print(f"Loaded {len(people):,} reference records in {load_seconds:.2f}s")
 
-    cases = build_case_queries(people, args.query_count, args.close_variation_rate, args.seed)
-    queries = [(query_id, query) for query_id, _, query, _ in cases]
+    cases = perturbed_case_tuples(people, args.query_count, args.seed, args.close_variation_rate,
+                                  include_identical=True, include_close=True)
+    queries = [(query_id, query) for query_id, _, query, _, _ in cases]
 
     blocker = Blocker(store, k=args.blocking_k)
 
@@ -114,7 +116,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
 def _score(name, settings, cases, query_records, candidate_records, threshold, results):
     print(f"Scoring under {name}...")
     start = time.perf_counter()
-    matched = score_batch(query_records, candidate_records, settings, threshold)
+    matched = score_batch(query_records, candidate_records, settings, threshold,
+                              base_records=[p.to_dict() for p in people])
     elapsed_ms = (time.perf_counter() - start) * 1000
     matrix, by_category, metrics = confusion_matrix(cases, matched)
     return {"confusion_matrix": matrix, "by_category": by_category,

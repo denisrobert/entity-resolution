@@ -138,10 +138,11 @@ def main():
     ap.add_argument("--max-iterations", type=int, default=15)
     ap.add_argument("--em-convergence", type=float, default=0.001)
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--output", default="scripts/ncvoter/results_mu_comparison.json")
+    ap.add_argument("--output", default="results/erwhitepaper/ncvoter/results_mu_comparison.json")
     args = ap.parse_args()
 
     results = run(args)
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(f"Saved to {args.output}")
 

@@ -13,9 +13,9 @@
     "sample": "datasets\\ncvoter\\sample_5000.csv"
   },
   "timing": {
-    "index_build_seconds": 40.95838039997034,
-    "blocking_seconds": 82.95501690002857,
-    "query_seconds": 38.47013520001201
+    "index_build_seconds": 31.531155499978922,
+    "blocking_seconds": 54.67838400002802,
+    "query_seconds": 25.276582000020426
   },
   "confusion_matrix": {
     "TP": 1312,

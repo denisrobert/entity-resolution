@@ -2,24 +2,35 @@
   "parameters": {
     "reference_records": 5000,
     "test_rows": 5000,
-    "queries_per_test_row": 3,
-    "total_queries": 15000,
+    "queries_per_test_row": 8.003,
+    "total_queries": 40013,
+    "positive_categories": [
+      "identical",
+      "initial_first_name",
+      "typo_identity",
+      "typo_address",
+      "denormalize_address",
+      "typo_email",
+      "missing_optional",
+      "close_same_entity"
+    ],
     "missing_rate": 0.3,
     "model_name": "sentence-transformers/all-MiniLM-L6-v2",
     "blocking_k": 20,
     "match_threshold": 0.85,
     "close_variation_rate": 0.15,
     "seed": 42,
-    "address_strength": 1.0
+    "address_strength": 1.0,
+    "positive_kind": "perturbed"
   },
   "timing": {
-    "index_build_seconds": 37.59284070000285,
-    "query_seconds": 264.38373649999266,
-    "mean_query_milliseconds": 17.625582433332845
+    "index_build_seconds": 56.448078399989754,
+    "query_seconds": 1722.5189180999296,
+    "mean_query_milliseconds": 43.0489820333374
   },
   "confusion_matrix": {
-    "TP": 9883,
-    "FN": 117,
+    "TP": 34413,
+    "FN": 600,
     "FP": 22,
     "TN": 4978
   },
@@ -29,13 +40,114 @@
       "TP": 5000,
       "FN": 0
     },
+    "initial_first_name": {
+      "expected_match": true,
+      "TP": 4527,
+      "FN": 473
+    },
+    "typo_identity": {
+      "expected_match": true,
+      "TP": 4991,
+      "FN": 9
+    },
+    "typo_address": {
+      "expected_match": true,
+      "TP": 3490,
+      "FN": 0
+    },
+    "denormalize_address": {
+      "expected_match": true,
+      "TP": 3490,
+      "FN": 0
+    },
+    "typo_email": {
+      "expected_match": true,
+      "TP": 3495,
+      "FN": 0
+    },
+    "missing_optional": {
+      "expected_match": true,
+      "TP": 4535,
+      "FN": 3
+    },
     "close_same_entity": {
       "expected_match": true,
-      "TP": 4883,
-      "FN": 117
+      "TP": 4885,
+      "FN": 115
     },
     "unrelated": {
       "expected_match": false,
+      "FP": 22,
+      "TN": 4978
+    }
+  },
+  "category_metrics": {
+    "identical": {
+      "queries": 5000,
+      "TP": 5000,
+      "FN": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "initial_first_name": {
+      "queries": 5000,
+      "TP": 4527,
+      "FN": 473,
+      "precision": 1.0,
+      "recall": 0.9054,
+      "f1": 0.950351632203212
+    },
+    "typo_identity": {
+      "queries": 5000,
+      "TP": 4991,
+      "FN": 9,
+      "precision": 1.0,
+      "recall": 0.9982,
+      "f1": 0.9990991892703434
+    },
+    "typo_address": {
+      "queries": 3490,
+      "TP": 3490,
+      "FN": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "denormalize_address": {
+      "queries": 3490,
+      "TP": 3490,
+      "FN": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "typo_email": {
+      "queries": 3495,
+      "TP": 3495,
+      "FN": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "missing_optional": {
+      "queries": 4538,
+      "TP": 4535,
+      "FN": 3,
+      "precision": 1.0,
+      "recall": 0.999338915821948,
+      "f1": 0.999669348616775
+    },
+    "close_same_entity": {
+      "queries": 5000,
+      "TP": 4885,
+      "FN": 115,
+      "precision": 1.0,
+      "recall": 0.977,
+      "f1": 0.9883662114314619
+    },
+    "unrelated": {
+      "queries": 5000,
       "FP": 22,
       "TN": 4978
     }
@@ -48,28 +160,64 @@
         "positives": 5000,
         "recall": 1.0
       },
-      "close_same_entity": {
-        "blocked": 4887,
+      "initial_first_name": {
+        "blocked": 4986,
         "positives": 5000,
-        "recall": 0.9774
+        "recall": 0.9972
+      },
+      "typo_identity": {
+        "blocked": 4993,
+        "positives": 5000,
+        "recall": 0.9986
+      },
+      "typo_address": {
+        "blocked": 3490,
+        "positives": 3490,
+        "recall": 1.0
+      },
+      "denormalize_address": {
+        "blocked": 3490,
+        "positives": 3490,
+        "recall": 1.0
+      },
+      "typo_email": {
+        "blocked": 3495,
+        "positives": 3495,
+        "recall": 1.0
+      },
+      "missing_optional": {
+        "blocked": 4535,
+        "positives": 4538,
+        "recall": 0.999338915821948
+      },
+      "close_same_entity": {
+        "blocked": 4889,
+        "positives": 5000,
+        "recall": 0.9778
       }
     },
     "blocked_in_but_rejected": {
       "identical": 0,
+      "initial_first_name": 459,
+      "typo_identity": 2,
+      "typo_address": 0,
+      "denormalize_address": 0,
+      "typo_email": 0,
+      "missing_optional": 0,
       "close_same_entity": 4
     },
-    "overall_recall": 0.9887
+    "overall_recall": 0.9961442892639877
   },
   "identity_collisions": {
     "count": 0,
     "note": "unrelated queries sharing first/last name and date of birth with their reference record (hard negatives)"
   },
   "metrics": {
-    "accuracy": 0.9907333333333334,
-    "precision": 0.997778899545684,
-    "recall": 0.9883,
+    "accuracy": 0.9844550521080648,
+    "precision": 0.9993611151444751,
+    "recall": 0.9828635078399451,
     "specificity": 0.9956,
-    "f1": 0.9930168299422256
+    "f1": 0.9910436585646815
   },
   "environment": {
     "python": "3.13.1",

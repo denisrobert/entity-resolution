@@ -27,6 +27,7 @@ from entity_pipeline import (
     HuggingFaceEmbeddingModel,
     MemoryVectorDatabase,
 )
+from model_pins import EMBEDDING_MODEL_SHORT  # noqa: E402
 
 DEFAULT_K = (5, 10, 20)
 
@@ -69,7 +70,7 @@ def run(args: argparse.Namespace) -> dict:
             "records_in_index": len(persons),
             "query_count": len(mutated_queries),
             "blocking_k": ks,
-            "model": "all-MiniLM-L6-v2",
+            "model": EMBEDDING_MODEL_SHORT,
             "data": "ncvoter (real) + synthetic mutations",
             "mutation_seed": args.mutation_seed,
             "sample": str(args.sample),
@@ -88,10 +89,11 @@ def main() -> None:
     parser.add_argument("--query-count", type=int, default=1000)
     parser.add_argument("--k", type=int, nargs="+", default=list(DEFAULT_K))
     parser.add_argument("--mutation-seed", type=int, default=7)
-    parser.add_argument("--output", default="ncvoter_blocking_recall.json")
+    parser.add_argument("--output", default="results/erwhitepaper/ncvoter/results_blocking_recall.json")
     args = parser.parse_args()
 
     results = run(args)
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(json.dumps(results["recall_at_k"]))
     print(f"Saved results to {args.output}")

@@ -56,8 +56,9 @@ from experiment_batch_dedup import (  # noqa: E402
     canopy_cluster,
     store_vectors,
 )
+from model_pins import EMBEDDING_MODEL_ID  # noqa: E402
 
-MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+MODEL = EMBEDDING_MODEL_ID
 
 # Field -> (label used in the default serialization, getter on Person.to_dict()).
 FIELD_LABELS = {

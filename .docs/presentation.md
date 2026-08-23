@@ -101,8 +101,8 @@ Query ──► [embed] ──► [FAISS top-k]
 
 # What it delivers
 
-- **99.3% F1** on the synthetic test corpus (15,000 labelled queries).
-- **~18 ms/query amortized** *batched* throughput; the honest **online** per-query path is **~38 ms median** (embedding + FAISS + a lightweight trained scorer — no per-query Splink construction).
+- **99.1% F1** on the synthetic test corpus (40,013 labelled queries: identical + six clerical perturbations + close + unrelated).
+- **~18 ms/query amortized** *batched* throughput; the honest **online** per-query path is **~45 ms median** (embedding + FAISS + a lightweight trained scorer — no per-query Splink construction).
 - **Persisted and reusable**: the index reloads without re-embedding the population.
 - **Defensible numbers**: every result reproduces by re-running the code.
 
@@ -157,7 +157,7 @@ Around **7–14 M records** (or when you need replicated, multi-region durabilit
 - Sponsor a short **proof-on-real-data** phase: a representative, labelled sample of the population we must link (with access/privacy).
 - We then commit to an F1 on *that* data, not the synthetic one.
 
-**Value in one line:** near-perfect, explainable identity resolution with batched throughput ~18 ms/query and **online per-query latency ~38 ms** — the per-query Splink rebuild is gone, replaced by a lightweight trained scorer (whitepaper §3.3).
+**Value in one line:** near-perfect, explainable identity resolution with batched throughput ~18 ms/query and **online per-query latency ~45 ms** — the per-query Splink rebuild is gone, replaced by a lightweight trained scorer (whitepaper §3.3).
 
 ---
 
@@ -185,9 +185,9 @@ Query ──► MiniLM embed ──► FAISS top-k ──► lightweight scorer 
 
 **Blocking recall is the ceiling; the scorer is where F1 is won or lost.**
 
-- On the confusion-matrix query set (15k queries): top-20 blocking recall **98.87%** → end-to-end recall **98.83%** — the linkage stage rejects only 4 of the 9,887 retrieved positives; blocking is the binding constraint.
-- A "perfect" blocker would take F1 from **99.30 → ~99.87%**, since 113 positives were missed at top-20; retrieval now has real headroom.
-- (Section 7, a different query construction: blocking recall 99.75%; compact raises it to 99.88%.)
+- On the confusion-matrix query set (40k queries): top-20 blocking recall **99.61%** → end-to-end recall **98.29%** — the linkage stage rejects only 4 of the retrieved positives; blocking is the binding constraint.
+- Per-kind through-pipeline recall is now recorded (initial-first-name 90.5%, close 97.6%, identity-typo 99.7%, everything else ≥99.9%): the harder name-level noise is where the residual errors live.
+- (Section 7, same perturbed deck, strategy comparison: default blocking recall 99.61%; compact raises it to 99.76% and F1 99.104% → 99.175%.)
 
 > Design implication: improving the embedding/blocking engine is **not** the lever today; linkage configuration is.
 
@@ -197,11 +197,11 @@ Query ──► MiniLM embed ──► FAISS top-k ──► lightweight scorer 
 
 | Lever | Effect | Verdict |
 |---|---|---|
-| **Threshold τ** | 0.85→0.95: F1 barely moves (99.30→99.34%); recall scarce | Small—retrieval is the lever now |
-| **Serialization** | single seed: recall 99.88%, F1 99.83%; five-seed mean F1 99.90 vs 99.82 (+0.08) | Yes—small, reproducible |
+| **Threshold τ** | 0.85→0.95: F1 barely moves (99.104→99.116%); recall scarce | Small—retrieval is the lever now |
+| **Serialization** | single seed: R@20 99.76%, F1 99.175% compact vs 99.61%/99.104% default; five-seed companion confirms the ordering | Yes—small, reproducible |
 | **Blocking size k** | 20→100: +recall, ~2.4× scorer time | Diminishing returns |
 | **Weaken address** | never beat full-strength | No (this data) |
-| **Retrain m/u** | §8.1: supervised **improves** (98.44 vs 97.64, precision→100%); §8.2 100k: EM at default prior best (97.85%) | Yes for supervised; EM needs prior pinned |
+| **Retrain m/u** | §8.1: supervised **improves** (98.79 vs 98.05, precision→99.99%); §8.2 100k (perturbed deck): untrained 97.66 > supervised 97.43 > EM 94.86 | Precision-vs-recall: depends on the deck |
 
 ---
 
@@ -214,7 +214,7 @@ Splink's decision rule: classify as *match* when `P(M|γ) ≥ τ` (range ~[0.5, 
 
 Decision-theoretic setting: `τ* = C_FP / (C_FP + C_FN)` — presumes a calibrated posterior, zero cost for correct decisions, and per-pair decisions (whitepaper Appendix — Deriving τ).
 
-- Measured: `τ` 0.85 → 0.95 moved F1 barely (99.30% → 99.34%; FP 22→4) because recall — not threshold — is the scarce resource.
+- Measured: `τ` 0.85 → 0.95 moved F1 barely (99.104% → 99.116%; FP 22→4) because recall — not threshold — is the scarce resource.
 - With recall headroom, raising `τ` is the cheapest precision lever — the mechanism to encode FP/FN business costs. (Methods: whitepaper **Appendix — Deriving τ**.)
 
 ---
@@ -223,8 +223,8 @@ Decision-theoretic setting: `τ* = C_FP / (C_FP + C_FN)` — presumes a calibrat
 
 Retraining the match model is **worth doing with real labels** — and stays coherent when the prior is handled properly.
 
-1. **Supervised calibration improves results** (§8.1): fitting `m/u` on labelled match/non-match pairs lifts F1 to **98.44% vs 97.64% untrained**, precision to **100%** (FP 62→0) at unchanged recall — under the lightweight scorer's weight tables.
-2. **EM matches or beats untrained** in every measured configuration (including the duplicate-bearing set where all variants reach F1 1.0 at τ=0.85): calibrated m/u never underperform the defaults at a fixed operating point.
+1. **Supervised calibration improves results** (§8.1): fitting `m/u` on labelled match/non-match pairs lifts F1 to **98.79% vs 98.05% untrained**, precision to **99.99%** (recall 96.59→97.61%) — under the lightweight scorer's weight tables on the perturbed deck.
+2. **Calibration is precision/recall-sensitive on duplicate-rich data** (§8.2 100k, perturbed deck): untrained F1 97.66% > supervised 97.43% > EM 94.86%7% — calibrated schemes hit precision 100% but trade recall; the right variant depends on the deployment cost model.
 
 > Supervised calibration uses genuine match/non-match evidence; EM fits `m/u` from the (resemblance-biased) candidate structure. Both stay stable when the prior is kept coherent.
 
@@ -279,9 +279,9 @@ Store     : add / update / delete / save / load (no re-embed on load)
 
 # Scorecard to remember
 
-- Confusion matrix (5k refs / 15k queries): **F1 99.30%**, recall 98.83%, precision 99.78%.
-- Same-set blocking recall: **98.87%** @k=20 (Section 7's query set: 99.75%; compact 99.88%).
-- **~18 ms/query amortized batched** (embed + block + scorer); **cold per-query online path median ~38 ms** on the 50k index (embedding ~24 ms + FAISS ~25 ms + scorer ~11 ms).
+- Confusion matrix (5k refs / 40k queries, perturbed deck): **F1 99.10%**, recall 98.29%, precision 99.94% (strict per-row definition).
+- Same-set blocking recall: **99.61%** @k=20 (Section 7, same deck, default strategy; compact 99.76%).
+- **~18 ms/query amortized batched** (embed + block + scorer); **cold per-query online path median ~45 ms** on the 50k index (embedding ~27 ms + FAISS ~29 ms + scorer ~15 ms).
 - NC-voter (real schema, synthetic mutations): **F1 92–94%**; blocking is the binding constraint at the default `k=20` (linkage becomes binding at `k=100`).
 
 > Baseline engineering numbers — config, hardware, and data shape all move them.
@@ -313,7 +313,7 @@ For **your** data: population-based scripts accept `--input-records FILE`.
 
 # Gotchas — tuning & thresholds
 
-- **Calibrate `m/u` with labels — and pin the prior.** Supervised calibration improves F1 (98.44 vs 97.64) and precision (→100%); the pitfall is the EM route's free prior, which underperforms unless anchored. Re-validate prior + `τ` + weights together (Appendix — Tuning the Match Prior).
+- **Calibrate `m/u` with labels — and tune the prior.** Supervised calibration improves results (98.79 vs 98.05 on the 50k perturbed deck, precision→99.99%); on the duplicate-bearing 100k data the ranking flips (untrained 97.66 > supervised 97.43 > EM 94.86), so re-validate prior + `τ` + weights together against the deployment cost model (Appendix — Tuning the Match Prior).
 - **`τ` encodes business cost.** `τ* = C_FP/(C_FP+C_FN)`; exposed via `--threshold` / `--tau` and the F1 sweep. Raise `τ` for fewer wrong links, lower it for recall-first (Appendix — Deriving τ).
 - **Tune the prior properly.** Anchor `λ`, fit with the prior pinned, tune `τ` jointly, watch the score-shift guard (Appendix — Tuning the Match Prior).
 

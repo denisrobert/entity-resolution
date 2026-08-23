@@ -14,6 +14,10 @@ from langchain_huggingface import HuggingFaceEmbeddings
 
 from generate_data import Person
 
+from model_pins import EMBEDDING_MODEL_ID
+
+DEFAULT_MODEL = EMBEDDING_MODEL_ID
+
 
 class FaissPersonStore(VectorStore):
     """FAISS-backed vector store for person records with LangChain interface."""
@@ -57,12 +61,17 @@ class FaissPersonStore(VectorStore):
     def from_people(
         cls,
         people: List[Person],
-        model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+        model_name: str = DEFAULT_MODEL,
         normalize: bool = True,
         **kwargs
     ) -> "FaissPersonStore":
         """Create store from list of people."""
-        embedding = HuggingFaceEmbeddings(model_name=model_name, **kwargs)
+        from model_pins import EMBEDDING_MODEL_ID, embedding_model_kwargs
+
+        model_name = model_name or EMBEDDING_MODEL_ID
+        user_kwargs = dict(kwargs)
+        user_kwargs["model_kwargs"] = embedding_model_kwargs(user_kwargs.get("model_kwargs"))
+        embedding = HuggingFaceEmbeddings(model_name=model_name, **user_kwargs)
         return cls(embedding, people, normalize)
     
     @classmethod
@@ -178,11 +187,14 @@ class FaissPersonStore(VectorStore):
         model_name: Optional[str] = None,
     ) -> "FaissPersonStore":
         """Load a persisted FAISS index and person metadata."""
+        from model_pins import embedding_model_kwargs
+
         directory = Path(directory)
         metadata = json.loads((directory / "people.json").read_text(encoding="utf-8"))
         people = [Person.from_dict(person) for person in metadata["people"]]
         embedding = HuggingFaceEmbeddings(
-            model_name=model_name or metadata["model_name"]
+            model_name=model_name or metadata["model_name"],
+            model_kwargs=embedding_model_kwargs(),
         )
         index = faiss.read_index(str(directory / "people.faiss"))
         return cls(
@@ -198,7 +210,7 @@ class FaissPersonStore(VectorStore):
 
 def build_person_store(
     people: List[Person],
-    model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    model_name: str = DEFAULT_MODEL
 ) -> FaissPersonStore:
     """Build a FAISS vector store from a list of people."""
     return FaissPersonStore.from_people(people, model_name)

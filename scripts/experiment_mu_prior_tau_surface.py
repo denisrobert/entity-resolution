@@ -161,10 +161,11 @@ def main() -> None:
     parser.add_argument("--max-iterations", type=int, default=15)
     parser.add_argument("--em-convergence", type=float, default=0.001)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--output", default="mu_prior_tau_surface.json")
+    parser.add_argument("--output", default="results/erwhitepaper/mu_prior_tau_surface.json")
     args = parser.parse_args()
 
     results = run(args)
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(json.dumps(results["summary"], indent=2))
     print(f"Saved results to {args.output}")

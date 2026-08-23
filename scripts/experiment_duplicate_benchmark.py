@@ -41,6 +41,8 @@ _PATH_CURRENT = Path(__file__).resolve().parent
 sys.path.insert(0, str(_PATH_CURRENT.parent))
 sys.path.insert(0, str(_PATH_CURRENT))
 
+from model_pins import EMBEDDING_MODEL_ID  # noqa: E402
+
 import pandas as pd  # noqa: E402
 
 from common import (  # noqa: E402
@@ -65,7 +67,7 @@ from entity_pipeline import (  # noqa: E402
 )
 from generate_data import generate_people  # noqa: E402
 
-DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_MODEL = EMBEDDING_MODEL_ID
 DEFAULT_MISSING_RATE = 0.3
 DEFAULT_K = 20
 DEFAULT_THRESHOLD = 0.85
@@ -154,6 +156,56 @@ def build_cases(
     return cases
 
 
+def build_perturbed_cases(
+    base: list[Any],
+    missing_rate: float,
+    seed: int,
+    eval_indexes: list[int],
+    twin_positions: dict[int, int] | None = None,
+) -> list[tuple[str, str, Any, bool, set[int]]]:
+    """Option B positive queries: for each eval base, one query per
+    PersonPerturbator kind the record supports (plus its twin as a fallback
+    positive), all expecting a match against the base/twin positions.
+
+    Returns the same ``(query_id, category, person, expected, true_positions)``
+    shape as :func:`build_cases` so the scoring/evaluation path is unchanged;
+    the category label lets results be aggregated per perturbation kind.
+    """
+    from person_perturbation import PersonPerturbator, Perturbation
+
+    perturber = PersonPerturbator(seed=seed)
+    unrelated = generate_people(len(eval_indexes), missing_rate=missing_rate, seed=seed + 1)
+    required = {
+        Perturbation.INITIAL_FIRST_NAME: ("first_name",),
+        Perturbation.TYPO_IDENTITY: ("first_name", "last_name", "date_of_birth"),
+        Perturbation.TYPO_ADDRESS: ("address",),
+        Perturbation.DENORMALIZE_ADDRESS: ("address",),
+        Perturbation.TYPO_EMAIL: ("email",),
+        Perturbation.MISSING_OPTIONAL: ("address", "email"),
+    }
+    cases: list[tuple[str, str, Any, bool, set[int]]] = []
+    for index, base_idx in enumerate(eval_indexes):
+        person = base[base_idx]
+        positions = {base_idx}
+        if twin_positions:
+            positions.add(twin_positions[index])
+        for kind in Perturbation:
+            if not any(getattr(person, field, None) for field in required[kind]):
+                continue
+            try:
+                _, perturbed = perturber.perturb_different(person, kind)
+            except ValueError:
+                continue
+            if perturbed.to_dict() == person.to_dict():
+                continue
+            cases.append((f"Q_pos_{index}_{kind.value}", kind.value, perturbed, True, positions))
+        # Legacy close variant as an extra positive (kept for comparability).
+        close = make_non_identical_close_person(person, DEFAULT_CLOSE_VARIATION_RATE)
+        cases.append((f"Q_pos_{index}_close", "close", close, True, positions))
+        cases.append((f"Q_neg_{index}", "nonmatch", unrelated[index], False, set()))
+    return cases
+
+
 def build_labelled_pairs(
     pairs: list[tuple[Any, Any]],
     missing_rate: float,
@@ -233,7 +285,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         train_match_fraction=args.train_match_fraction,
     )
     args.base_count = len(base)
-    cases = build_cases(query_variants, args.missing_rate, args.seed, eval_indexes, twin_positions)
+    if args.positive_kind == "perturbed":
+        cases = build_perturbed_cases(base, args.missing_rate, args.seed,
+                                      eval_indexes, twin_positions)
+    else:
+        cases = build_cases(query_variants, args.missing_rate, args.seed,
+                            eval_indexes, twin_positions)
     query_tuples = [(query_id, person) for query_id, _, person, _, _ in cases]
     dataset_seconds = time.perf_counter() - param_start
 
@@ -293,6 +350,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 "train_match_fraction": args.train_match_fraction,
                 "train_pair_bases": len(pairs),
                 "eval_query_bases": len(query_variants),
+                "positive_kind": args.positive_kind,
+                "positive_by_category": {
+                    cat: sum(1 for _, c, _, e, _ in cases if e and c == cat)
+                    for cat in sorted({c for _, c, _, e, _ in cases if e})
+                },
                 "note": "supervised training pairs and positive evaluation "
                         "queries are generated from disjoint base records",
             },
@@ -317,9 +379,16 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         matched, best_position = score_batch(
             query_records, candidate_records, settings, args.threshold,
             return_best=True,
+            base_records=[p.to_dict() for p in base],
         )
         results["timing"][f"{name}_seconds"] = time.perf_counter() - score_start
         evaluation = evaluate(cases, matched, best_position)
+        evaluation["by_category"] = {
+            cat: evaluate(
+                [c for c in cases if c[1] == cat], matched, best_position
+            )["metrics"]
+            for cat in sorted({c[1] for c in cases})
+        }
         results["variants"][name] = evaluation
         summary = {k: round(v, 4) for k, v in evaluation["metrics"].items()}
         results["summary"][name] = summary
@@ -348,10 +417,14 @@ def main() -> None:
                              "pairs; the rest generate the positive evaluation queries")
     parser.add_argument("--input-records", type=Path, default=None,
                         help="JSON/CSV file of person records to use as the base population (duplicates are then injected)")
-    parser.add_argument("--output", default="training_results.json")
+    parser.add_argument("--positive-kind", choices=("perturbed", "basic"), default="perturbed",
+                        help="'perturbed' = Option B deck (per-kind PersonPerturbator positives + close "
+                             "+ unrelated per eval twin); 'basic' = old single small-difference variant")
+    parser.add_argument("--output", default="results/erwhitepaper/training_results.json")
     args = parser.parse_args()
 
     results = run(args)
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(f"Saved results to {args.output}")
 

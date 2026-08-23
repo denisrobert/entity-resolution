@@ -60,6 +60,7 @@ class PersonEntityResolver:
             self._settings["comparisons"],
             prior=UNTRAINED_PRIOR,
             threshold=self.match_threshold,
+            base_records=[person.to_dict() for person in self.store.people],
         )
     
     def _setup_splink(self) -> None:

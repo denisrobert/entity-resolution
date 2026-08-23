@@ -49,9 +49,10 @@ sys.path.insert(0, str(_PATH_CURRENT))
 import faiss  # noqa: E402
 
 from experiment_duplicate_benchmark import build_dataset  # noqa: E402
+from model_pins import EMBEDDING_MODEL_ID  # noqa: E402
 from generate_data import Person, generate_people  # noqa: E402
 
-MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+MODEL = EMBEDDING_MODEL_ID
 DEFAULT_MISSING_RATE = 0.3
 DEFAULT_CLOSE_VARIATION_RATE = 0.15
 
@@ -270,10 +271,11 @@ def main() -> None:
     parser.add_argument("--model", nargs="+", default=[MODEL],
                         help="Sentence-transformer model name(s) to compare")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--output", default="small_k_recall_results.json")
+    parser.add_argument("--output", default="results/erwhitepaper/small_k_recall_results.json")
     args = parser.parse_args()
 
     results = run(args)
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(f"\nSaved results to {args.output}")
 

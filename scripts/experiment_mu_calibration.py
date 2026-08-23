@@ -38,9 +38,9 @@ sys.path.insert(0, str(_PATH_CURRENT))
 from common import (  # noqa: E402
     UNTRAINED_PRIOR,
     build_batch,
-    build_case_queries,
     build_labelled_pairs,
     environment_block,
+    perturbed_case_tuples,
     score_batch,
     strict_confusion_matrix,
     to_link_settings,
@@ -53,8 +53,9 @@ from entity_pipeline import (  # noqa: E402
     default_comparisons,
 )
 from generate_data import Person  # noqa: E402
+from model_pins import EMBEDDING_MODEL_ID  # noqa: E402
 
-DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_MODEL = EMBEDDING_MODEL_ID
 DEFAULT_MISSING_RATE = 0.3
 DEFAULT_BLOCKING_K = 20
 DEFAULT_THRESHOLD = 0.85
@@ -87,10 +88,11 @@ def run_comparison(args: argparse.Namespace) -> dict[str, Any]:
 
     train_people = people[train_slice[0]:train_slice[1]]
     eval_people = people[eval_slice[0]:eval_slice[1]]
-    cases = build_case_queries(
-        eval_people, args.query_count, args.close_variation_rate, args.seed
+    cases = perturbed_case_tuples(
+        eval_people, args.query_count, args.seed, args.close_variation_rate,
+        include_identical=True, include_close=True,
     )
-    queries = [(query_id, query) for query_id, _, query, _ in cases]
+    queries = [(query_id, query) for query_id, _, query, _, _ in cases]
 
     blocker = Blocker(store, k=args.blocking_k)
 
@@ -177,7 +179,8 @@ def run_comparison(args: argparse.Namespace) -> dict[str, Any]:
         print(f"Scoring under {name} m/u...")
         start = time.perf_counter()
         matched, best_position = score_batch(
-            query_records, candidate_records, settings, args.threshold, return_best=True
+            query_records, candidate_records, settings, args.threshold, return_best=True,
+            base_records=[p.to_dict() for p in people],
         )
         query_ms = (time.perf_counter() - start) * 1000
         results["timing"]["query_total_ms"][name] = query_ms
@@ -186,15 +189,32 @@ def run_comparison(args: argparse.Namespace) -> dict[str, Any]:
         import re as _re
         true_position = {
             query_id: eval_slice[0] + int(_re.match(r"Q_(\d+)", query_id).group(1))
-            for query_id, _, _, _ in cases
+            for query_id, _, _, _, _ in cases
             if _re.match(r"Q_(\d+)", query_id)
         }
         matrix, by_category, metrics = strict_confusion_matrix(
             cases, matched, best_position, true_position
         )
+        # Per-category precision/recall/F1 derived from the raw counts.
+        category_metrics: dict[str, dict[str, Any]] = {}
+        for cat, counts in by_category.items():
+            base = {"counts": counts}
+            if cat == "unrelated":
+                fp, tn = counts.get("FP", 0), counts.get("TN", 0)
+                base.update({"queries": fp + tn, "FP": fp, "TN": tn})
+            else:
+                tp, fn = counts.get("TP", 0), counts.get("FN", 0)
+                base.update({
+                    "queries": tp + fn, "TP": tp, "FN": fn,
+                    "precision": tp / (tp + counts.get("FP", 0)) if (tp + counts.get("FP", 0)) else 0.0,
+                    "recall": tp / (tp + fn) if (tp + fn) else 0.0,
+                    "f1": 2 * tp / (2 * tp + counts.get("FP", 0) + fn) if (2 * tp + counts.get("FP", 0) + fn) else 0.0,
+                })
+            category_metrics[cat] = base
         results["variants"][name] = {
             "confusion_matrix": matrix,
             "by_category": by_category,
+            "category_metrics": category_metrics,
             "metrics": metrics,
         }
         print(f"  {name}: {json.dumps(metrics)}")
@@ -223,10 +243,11 @@ def main() -> None:
     parser.add_argument("--max-iterations", type=int, default=20)
     parser.add_argument("--em-convergence", type=float, default=0.001)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--output", default="mu_calibration_results.json")
+    parser.add_argument("--output", default="results/erwhitepaper/mu_calibration_results.json")
     args = parser.parse_args()
 
     results = run_comparison(args)
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(f"Saved results to {args.output}")
 

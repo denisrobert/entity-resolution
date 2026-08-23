@@ -38,6 +38,7 @@ _PATH_CURRENT = Path(__file__).resolve().parent
 sys.path.insert(0, str(_PATH_CURRENT.parent))
 sys.path.insert(0, str(_PATH_CURRENT))
 
+from model_pins import EMBEDDING_MODEL_ID  # noqa: E402
 from generate_data import Person  # noqa: E402
 
 from experiment_temporal_gap import (  # noqa: E402
@@ -51,7 +52,7 @@ from experiment_small_k_recall import make_embedder  # noqa: E402
 
 
 FIELDS = ["first_name", "last_name", "date_of_birth", "address", "email"]
-MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+MODEL = EMBEDDING_MODEL_ID
 
 
 def _person(row: dict[str, str], born_year: str) -> Person:

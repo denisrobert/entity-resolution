@@ -78,9 +78,10 @@ from experiment_small_k_recall import (  # noqa: E402
 VIEWS = dict(VIEWS)
 VIEWS["address"] = ["address"]
 from generate_data import CanadianAddressProvider  # noqa: E402  (for moved addresses)
+from model_pins import EMBEDDING_MODEL_ID  # noqa: E402
 from common import environment_block  # noqa: E402
 
-MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+MODEL = EMBEDDING_MODEL_ID
 DEFAULT_MISSING_RATE = 0.3
 DEFAULT_CLOSE_VARIATION_RATE = 0.15
 RESIDENCY_YEARS = 10  # shorter than this is "short gap"; longer is "long gap"
@@ -517,9 +518,10 @@ def main() -> None:
                         help="Also score candidates through Splink and report F1")
     parser.add_argument("--threshold", type=float, default=0.85)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--output", default="temporal_gap_results.json")
+    parser.add_argument("--output", default="results/erwhitepaper/temporal_gap_results.json")
     args = parser.parse_args()
     results = run(args)
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(f"Saved results to {args.output}")
 

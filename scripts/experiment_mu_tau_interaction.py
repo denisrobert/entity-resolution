@@ -185,10 +185,11 @@ def main() -> None:
     parser.add_argument("--max-iterations", type=int, default=15)
     parser.add_argument("--em-convergence", type=float, default=0.001)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--output", default="mu_tau_interaction.json")
+    parser.add_argument("--output", default="results/erwhitepaper/mu_tau_interaction.json")
     args = parser.parse_args()
 
     results = run(args)
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(results, indent=2), encoding="utf-8")
     summary = {name: {"best_tau": v["best_tau"], "best_f1": round(v["best_f1"], 4)} for name, v in results["variants"].items()}
     print(json.dumps(summary, indent=2))

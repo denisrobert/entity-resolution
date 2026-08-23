@@ -143,10 +143,11 @@ def main() -> None:
     parser.add_argument("--address-strength", type=float, default=1.0)
     parser.add_argument("--mutation-seed", type=int, default=7)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--output", default="ncvoter_resolution.json")
+    parser.add_argument("--output", default="results/erwhitepaper/ncvoter/results_resolution.json")
     args = parser.parse_args()
 
     results = run(args)
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(json.dumps(results["confusion_matrix"]))
     print(json.dumps(results["metrics"]))

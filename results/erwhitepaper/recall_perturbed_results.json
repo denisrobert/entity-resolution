@@ -1,0 +1,87 @@
+{
+  "parameters": {
+    "index_dir": "data",
+    "reference_records": 50000,
+    "per_kind": 500,
+    "k": 20,
+    "seed": 42,
+    "model_name": "sentence-transformers/all-MiniLM-L6-v2",
+    "model_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+    "model_short": "all-MiniLM-L6-v2",
+    "perturbation_kinds": [
+      "initial_first_name",
+      "typo_identity",
+      "typo_address",
+      "denormalize_address",
+      "typo_email",
+      "missing_optional"
+    ],
+    "query_source": "person_perturbation.PersonPerturbator (seeded)"
+  },
+  "recall_by_kind": {
+    "initial_first_name": {
+      "queries": 500,
+      "recall_at_1": 0.826,
+      "recall_at_20": 0.958,
+      "hits_at_1": 413,
+      "hits_at_20": 479
+    },
+    "typo_identity": {
+      "queries": 500,
+      "recall_at_1": 0.876,
+      "recall_at_20": 0.98,
+      "hits_at_1": 438,
+      "hits_at_20": 490
+    },
+    "typo_address": {
+      "queries": 500,
+      "recall_at_1": 1.0,
+      "recall_at_20": 1.0,
+      "hits_at_1": 500,
+      "hits_at_20": 500
+    },
+    "denormalize_address": {
+      "queries": 500,
+      "recall_at_1": 1.0,
+      "recall_at_20": 1.0,
+      "hits_at_1": 500,
+      "hits_at_20": 500
+    },
+    "typo_email": {
+      "queries": 500,
+      "recall_at_1": 0.996,
+      "recall_at_20": 1.0,
+      "hits_at_1": 498,
+      "hits_at_20": 500
+    },
+    "missing_optional": {
+      "queries": 500,
+      "recall_at_1": 0.736,
+      "recall_at_20": 0.98,
+      "hits_at_1": 368,
+      "hits_at_20": 490
+    }
+  },
+  "summary": {
+    "mean_recall_at_1": 0.9056666666666667,
+    "mean_recall_at_k": 0.9863333333333332,
+    "k": 20
+  },
+  "timing": {
+    "total_seconds": 32.5
+  },
+  "environment": {
+    "python": "3.13.1",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "cpu": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel",
+    "threads": 8,
+    "libs": {
+      "pandas": "3.0.5",
+      "numpy": "2.4.6",
+      "faiss": "1.14.3",
+      "splink": "4.0.16",
+      "sentence_transformers": "5.6.1",
+      "torch": "2.13.0+cpu"
+    }
+  }
+}

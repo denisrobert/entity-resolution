@@ -40,6 +40,8 @@ _PATH_CURRENT = Path(__file__).resolve().parent
 sys.path.insert(0, str(_PATH_CURRENT.parent))
 sys.path.insert(0, str(_PATH_CURRENT))
 
+from model_pins import EMBEDDING_MODEL_ID  # noqa: E402
+
 import faiss
 import numpy as np
 
@@ -60,7 +62,7 @@ from entity_pipeline import Blocker, Linker, default_comparisons  # noqa: E402
 from generate_data import generate_people
 from vector_store import build_person_store
 
-DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_MODEL = EMBEDDING_MODEL_ID
 DEFAULT_MISSING_RATE = 0.3
 DEFAULT_BLOCKING_K = 20
 DEFAULT_THRESHOLD = 0.85

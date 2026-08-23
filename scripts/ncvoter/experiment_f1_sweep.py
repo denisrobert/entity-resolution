@@ -151,10 +151,11 @@ def main() -> None:
     parser.add_argument("--thresholds", type=float, nargs="+", default=list(DEFAULT_THRESHOLDS))
     parser.add_argument("--address-strengths", type=float, nargs="+", default=list(DEFAULT_ADDRESS_STRENGTHS))
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--output", default="ncvoter_f1_sweep.json")
+    parser.add_argument("--output", default="results/erwhitepaper/ncvoter/results_f1_sweep.json")
     args = parser.parse_args()
 
     results = run(args)
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(results, indent=2), encoding="utf-8")
     print("Best:", json.dumps(results["best"]))
     print(f"Saved results to {args.output}")

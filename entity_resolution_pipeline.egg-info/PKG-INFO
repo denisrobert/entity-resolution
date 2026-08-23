@@ -1,0 +1,512 @@
+Metadata-Version: 2.4
+Name: entity-resolution-pipeline
+Version: 1.0.0
+Summary: Two-stage entity resolution: FAISS blocking + trained Fellegi--Sunter scoring (train with Splink, infer with a lightweight scorer).
+Requires-Python: <3.14,>=3.13
+Description-Content-Type: text/markdown
+Requires-Dist: langchain-core==1.5.1
+Requires-Dist: langchain-huggingface==1.2.2
+Requires-Dist: sentence-transformers==5.6.1
+Requires-Dist: faiss-cpu==1.14.3
+Requires-Dist: numpy==2.4.6
+Requires-Dist: scipy==1.18.0
+Requires-Dist: splink==4.0.16
+Requires-Dist: duckdb==1.5.5
+Requires-Dist: altair==6.2.2
+Requires-Dist: RapidFuzz==3.14.5
+Requires-Dist: scikit-learn==1.9.0
+Requires-Dist: Faker==40.36.0
+Requires-Dist: pandas==3.0.5
+Requires-Dist: matplotlib==3.11.1
+Requires-Dist: tqdm==4.69.1
+Requires-Dist: python-dotenv==1.2.2
+Requires-Dist: torch==2.13.0
+Requires-Dist: transformers==5.5.4
+Requires-Dist: tokenizers==0.22.2
+Requires-Dist: safetensors==0.7.0
+Requires-Dist: huggingface-hub==1.21.0
+Requires-Dist: filelock==3.32.0
+Requires-Dist: fsspec==2026.6.0
+Requires-Dist: regex==2026.7.19
+Requires-Dist: requests==2.34.2
+Requires-Dist: PyYAML==6.0.3
+Requires-Dist: langchain==1.3.14
+Requires-Dist: langchain-community==0.4.2
+Requires-Dist: langchain-text-splitters==1.1.2
+Requires-Dist: langsmith==0.10.10
+Requires-Dist: orjson==3.11.9
+Requires-Dist: sqlglot==30.14.0
+Requires-Dist: pydantic==2.13.4
+Requires-Dist: pydantic-settings==2.14.2
+Requires-Dist: python-dateutil==2.9.0.post0
+Requires-Dist: pytz==2026.3.post1
+Requires-Dist: tzdata==2026.3
+Requires-Dist: typing_extensions==4.16.0
+Requires-Dist: packaging==26.2
+Requires-Dist: pillow==12.3.0
+Requires-Dist: contourpy==1.3.3
+Requires-Dist: cycler==0.12.1
+Requires-Dist: fonttools==4.63.0
+Requires-Dist: kiwisolver==1.5.0
+Requires-Dist: pyparsing==3.3.2
+Requires-Dist: joblib==1.5.3
+Requires-Dist: threadpoolctl==3.6.0
+Provides-Extra: rest
+Requires-Dist: fastapi==0.140.0; extra == "rest"
+Requires-Dist: uvicorn==0.51.0; extra == "rest"
+Requires-Dist: pydantic==2.13.4; extra == "rest"
+Requires-Dist: python-multipart==0.0.32; extra == "rest"
+Provides-Extra: rfc-decay
+Requires-Dist: splinkrfc-decay @ git+https://github.com/denisrobert/SplinkRFCDecay.git@6c59a280acabce9c85dcff13a02731a4b2ed1444 ; extra == "rfc-decay"
+Provides-Extra: openvino
+Requires-Dist: openvino==2026.3.0; extra == "openvino"
+Requires-Dist: openvino-tokenizers==2026.3.0.0; extra == "openvino"
+Requires-Dist: openvino-telemetry==2025.2.0; extra == "openvino"
+Requires-Dist: optimum==2.3.0; extra == "openvino"
+Requires-Dist: optimum-intel==2.1.0; extra == "openvino"
+Requires-Dist: nncf==3.3.0; extra == "openvino"
+Requires-Dist: ninja==1.13.0; extra == "openvino"
+Requires-Dist: pydot==3.0.4; extra == "openvino"
+Requires-Dist: tabulate==0.10.0; extra == "openvino"
+Requires-Dist: typer==0.25.1; extra == "openvino"
+
+# Entity Resolution with FAISS + Splink
+
+Repository: <https://github.com/denisrobert/entity-resolution>
+
+This project implements a two-stage entity resolution pipeline for synthetic
+Canadian person records. FAISS performs dense-vector candidate blocking and
+Splink performs interpretable probabilistic record linkage over the candidates.
+
+## Architecture
+
+```text
+Query person -> MiniLM embedding -> FAISS top-k blocking -> Splink matching
+                                                               |
+                                                               v
+                                                        Match or no match
+```
+
+## Features
+
+- **Synthetic Canadian person records** with independently missing address and email fields
+- **Normalized `sentence-transformers/all-MiniLM-L6-v2` embeddings** in FAISS `IndexFlatIP`
+- **Persisted index and metadata** that can be reloaded without re-embedding the reference population
+- **Splink probabilistic matching** with field comparisons:
+  1. First Name (Jaro-Winkler, high weight)
+  2. Last Name (Jaro-Winkler, high weight)
+  3. Date of Birth (Date-of-birth comparison, highest weight)
+  4. Email (Email comparison, medium weight)
+  5. Address (Jaro-Winkler, lower weight - handles variations)
+- **Configurable top-k blocking and match thresholds**
+- **Reproducible confusion-matrix and Section 7 benchmark evaluations**
+
+## Installation
+
+```bash
+# Python 3.13.x, pinned exactly by requires-python in pyproject.toml.
+pip install -e .
+# Optional: example REST service deps, or the Splink RFC-decay extension
+pip install -e ".[rest]"        # fastapi/uvicorn/pydantic for examples/rest_service
+pip install -e ".[rfc-decay]"   # pinned SplinkRFCDecay extension (optional decay experiments)
+```
+
+Run commands from the repository root. All Python dependencies and the
+interpreters' minor version (3.13) are pinned exactly in `pyproject.toml`
+(which replaces the former `requirements.txt`).
+
+## Usage
+
+### Command Line
+
+```bash
+# Generate people, create embeddings, and persist the FAISS index plus metadata
+python scripts/generate_data.py --count 50000 --missing-rate 0.3 --output-dir data
+
+# Resolve a person using the persisted index
+python scripts/search_cli.py \
+  --index-dir data \
+  --first-name John \
+  --last-name Smith \
+  --date-of-birth 1985-06-15 \
+  --address "123 Main St, Toronto, ON M5V 1A1" \
+  --email john.smith@example.com \
+  --threshold 0.85 \
+  --blocking-k 20
+
+# Or provide the input record as JSON
+python scripts/search_cli.py --index-dir data --input-json query.json
+
+# Run the 5,000-row confusion-matrix experiment
+python scripts/experiment_confusion_matrix.py --count 5000 --output confusion_matrix_results.json
+
+# Run the full Section 7 evaluation plan
+python scripts/experiment_section7_eval.py --count 5000 --ablation-count 500 \
+  --output section7_results.json --csv-output section7_metrics.csv
+
+# Compare m/u calibration (supervised vs EM vs untrained) on the persisted 50k index
+python scripts/experiment_mu_calibration.py --index-dir data --query-count 2000 \
+  --output mu_calibration_results.json
+```
+
+## Reproduce all whitepaper experiments
+
+`whitepaper-experiments.py` re-runs the full experiment suite reported in the
+whitepaper (the artifacts referenced as `results/erwhitepaper/*.json` in
+`.docs/entity_resolution_whitepaper.tex`). Each entry runs with the exact CLI
+above; the registry is the single place to update when a script or its
+parameters change.
+
+```bash
+# Preview the suite (16 experiments across the whitepaper sections)
+python whitepaper-experiments.py --list
+python whitepaper-experiments.py --list-sections
+
+# Dry-run the exact commands
+python whitepaper-experiments.py --dry-run
+
+# Run everything (paper scale; requires the persisted `data/` index and the
+# NC-voter sample `datasets/ncvoter/sample_5000.csv`; many hours)
+python whitepaper-experiments.py
+
+# Run a subset / section, or a quick smoke validation
+python whitepaper-experiments.py --only confusion_matrix,temporal_gap
+python whitepaper-experiments.py --by-section calibration
+python whitepaper-experiments.py --smoke    # small counts, verifies plumbing
+
+# NOTE: --smoke writes to the same artifact paths as full runs (the registry's
+# canonical --output values), so it overwrites paper-scale artifacts with
+# small-count results. Use --dry-run first, or run smoke in a scratch checkout,
+# if you need to preserve the canonical results/erwhitepaper/*.json files.
+```
+
+Every run writes a manifest (`results/erwhitepaper/whitepaper_experiments_manifest.json`)
+recording each experiment's status, exact command, elapsed time, and output
+artifact paths.
+
+**Results convention:** all whitepaper experiment *results* live under
+`results/erwhitepaper/`. The driver validates this before running and refuses to
+start if any result output would land elsewhere; the experiment scripts'
+`--output`/`--csv-output` defaults are also set to `results/erwhitepaper/**`, so
+running a script directly (without the driver) still writes there. The only
+non-result artifacts are data prerequisites (e.g. the persisted FAISS index in
+`data/`) and input samples (`datasets/`).
+
+
+The Section 7 evaluator reports blocking recall at `k=10,20,50,100`, threshold
+metrics including precision, recall, F1, and false-match rate, calibration
+bins, per-query FAISS latency percentiles, index build time, and persisted
+index sizes. It also evaluates missing email, missing address, both fields
+missing, address changes, and name perturbations. The `default`,
+`identity_first`, and `compact` row serialization strategies can be selected
+with `--strategies`.
+
+The Section 7 run builds the default, `identity_first`, and `compact`
+serialization indexes. It evaluates 15,000 labelled queries, blocking recall
+at `k=10,20,50,100`, thresholds from `0.50` through `0.95`, calibration bins,
+latency, storage, build time, and controlled field/perturbation ablations.
+
+The latest paper-scale run reported, for the default serialization, 99.84%
+top-20 blocking recall, 99.58% precision, 99.80% recall, and 99.69% F1 at a
+0.85 threshold. The compact serialization reached 99.95% top-20 blocking
+recall and 99.77% F1. Results are stored in `section7_results.json` and
+`section7_metrics.csv`.
+
+### Python API
+
+The project-root module `entity_pipeline` provides the primary pipeline API. The
+legacy resolver stack (`generate_data`, `vector_store`, `entity_resolver`) is
+maintained under `scripts/`.
+
+```python
+# Legacy resolver API (modules live under scripts/; run with scripts/ on sys.path)
+from generate_data import Person, generate_people
+from entity_resolver import create_resolver
+from vector_store import FaissPersonStore, build_person_store
+
+# Generate data and build the persisted index once
+people = generate_people(50000, missing_rate=0.3)
+store = build_person_store(people)
+store.save("data")
+
+# Later, load the index without re-embedding the people
+store = FaissPersonStore.load("data")
+
+# Create resolver
+resolver = create_resolver(store, match_threshold=0.85, blocking_k=20)
+
+# Resolve a query person
+query = Person(
+    first_name="John",
+    last_name="Smith",
+    date_of_birth="1985-06-15",
+    address="123 Main St, Toronto, ON M5V 1A1",
+    email="john.smith@example.com"
+)
+
+result = resolver.resolve(query)
+if result:
+    print(f"Match found: {result['match_probability']:.4f}")
+    print(f"Matched: {result['matched_person'].first_name} {result['matched_person'].last_name}")
+```
+
+The abstract `Blocker`/`Linker` classes in `entity_pipeline.py` (the root module)
+expose the two stages separately and support training the Splink `m/u` parameters
+on the vector store:
+
+```python
+from entity_pipeline import Blocker, Linker, default_comparisons
+
+blocker = Blocker.build(people, k=20)          # index the reference population
+linker = Linker(default_comparisons(), tau=0.85)
+
+linker.train(blocker.vector_database, seed=1)  # fit m/u on the vector store
+print("trained:", linker.is_trained)
+
+candidates = blocker.block(query, k=20)        # FAISS k-ANN blocking
+matches = linker.link(query, candidates)       # Splink linkage above tau
+for m in matches:
+    print(m.match_probability, m.record.first_name, m.record.last_name)
+```
+
+An in-memory store can be persisted to and restored from disk, and exposes
+`update`/`delete` (which rebuild the index) alongside `add`:
+
+```python
+from entity_pipeline import MemoryVectorDatabase, HuggingFaceEmbeddingModel, FlatIndexingStrategy
+
+db = MemoryVectorDatabase(HuggingFaceEmbeddingModel(), FlatIndexingStrategy())
+db.add(people)
+db.save("data2")                                # writes index.faiss + records.pkl + metadata.json
+db.update([person], [3])                        # replace record at position 3
+db.delete([7])                                  # remove record at position 7
+
+db2 = MemoryVectorDatabase.load("data2")        # restore without re-embedding
+print(len(db2))
+```
+
+External stores implement `VectorDatabase` (update methods only) and do not
+need persistence.
+
+## Project Structure
+
+```
+entity-resolution/
+├── __init__.py           # Package exports (entity_pipeline API)
+├── requirements.txt      # Dependencies
+├── entity_pipeline.py    # Abstract Blocker/Linker pipeline + in-memory store
+├── scripts/              # Command-line / whitepaper evaluation scripts
+│   ├── common.py         # Shared helpers + dataset loader (reuse on other data)
+│   ├── generate_data.py  # Synthetic Canadian person generation
+│   ├── vector_store.py   # Legacy FAISS vector store (LangChain interface)
+│   ├── entity_resolver.py # Legacy Splink-based resolver
+│   ├── search_cli.py     # Load index and resolve one input person
+│   ├── extract_ncvoter.py # Pre-process the NC voter export into a person CSV
+│   ├── experiment_confusion_matrix.py  # Section 8 confusion-matrix experiment
+│   ├── experiment_section7_eval.py     # Section 7 benchmark suite
+│   ├── experiment_mu_calibration.py    # Section 8.1: supervised/EM vs untrained m/u
+│   ├── experiment_duplicate_benchmark.py  # Section 8.2: 100k duplicate-bearing benchmark
+│   ├── experiment_f1_sweep.py          # Section 8.3: threshold/address-weight F1 sweep
+│   ├── experiment_mu_tau_interaction.py   # Calibration-paradox decomposition
+│   ├── experiment_mu_prior_tau_surface.py # Joint (tau, prior) F1 surface
+│   ├── experiment_smoothing_sweep.py      # Calibration-paradox smoothing (Table 4)
+│   ├── experiment_paradox_figures.py      # Calibration-paradox mechanism figures/metrics
+│   ├── ncvoter/          # Real-data NC-voter experiments (mutation model)
+│   │   ├── ncvoter_util.py              # person mapping + mutation model
+│   │   ├── prepare_sample.py            # subsample the records CSV
+│   │   ├── experiment_blocking_recall.py
+│   │   ├── experiment_resolution.py
+│   │   └── experiment_f1_sweep.py
+│   └── *_results.json    # Saved experiment outputs
+├── data/                 # Persisted FAISS index and person metadata (synthetic)
+├── datasets/ncvoter/     # NC voter export + derived CSVs (not committed)
+├── examples/             # Runnable example projects (search a saved index)
+│   ├── cli_search/       #   Command-line search tool
+│   └── rest_service/     #   FastAPI REST search service
+├── results/
+│   ├── erwhitepaper/     # Canonical artifacts for the entity-resolution whitepaper
+│   │   └── ncvoter/      #   NC-voter artifacts
+│   └── calibration/      # Canonical artifacts for the calibration-paradox paper
+└── .docs/                # Paper/whitepaper LaTeX source and PDF
+```
+
+## Examples
+
+Two self-contained example projects search a persisted index (defaulting to
+`data/`) for a candidate row using `entity_pipeline`:
+
+- **Command-line tool** — `examples/cli_search/`:
+  ```bash
+  python examples/cli_search/search.py --index-dir data \
+    --first-name Robert --last-name Martinez --date-of-birth 1985-06-15 --threshold 0.85
+  ```
+- **REST service** — `examples/rest_service/` (FastAPI):
+  ```bash
+  pip install -r requirements.txt fastapi "uvicorn[standard]" pydantic
+  python examples/rest_service/app.py
+  curl -s http://127.0.0.1:8000/health
+  ```
+  `POST /search` accepts a JSON person body (plus optional `k`/`threshold`) and
+  returns ranked matches with probabilities.
+
+Each has its own `README.md` with full usage.
+
+## Reproducing the Experiments
+
+This section gives a reviewer everything needed to re-run every experiment
+reported in `.docs/entity_resolution_whitepaper.pdf`. Run all commands from the
+repository root after `pip install -e .`. Every experiment script
+supports `--help`; the defaults reproduce the numbers reported in the paper.
+
+The embedding model (`sentence-transformers/all-MiniLM-L6-v2`) is downloaded
+from Hugging Face on first use; set `HF_HOME`/`HF_TOKEN` if you run offline. The
+**revision is pinned** to commit `1110a243fdf4706b3f48f1d95db1a4f5529b4d41`
+(see `model_pins.py`): every embedding construction passes `revision=` to the
+model loader, so re-runs embed with the exact snapshot used for the reported
+results regardless of later model uploads. The
+**synthetic** experiments are fully self-contained and deterministic by seed
+(default 42). Only the NC Voter replication requires downloading an external
+export first (see below).
+
+### Synthetic experiments (paper Sections 7, 8, and calibration)
+
+| Paper section | Script | Command |
+|---|---|---|
+| §7 benchmark suite | `scripts/experiment_section7_eval.py` | `python scripts/experiment_section7_eval.py --count 5000 --ablation-count 500 --output results/erwhitepaper/section7_results.json --csv-output results/erwhitepaper/section7_metrics.csv` |
+| Blocking recall under clerical perturbations | `scripts/experiment_recall_perturbed.py` | `python scripts/experiment_recall_perturbed.py --index-dir data --per-kind 500 --k 20 --output results/erwhitepaper/recall_perturbed_results.json` |
+| §8 confusion matrix | `scripts/experiment_confusion_matrix.py` | `python scripts/experiment_confusion_matrix.py --count 5000 --output results/erwhitepaper/confusion_matrix_results.json` (add `--address-strength 0.8` for the weakened-address run) |
+| §8.1 m/u (supervised/EM vs untrained) | `scripts/experiment_mu_calibration.py` | `python scripts/experiment_mu_calibration.py --index-dir data --query-count 2000 --output results/erwhitepaper/mu_calibration_results.json` |
+| §8.2 duplicate-bearing benchmark | `scripts/experiment_duplicate_benchmark.py` | `python scripts/experiment_duplicate_benchmark.py --base-count 100000 --match-rate 0.03 --output results/erwhitepaper/training_results.json` |
+| §8.3 threshold/address-weight sweep | `scripts/experiment_f1_sweep.py` | `python scripts/experiment_f1_sweep.py --count 5000 --address-strengths 0.6 0.7 0.8 0.9 0.95 1.0 --output results/erwhitepaper/f1_sweep_results.json` |
+| Calibration-paradox decomposition | `scripts/experiment_mu_tau_interaction.py` | `python scripts/experiment_mu_tau_interaction.py --base-count 5000 --match-rate 0.03 --output results/calibration/mu_tau_interaction.json` |
+| Joint (τ, prior) F1 surface | `scripts/experiment_mu_prior_tau_surface.py` | `python scripts/experiment_mu_prior_tau_surface.py --base-count 5000 --output results/calibration/mu_prior_tau_surface.json` |
+| Calibration-paradox smoothing (Table 4) | `scripts/experiment_smoothing_sweep.py` | `python scripts/experiment_smoothing_sweep.py --index-dir data --query-count 2000 --output results/calibration/smoothing_sweep.json` |
+| Calibration-paradox mechanism figures/metrics | `scripts/experiment_paradox_figures.py` | `python scripts/experiment_paradox_figures.py --dataset ncvoter --out-dir results/calibration` and `... --dataset synthetic --out-dir results/calibration` |
+
+The entity-resolutions-whitepaper results are persisted under `results/erwhitepaper/`
+(and `results/erwhitepaper/ncvoter/` for the NC-voter runs); every table/figure in
+`.docs/entity_resolution_whitepaper.tex` cites the exact artifact that produced it, and
+`scripts/verify_claims.py` cross-checks each number in the paper against those artifacts
+(regenerate the manifest with `python scripts/verify_claims.py --manifest-out source_papers/claims_manifest.md`).
+The calibration-paradox results are persisted under `results/calibration/` and each
+table/figure in `.docs/calibration_paradox.tex` cites the artifact that produced it.
+
+`experiment_mu_calibration.py` loads the persisted 50,000-record index from
+`--index-dir data`. If that artifact is absent, regenerate it first:
+
+```bash
+python scripts/generate_data.py --count 50000 --missing-rate 0.3 --output-dir data
+```
+
+### NC Voter replication (paper Section 9) — data source and pre-processing
+
+The Section 9 experiments use the **North Carolina statewide voter-registration
+export**. Download it from the official source:
+
+- NCSBE voter registration data: <https://www.ncsbe.gov/results-data/voter-registration-data> (statewide file `ncvoter_Statewide.txt`).
+
+Place the file at `datasets/ncvoter/ncvoter_Statewide.txt`. The export is a
+tab-separated, quote-delimited file (~4 GB) with columns including `last_name`,
+`first_name`, `birth_year`, and the residential address fields
+(`res_street_address`, `res_city_desc`, `state_cd`, `zip_code`). It contains
+**no** full birth date and **no** email.
+
+Pre-process it into a standard person CSV (extract the relevant columns, keep
+birth year, omit the absent email, and drop rows with no first/last name):
+
+```bash
+python scripts/extract_ncvoter.py \
+  --input datasets/ncvoter/ncvoter_Statewide.txt \
+  --output datasets/ncvoter/ncvoter_records.csv
+```
+
+Then subsample a workable subset (the full file has ~9.2M records; the paper
+uses a 5,000-record uniform sample):
+
+```bash
+python scripts/ncvoter/prepare_sample.py \
+  --input datasets/ncvoter/ncvoter_records.csv \
+  --output datasets/ncvoter/sample_5000.csv --count 5000 --seed 42
+```
+
+### NC Voter experiments (with the mutation model)
+
+Because the registration file is already de-duplicated (no known duplicate
+pairs), these scripts apply a **synthetic mutation model** (`ncvoter_util.py`)
+to create realistic noisy duplicates: name typos (~55%), address
+changes/omissions (55%/20%), and birth-year shifts (~10%). Mutation rates and
+`--mutation-seed` are configurable.
+
+```bash
+# Blocking recall: does a mutated duplicate recover its clean base at k=5..100?
+python scripts/ncvoter/experiment_blocking_recall.py \
+  --sample datasets/ncvoter/sample_5000.csv --query-count 1000 --k 5 10 20 50 100 \
+  --output results/erwhitepaper/ncvoter/results_blocking_recall.json
+
+# Confusion matrix + F1 (re-run with --k 50 / --k 100 for the k-scaling analysis)
+python scripts/ncvoter/experiment_resolution.py \
+  --sample datasets/ncvoter/sample_5000.csv \
+  --in-index 3000 --pos-queries 1500 --neg-queries 1500 --k 20 --threshold 0.85 \
+  --output results/erwhitepaper/ncvoter/results_resolution.json
+
+# Threshold/address-weight F1 sweep
+python scripts/ncvoter/experiment_f1_sweep.py \
+  --sample datasets/ncvoter/sample_5000.csv \
+  --in-index 3000 --pos-queries 1500 --neg-queries 1500 \
+  --thresholds 0.85 0.9 0.95 --address-strengths 0.8 1.0 \
+  --output results/erwhitepaper/ncvoter/results_f1_sweep.json
+```
+
+Performance note for reviewers: `--k` grows the candidate set, and the scripts
+report the batched Splink scoring time alongside F1 (see Table `tab:ncvoter-k`
+in the paper). The `datasets/` folder — including the raw NC export and the
+derived CSVs — is not committed to the repository; reviewers must download or
+re-generate it exactly as described above.
+
+### Interpreting outputs
+
+Each experiment writes a JSON file (named by its `--output` argument) containing
+a `parameters` block (dataset size, `k`, `τ`, seed, missing rate), a `timing`
+block (index build, blocking, and Splink scoring seconds), and the result: a
+`confusion_matrix` + `metrics {accuracy, precision, recall, specificity, f1}`,
+or for the sweeps an `f1_by_tau` / `surface` / `best` grid. Trained-prior values
+(such as `mu_prior_em` or `em_prior_fitted`) capture the fitted
+`probability_two_random_records_match` discussed in the calibration-paradox
+section.
+
+## Splink Comparison Priority
+
+The Splink model is configured with the following priority order:
+
+| Priority | Field | Comparison | Reason |
+|----------|-------|------------|--------|
+| 1 (Highest) | First Name | Jaro-Winkler (0.9/0.8/0.7) | Core identity |
+| 1 (Highest) | Last Name | Jaro-Winkler (0.9/0.8/0.7) | Core identity |
+| 1 (Highest) | Date of Birth | Date-of-birth comparison | Immutable identifier |
+| 2 (Medium) | Email | Email comparison | Stable when present |
+| 3 (Lower) | Address | Jaro-Winkler (0.85/0.75/0.65) | Changes frequently |
+
+## Artifacts and Caveats
+
+The resolver produces match probabilities, FAISS cosine similarity scores,
+matched person records, and candidate rankings. `scripts/generate_data.py`
+persists `data/people.faiss` and `data/people.json`.
+
+The included data is synthetic and intended for evaluation. Splink currently
+uses untrained default `m/u` parameters; production use requires calibration
+on labelled pairs. The current `IndexFlatIP` query is a linear scan, so HNSW,
+IVF/PQ, sharding, or an external vector database should be benchmarked at
+larger scale. The confusion-matrix and Section 7 evaluators batch Splink
+inference for throughput; the production resolver remains per-query.
+
+The whitepaper is available at `.docs/entity_resolution_whitepaper.pdf`, with
+source in `.docs/entity_resolution_whitepaper.tex`.
+
+## Requirements
+
+- Python 3.10+
+- FAISS (CPU)
+- Splink 4.0+ (with DuckDB)
+- sentence-transformers
+- langchain-huggingface, langchain-core
+- faker (for data generation)

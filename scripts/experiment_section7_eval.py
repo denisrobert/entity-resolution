@@ -34,9 +34,10 @@ from splink import Linker, block_on
 from common import load_records
 from entity_pipeline import default_comparisons
 from generate_data import Person, generate_people, introduce_variations
+from model_pins import EMBEDDING_MODEL_ID  # noqa: E402
 
 
-DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_MODEL = EMBEDDING_MODEL_ID
 DEFAULT_THRESHOLDS = (0.50, 0.65, 0.75, 0.85, 0.90, 0.95)
 DEFAULT_K_VALUES = (10, 20, 50, 100)
 DEFAULT_SCORING_K = 20
@@ -77,8 +78,13 @@ def build_index(
     strategy: str,
 ) -> tuple[Any, Any, list[str], float]:
     """Build a normalized FAISS index and return its embedding client."""
+    from model_pins import embedding_model_kwargs
+
     start = time.perf_counter()
-    embedding = HuggingFaceEmbeddings(model_name=model_name)
+    embedding = HuggingFaceEmbeddings(
+        model_name=model_name,
+        model_kwargs=embedding_model_kwargs(),
+    )
     texts = [serialize(person, strategy) for person in people]
     vectors = np.asarray(embedding.embed_documents(texts), dtype="float32")
     faiss.normalize_L2(vectors)
@@ -107,16 +113,30 @@ def perturb_address(person: Person) -> Person:
 
 
 def make_cases(people: list[Person], seed: int) -> list[dict[str, Any]]:
-    """Create labelled positive and negative cases with their true row index."""
-    unrelated = generate_people(len(people), missing_rate=0.3, seed=seed + 1)
+    """Create labelled positive and negative cases with their true row index.
+
+    Option B deck: for each reference row an identical positive, a positive per
+    PersonPerturbator kind the record supports, the legacy ``introduce_variations``
+    close positive, and an unrelated negative. Case dicts carry ``category``
+    (identical | <kind> | close | unrelated) and ``true_index`` for strict
+    per-row scoring.
+    """
+    from common import perturbed_case_tuples
+
+    tuples = perturbed_case_tuples(
+        people, len(people), seed, close_variation_rate=0.15,
+        include_identical=True, include_close=True,
+    )
     cases: list[dict[str, Any]] = []
-    for index, (person, negative) in enumerate(zip(people, unrelated)):
-        close = introduce_variations(person, variation_rate=0.15)
-        cases.extend([
-            {"id": f"identical_{index}", "category": "identical", "person": person, "true_index": index, "label": 1},
-            {"id": f"close_{index}", "category": "close", "person": close, "true_index": index, "label": 1},
-            {"id": f"unrelated_{index}", "category": "unrelated", "person": negative, "true_index": None, "label": 0},
-        ])
+    for query_id, category, person, expected_match, ref_index in tuples:
+        cases.append({
+            "id": query_id,
+            "category": category,
+            "person": person,
+            "true_index": ref_index if expected_match else None,
+            "label": 1 if expected_match else 0,
+            "expected_match": expected_match,
+        })
     return cases
 
 
@@ -127,18 +147,22 @@ def search_candidates(
     strategy: str,
     k: int,
 ) -> tuple[np.ndarray, np.ndarray, list[float]]:
-    """Return candidate indices and per-query FAISS latency samples."""
-    indices: list[np.ndarray] = []
-    scores: list[np.ndarray] = []
-    latencies: list[float] = []
-    for case in cases:
-        start = time.perf_counter()
-        vector = np.asarray([embedding.embed_query(serialize(case["person"], strategy))], dtype="float32")
-        faiss.normalize_L2(vector)
-        query_scores, query_indices = index.search(vector, min(k, index.ntotal))
-        latencies.append((time.perf_counter() - start) * 1000)
-        scores.append(query_scores[0])
-        indices.append(query_indices[0])
+    """Return candidate indices and per-query FAISS latency samples.
+
+    Queries are embedded in one batched ``embed_documents`` call (the same
+    batching the confusion-matrix path uses) rather than one ``embed_query`` per
+    case, which keeps the 40k-query Option B deck from thrashing memory.
+    """
+    texts = [serialize(case["person"], strategy) for case in cases]
+    start = time.perf_counter()
+    vectors = np.asarray(embedding.embed_documents(texts), dtype="float32")
+    embed_seconds = time.perf_counter() - start
+    faiss.normalize_L2(vectors)
+    min_k = min(k, index.ntotal)
+    scores, indices = index.search(vectors, min_k)
+    # Per-query latency estimate: average embedding + search time spread evenly.
+    per_query_ms = embed_seconds / max(1, len(cases)) * 1000
+    latencies: list[float] = [per_query_ms] * len(cases)
     return np.asarray(scores), np.asarray(indices), latencies
 
 
@@ -175,6 +199,8 @@ def splink_scores(cases: list[dict[str, Any]], candidate_indices: np.ndarray, pe
     from collections import defaultdict
     from scorer import SplinkScorer
 
+    base_records = [person.to_dict() for person in people]
+
     candidate_records: list[dict[str, Any]] = []
     by_block: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for query_number, case in enumerate(cases):
@@ -189,7 +215,9 @@ def splink_scores(cases: list[dict[str, Any]], candidate_indices: np.ndarray, pe
             candidate_records.append(candidate)
             by_block[query_number].append(candidate)
 
-    scorer = SplinkScorer.from_comparisons(default_comparisons(), prior=0.0001)
+    scorer = SplinkScorer.from_comparisons(
+        default_comparisons(), prior=0.0001, base_records=base_records,
+    )
     result = {case["id"]: 0.0 for case in cases}
     best_pos = {case["id"]: None for case in cases}
     for query_number, case in enumerate(cases):
@@ -290,6 +318,16 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
             positives = [case for case in cases if case["true_index"] is not None]
             blocking[str(k)] = {"hits": len(hits), "positives": len(positives), "recall": len(hits) / len(positives)}
         thresholds = {str(threshold): classification_metrics(cases, probabilities, threshold, best_pos) for threshold in args.thresholds}
+        # Per-category metrics at the default (first) threshold: how each
+        # perturbation kind behaves through the full pipeline.
+        first_tau = str(args.thresholds[0])
+        by_category = {
+            cat: classification_metrics(
+                [c for c in cases if c["category"] == cat],
+                probabilities, args.thresholds[0], best_pos,
+            )
+            for cat in sorted({c["category"] for c in cases})
+        }
         with tempfile.TemporaryDirectory(prefix="entity_eval_") as temp_dir:
             index_dir = Path(temp_dir)
             faiss.write_index(index, str(index_dir / "people.faiss"))
@@ -305,6 +343,7 @@ def run_evaluation(args: argparse.Namespace) -> dict[str, Any]:
             "blocking_recall": blocking,
             "scoring_k": scoring_k,
             "threshold_metrics": thresholds,
+            "by_category": {"threshold": first_tau, "categories": by_category},
             "calibration": calibration_bins(cases, probabilities),
             "latency_ms": {
                 "mean": statistics.mean(latencies),
@@ -351,6 +390,7 @@ def run_ablations(people: list[Person], embedding: Any, index: Any, strategy: st
 
 def write_csv(results: dict[str, Any], output: Path) -> None:
     """Write the main metric tables as a single flat CSV."""
+    output.parent.mkdir(parents=True, exist_ok=True)
     rows = []
     for strategy, values in results["strategies"].items():
         for k, metric in values["blocking_recall"].items():
@@ -376,12 +416,13 @@ def main() -> None:
     parser.add_argument("--k-values", type=int, nargs="+", default=list(DEFAULT_K_VALUES))
     parser.add_argument("--thresholds", type=float, nargs="+", default=list(DEFAULT_THRESHOLDS))
     parser.add_argument("--strategies", nargs="+", default=["default", "identity_first", "compact"], choices=["default", "identity_first", "compact"])
-    parser.add_argument("--output", type=Path, default=Path("section7_results.json"))
-    parser.add_argument("--csv-output", type=Path, default=Path("section7_metrics.csv"))
+    parser.add_argument("--output", type=Path, default=Path("results/erwhitepaper/section7_results.json"))
+    parser.add_argument("--csv-output", type=Path, default=Path("results/erwhitepaper/section7_metrics.csv"))
     args = parser.parse_args()
     if args.ablation_count > args.count:
         parser.error("--ablation-count cannot exceed --count")
     results = run_evaluation(args)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(results, indent=2), encoding="utf-8")
     write_csv(results, args.csv_output)
     print(f"Saved JSON results to {args.output}")

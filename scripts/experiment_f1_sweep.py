@@ -38,26 +38,32 @@ import splink  # noqa: E402
 from splink import Linker, block_on  # noqa: E402
 
 from entity_pipeline import default_comparisons, weaken_comparison  # noqa: E402
+from model_pins import EMBEDDING_MODEL_ID
 from generate_data import Person, generate_people  # noqa: E402
 from common import load_records, make_non_identical_close_person  # noqa: E402
 from vector_store import build_person_store  # noqa: E402
 
-DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_MODEL = EMBEDDING_MODEL_ID
 DEFAULT_MISSING_RATE = 0.3
 DEFAULT_BLOCKING_K = 20
 DEFAULT_THRESHOLDS = (0.85, 0.87, 0.90, 0.92, 0.95)
 DEFAULT_ADDRESS_STRENGTHS = (0.6, 0.8, 0.9, 1.0)
 
 
-def build_cases(people: list[Person], unrelated: list[Person], close_rate: float):
-    """Identical / close / unrelated labelled queries (3 per person)."""
-    cases = []
-    for index, (person, other) in enumerate(zip(people, unrelated)):
-        close = make_non_identical_close_person(person, close_rate)
-        cases.append((f"Q_{index}_identical", "identical", person, True))
-        cases.append((f"Q_{index}_close", "close_same_entity", close, True))
-        cases.append((f"Q_{index}_unrelated", "unrelated", other, False))
-    return cases
+def build_cases(people: list[Person], unrelated: list[Person], close_rate: float, seed: int = 42):
+    """Option B perturbed deck: identical + six clerical kinds + close + unrelated.
+
+    Delegates to ``common.perturbed_case_tuples`` so the threshold/address sweep
+    sees the same hard positives as the confusion-matrix and Section 7 decks.
+    ``unrelated`` is generated inside the shared builder (seeded), so the argument
+    is accepted for signature compatibility but not used.
+    """
+    from common import perturbed_case_tuples
+
+    return perturbed_case_tuples(
+        people, len(people), seed=seed, close_variation_rate=close_rate,
+        include_identical=True, include_close=True,
+    )
 
 
 def block_all(queries: list[tuple[str, Person]], store: Any, k: int):
@@ -86,11 +92,12 @@ def block_all(queries: list[tuple[str, Person]], store: Any, k: int):
     return pd.DataFrame(query_records), pd.DataFrame(candidate_records)
 
 
-def score_all(query_df: pd.DataFrame, candidate_df: pd.DataFrame, comparisons) -> dict[str, float]:
+def score_all(query_df: pd.DataFrame, candidate_df: pd.DataFrame, comparisons, base_records=None) -> dict[str, float]:
     """Return {query_id: max match probability} for one comparison config.
 
     Uses the lightweight Splink-trained scorer over ``comparisons`` (no batched
-    Splink Linker).
+    Splink Linker). ``base_records`` (reference population dicts) enables
+    term-frequency adjustments.
     """
     from collections import defaultdict
     from scorer import SplinkScorer
@@ -101,7 +108,7 @@ def score_all(query_df: pd.DataFrame, candidate_df: pd.DataFrame, comparisons) -
     for cd in candidate_records:
         by_block[cd["block_id"]].append(cd)
 
-    scorer = SplinkScorer.from_comparisons(comparisons, prior=0.0001)
+    scorer = SplinkScorer.from_comparisons(comparisons, prior=0.0001, base_records=base_records)
     probs: dict[str, float] = {}
     for qi, qd in enumerate(query_records):
         qid = qd["unique_id"]
@@ -116,7 +123,8 @@ def score_all(query_df: pd.DataFrame, candidate_df: pd.DataFrame, comparisons) -
 
 def evaluate_threshold(cases, probs: dict[str, float], threshold: float) -> dict[str, Any]:
     matrix = {"TP": 0, "FN": 0, "FP": 0, "TN": 0}
-    for query_id, _, _, expected in cases:
+    for case in cases:
+        query_id, _, _, expected, *_ = case
         predicted = probs.get(query_id, 0.0) >= threshold
         if expected and predicted:
             matrix["TP"] += 1
@@ -147,8 +155,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     else:
         people = generate_people(args.count, missing_rate=args.missing_rate, seed=args.seed)
     unrelated = generate_people(args.count, missing_rate=args.missing_rate, seed=args.seed + 1)
-    cases = build_cases(people, unrelated, args.close_variation_rate)
-    queries = [(query_id, person) for query_id, _, person, _ in cases]
+    cases = build_cases(people, unrelated, args.close_variation_rate, args.seed)
+    queries = [(query_id, person) for query_id, _, person, _, _ in cases]
 
     print(f"Building FAISS index for {args.count:,} reference records...")
     start = time.perf_counter()
@@ -170,7 +178,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             comparisons = [*comparisons[:4], weaken_comparison(comparisons[4], strength=strength)]
         print(f"Scoring all pairs under address_strength={strength}...")
         start = time.perf_counter()
-        probs = score_all(query_df, candidate_df, comparisons)
+        probs = score_all(query_df, candidate_df, comparisons, base_records=[p.to_dict() for p in people])
         score_seconds = time.perf_counter() - start
         for threshold in args.thresholds:
             evaluation = evaluate_threshold(cases, probs, threshold)
@@ -217,10 +225,11 @@ def main() -> None:
     parser.add_argument("--address-strengths", type=float, nargs="+", default=list(DEFAULT_ADDRESS_STRENGTHS))
     parser.add_argument("--input-records", type=Path, default=None,
                         help="JSON/CSV file of person records to use as the base population (instead of synthetic)")
-    parser.add_argument("--output", default="f1_sweep_results.json")
+    parser.add_argument("--output", default="results/erwhitepaper/f1_sweep_results.json")
     args = parser.parse_args()
 
     results = run(args)
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(f"Saved results to {args.output}")
     print("Best:", json.dumps(results["best"]))

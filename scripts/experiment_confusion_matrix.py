@@ -20,17 +20,28 @@ import pandas as pd
 import splink
 from splink import Linker, block_on
 
-from common import classify, identity_collisions, load_records, make_non_identical_close_person, environment_block
+from common import (
+    classify,
+    identity_collisions,
+    load_records,
+    make_non_identical_close_person,
+    environment_block,
+    perturbed_case_tuples,
+)
 from entity_pipeline import default_comparisons, weaken_comparison
 from generate_data import Person, generate_people
 from vector_store import build_person_store
+from model_pins import EMBEDDING_MODEL_ID
+from person_perturbation import Perturbation
 
 
-DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_MODEL = EMBEDDING_MODEL_ID
 DEFAULT_MISSING_RATE = 0.3
 DEFAULT_BLOCKING_K = 20
 DEFAULT_THRESHOLD = 0.85
 DEFAULT_CLOSE_VARIATION_RATE = 0.15
+# The positive categories of the Option B perturbed deck (order == report order).
+POSITIVE_CATEGORIES = ["identical"] + [k.value for k in Perturbation] + ["close_same_entity"]
 
 def decode_matched_positions(
     predictions: pd.DataFrame,
@@ -119,7 +130,10 @@ def predict_batch(
             })
             candidate_records.append(candidate)
 
-    scorer = SplinkScorer.from_comparisons(comparisons, prior=0.0001, threshold=threshold)
+    scorer = SplinkScorer.from_comparisons(
+        comparisons, prior=0.0001, threshold=threshold,
+        base_records=[person.to_dict() for person in store.people],
+    )
     by_block: dict[int, list[dict]] = defaultdict(list)
     for cd in candidate_records:
         by_block[cd["block_id"]].append(cd)
@@ -152,8 +166,13 @@ def run_test(
     seed: int = 42,
     address_strength: float = 1.0,
     input_records: str | Path | None = None,
+    positive_kind: str = "perturbed",
 ) -> dict[str, Any]:
-    """Build a reference index and evaluate three generated rows per person.
+    """Build a reference index and evaluate the labelled query deck per reference.
+
+    ``positive_kind='perturbed'`` uses the Option B deck (identical + the six
+    clerical perturbations + close + unrelated); ``'basic'`` reproduces the old
+    three-query identical / close / unrelated deck for comparison.
 
     When ``input_records`` is provided, the base reference population is loaded
     from that file (JSON/CSV) instead of being generated synthetically, so the
@@ -165,7 +184,6 @@ def run_test(
         count = len(people)
     else:
         people = generate_people(count, missing_rate=missing_rate, seed=seed)
-    unrelated_people = generate_people(count, missing_rate=missing_rate, seed=seed + 1)
 
     print(f"Building FAISS index for {count:,} reference records...")
     start = time.perf_counter()
@@ -173,24 +191,32 @@ def run_test(
     build_seconds = time.perf_counter() - start
     matrix = {"TP": 0, "FN": 0, "FP": 0, "TN": 0}
     category_counts = {
-        "identical": {"expected_match": True, "TP": 0, "FN": 0},
-        "close_same_entity": {"expected_match": True, "TP": 0, "FN": 0},
-        "unrelated": {"expected_match": False, "FP": 0, "TN": 0},
+        cat: {"expected_match": True, "TP": 0, "FN": 0} for cat in POSITIVE_CATEGORIES
     }
-    total_queries = count * 3
-    test_cases = []
-    for index, (person, unrelated) in enumerate(zip(people, unrelated_people)):
-        close = make_non_identical_close_person(person, close_variation_rate)
-        test_cases.extend([
-            (f"Q_{index}_identical", "identical", person, True),
-            (f"Q_{index}_close", "close_same_entity", close, True),
-            (f"Q_{index}_unrelated", "unrelated", unrelated, False),
-        ])
+    category_counts["unrelated"] = {"expected_match": False, "FP": 0, "TN": 0}
+    # Option B deck: identical + six PersonPerturbator kinds (when the record
+    # carries the required field) + the legacy close variant + unrelated.
+    if positive_kind == "perturbed":
+        test_cases = perturbed_case_tuples(
+            people, count, seed, close_variation_rate,
+            include_identical=True, include_close=True,
+        )
+    else:
+        from common import build_case_queries
+
+        test_cases = build_case_queries(people, count, close_variation_rate, seed)
+        # 4-tuples -> 5-tuples (ref_index = row base index)
+        test_cases = [
+            (query_id, category, person, expected, int(query_id.split("_")[1]))
+            for query_id, category, person, expected in test_cases
+        ]
+    total_queries = len(test_cases)
+    queries_per_row = total_queries / count if count else 0
 
     print(f"Running batched FAISS blocking and Splink scoring for {total_queries:,} queries...")
     start = time.perf_counter()
     matched_query_ids, best_position, candidate_indices = predict_batch(
-        [(query_id, query) for query_id, _, query, _ in test_cases],
+        [(query_id, query) for query_id, _, query, _, _ in test_cases],
         store,
         blocking_k,
         threshold,
@@ -203,32 +229,33 @@ def run_test(
     # other row is not a hit and counts as FN. Unrelated queries are FP if matched
     # to anything (any match is spurious).
 
-    for query_index, (query_id, category, _, expected_match) in enumerate(test_cases):
+    for query_index, (query_id, category, _, expected_match, ref_index) in enumerate(test_cases):
         if not expected_match:
             result = {} if query_id in matched_query_ids else None
             cell = classify(expected_match, result)
         else:
-            ref_pos = query_index // 3
-            matched_correct_row = best_position.get(query_id) == ref_pos
+            matched_correct_row = best_position.get(query_id) == ref_index
             cell = 'TP' if matched_correct_row else 'FN'
         matrix[cell] += 1
+        category_counts.setdefault(category, {"expected_match": expected_match, "TP": 0, "FN": 0})
         category_counts[category][cell] += 1
 
 
     # Blocking recall measured on the *same* query set and index: a positive
-    # (identical / close) query is "blocked" if its true reference position is
-    # among the top-k neighbours, independent of the Splink decision.
+    # query is "blocked" if its true reference position is among the top-k
+    # neighbours, independent of the Splink decision.
     blocking = {
         "k": blocking_k,
-        "by_category": {"identical": {"blocked": 0, "positives": 0, "recall": 0.0},
-                        "close_same_entity": {"blocked": 0, "positives": 0, "recall": 0.0}},
-        "blocked_in_but_rejected": {"identical": 0, "close_same_entity": 0},
+        "by_category": {
+            cat: {"blocked": 0, "positives": 0, "recall": 0.0}
+            for cat in POSITIVE_CATEGORIES
+        },
+        "blocked_in_but_rejected": {cat: 0 for cat in POSITIVE_CATEGORIES},
     }
-    for query_index, (query_id, category, person, expected_match) in enumerate(test_cases):
+    for query_index, (query_id, category, person, expected_match, ref_index) in enumerate(test_cases):
         if category not in blocking["by_category"]:
             continue  # only positive categories contribute to blocking recall
-        ref_pos = query_index // 3  # identical/close share the base index of the row
-        blocked = ref_pos in candidate_indices[query_index][:blocking_k]
+        blocked = ref_index in candidate_indices[query_index][:blocking_k]
         cat = blocking["by_category"][category]
         cat["positives"] += 1
         if blocked:
@@ -237,8 +264,8 @@ def run_test(
                 blocking["blocked_in_but_rejected"][category] += 1
     for cat in blocking["by_category"].values():
         cat["recall"] = cat["blocked"] / cat["positives"] if cat["positives"] else 0.0
-    pos_blocked = blocking["by_category"]["identical"]["blocked"] + blocking["by_category"]["close_same_entity"]["blocked"]
-    pos_total = blocking["by_category"]["identical"]["positives"] + blocking["by_category"]["close_same_entity"]["positives"]
+    pos_blocked = sum(c["blocked"] for c in blocking["by_category"].values())
+    pos_total = sum(c["positives"] for c in blocking["by_category"].values())
     blocking["overall_recall"] = pos_blocked / pos_total if pos_total else 0.0
 
     positive_total = matrix["TP"] + matrix["FN"]
@@ -252,12 +279,33 @@ def run_test(
         "f1": (2 * matrix["TP"] / (2 * matrix["TP"] + matrix["FP"] + matrix["FN"]))
         if 2 * matrix["TP"] + matrix["FP"] + matrix["FN"] else 0.0,
     }
+    # Per-category precision/recall/F1 (positive categories have TP/FN counts;
+    # the unrelated category has FP/TN counts only).
+    category_metrics: dict[str, dict[str, Any]] = {}
+    for cat, counts in category_counts.items():
+        if cat == "unrelated":
+            category_metrics[cat] = {
+                "queries": counts["FP"] + counts["TN"],
+                "FP": counts["FP"],
+                "TN": counts["TN"],
+            }
+            continue
+        tp, fn = counts["TP"], counts["FN"]
+        category_metrics[cat] = {
+            "queries": tp + fn,
+            "TP": tp,
+            "FN": fn,
+            "precision": tp / (tp + counts.get("FP", 0)) if tp + counts.get("FP", 0) else 0.0,
+            "recall": tp / (tp + fn) if tp + fn else 0.0,
+            "f1": (2 * tp / (2 * tp + fn)) if 2 * tp + fn else 0.0,
+        }
     return {
         "parameters": {
             "reference_records": count,
             "test_rows": count,
-            "queries_per_test_row": 3,
+            "queries_per_test_row": round(queries_per_row, 3),
             "total_queries": total_queries,
+            "positive_categories": POSITIVE_CATEGORIES,
             "missing_rate": missing_rate,
             "model_name": model_name,
             "blocking_k": blocking_k,
@@ -265,6 +313,7 @@ def run_test(
             "close_variation_rate": close_variation_rate,
             "seed": seed,
             "address_strength": address_strength,
+            "positive_kind": positive_kind,
         },
         "timing": {
             "index_build_seconds": build_seconds,
@@ -273,6 +322,7 @@ def run_test(
         },
         "confusion_matrix": matrix,
         "by_category": category_counts,
+        "category_metrics": category_metrics,
         "blocking_recall": blocking,
         "identity_collisions": {
             "count": len(identity_collisions(test_cases)),
@@ -297,7 +347,10 @@ def main() -> None:
                         help="Weaken address evidence: scale address agreement m by this factor (<1 = weaker)")
     parser.add_argument("--input-records", type=Path, default=None,
                         help="JSON/CSV file of person records to use as the base population (instead of synthetic)")
-    parser.add_argument("--output", default="confusion_matrix_results.json")
+    parser.add_argument("--positive-kind", choices=("perturbed", "basic"), default="perturbed",
+                        help="'perturbed' = Option B deck (identical + six PersonPerturbator kinds "
+                             "+ close + unrelated); 'basic' = old 3-query identical/close/unrelated deck")
+    parser.add_argument("--output", default="results/erwhitepaper/confusion_matrix_results.json")
     args = parser.parse_args()
 
     results = run_test(
@@ -310,7 +363,9 @@ def main() -> None:
         seed=args.seed,
         address_strength=args.address_strength,
         input_records=args.input_records,
+        positive_kind=args.positive_kind,
     )
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
     Path(args.output).write_text(json.dumps(results, indent=2), encoding="utf-8")
 
     print(json.dumps(results["confusion_matrix"], indent=2))
