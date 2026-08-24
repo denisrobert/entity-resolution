@@ -338,6 +338,7 @@ For **your** data: population-based scripts accept `--input-records FILE`.
 
 Whitepaper: `docs/entity_resolution_whitepaper.pdf` (source: `.tex`).
 
+- **§2 System Objective & Data Model** — the data model and a **central architecture diagram** (Fig. 1) showing the offline build, the per-query embed→block→score→decide path, and the trained weights feeding the matcher.
 - **§3 Two-Stage** — blocking/linkage contract and costs; **Address volatility & temporal decay** (§3.5) consolidates why address evidence changes, the continuous retrieval-time decay and the bucketed comparison-level alternative, and their measured impact.
 - **§7 Evaluation** — recall, thresholds, latency, ablations.
 - **§8, 8.1, 8.2, 8.3** — headline results and the "don't retune alone" evidence.

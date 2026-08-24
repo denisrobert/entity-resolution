@@ -8,6 +8,8 @@
 \usepackage{enumitem}
 \usepackage{hyperref}
 \usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
 \usepackage{draftwatermark}
 \SetWatermarkText{DRAFT}
 \SetWatermarkScale{1.2}
@@ -52,6 +54,54 @@ The reference population contains 50,000 synthetic Canadian person records. Each
   \item a Canadian address; and
   \item an email address.
 \end{itemize}
+
+\paragraph{Pipeline architecture.}
+Figure~\ref{fig:architecture} gives the central view of the pipeline that the rest of the paper evaluates stage by stage. It is an \emph{incremental}, two-stage resolver over a fixed reference population: the reference is embedded once and persisted as a normalized FAISS index (with the person metadata alongside), then every incoming query follows the same per-request path --- embed the query with the same model, retrieve the top-$k$ candidates by cosine similarity, score those candidates with the Fellegi--Sunter matcher, and emit the match decision under the operating threshold. Two properties of this flow recur throughout the paper. First, the reference index and its metadata are built offline and load without re-embedding, so the online path never touches the bulk of the data. Second, the matcher is a lightweight scorer over the trained comparison weights (trained once with Splink, served at query time by custom code that reuses Splink's comparison definitions), which is what keeps the per-request cost to tens of milliseconds rather than a per-query Splink \texttt{Linker} construction.
+
+\begin{figure}[h]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\footnotesize,
+  node distance=0.5cm and 0.35cm,
+  box/.style={draw, rounded corners=2pt, align=center, inner sep=3pt,
+              fill=black!4, text width=2.55cm, minimum height=1.15cm},
+  arrow/.style={-{Stealth[length=2mm]}, thick, color=black!70},
+]
+
+% Offline row (top): build, reference, persist
+\node[box] (build) {Offline build\\embed reference\\population, persist\\FAISS index + metadata};
+\node[box, right=of build] (ref) {Reference store\\normalized vectors\\+ person metadata\\(50{,}000 records)};
+\node[box, right=of ref] (persist) {Persisted\\people.faiss\\+ people.json};
+
+\draw[arrow] (build) -- (ref);
+\draw[arrow] (ref) -- (persist);
+\draw[arrow] (persist) -- ++(0,-1.75) -| (ref.south);
+
+% Online row (bottom): query path
+\node[box, below=1.1cm of build] (query) {Query record\\(incomplete person)};
+\node[box, right=of query] (embed) {Embed query\\same model\\as reference};
+\node[box, right=of embed] (block) {Block\\FAISS top-$k$\\cosine similarity,\\$k$ = 20};
+\node[box, right=of block] (score) {Score candidates\\Fellegi--Sunter\\weights, $m/u$ + prior};
+\node[box, right=of score] (match) {Match decision\\$p(M|\gamma)\ge\tau$};
+
+\draw[arrow] (query) -- (embed);
+\draw[arrow] (embed) -- (block);
+\draw[arrow] (block) -- (score);
+\draw[arrow] (score) -- (match);
+
+% The persisted index feeds the blocking stage (straight vertical link)
+\draw[arrow] (persist.south) -- (block.north);
+
+% Trained weights feed the matcher
+\node[box, below=0.6cm of match] (trained) {Trained weights\\$m/u$, prior\\(Splink, offline)};
+\draw[arrow] (trained.north) -- (match.south);
+
+\end{tikzpicture}%
+}
+\caption{Pipeline architecture: an offline build embeds the reference population once and persists the vector index plus metadata; each incremental query embeds with the same model, blocks to the top-$k$ cosine neighbours, scores them with the trained Fellegi--Sunter weights, and emits the thresholded match decision. The trained weights come from a one-time Splink pass reused at query time by the lightweight scorer.}
+\label{fig:architecture}
+\end{figure}
 
 \paragraph{Synthetic-data generator.} The population is produced by the project\textquoteright s \texttt{generate\_data.py} with a fixed seed (42). Given names are gender-correlated: each record is drawn male with probability 0.498 (Statistics Canada 2021 Census share) and the given name is sampled from the male or female Faker name pool accordingly. The province or territory is sampled weighted by its 2021 Census resident population, so Ontario (~38\%), Quebec (~23\%), British Columbia (~14\%), and Alberta (~12\%) dominate as in the real national distribution. Addresses are Faker Canadian addresses whose postal-code forward-sortation-area prefix letter is drawn from the Canada Post mapping for that province (e.g.\ K--P for Ontario, G/H/J for Quebec, V for British Columbia), so the code and the province in a record always agree. Emails are Faker \texttt{ascii\_safe\_email()} addresses (varied local parts and example domains) rather than a mechanical name-based pattern, and ~30\% of addresses and emails are independently omitted. Last names are drawn from Faker\textquoteright s en\_CA surname pool; a non-English given-name distribution is left as future work.
 
@@ -132,7 +182,7 @@ The offline process in \texttt{generate\_data.py} performs the following steps:
 The metadata file is deliberately separate from the FAISS binary index. FAISS stores the vectors and their positional order; the JSON file stores the record associated with each position. Loading reconstructs the embedding client and reuses the saved vectors without re-embedding the reference population.
 
 \subsection{Online blocking}
-Given a query record $q$, the online (incremental) process embeds the same textual representation and searches the index for the top $k$ records; each query is handled independently and immediately, without rebuilding or re-clustering the reference population (that is the defining incremental property and why the pipeline is a per-request resolver rather than a batch linker). The default is $k=20$. If $e(q)$ and $e(r)$ are normalized query and reference vectors, the blocking score is
+Given a query record $q$, the online (incremental) process embeds the same textual representation and searches the index for the top $k$ records; each query is handled independently and immediately, without rebuilding or re-clustering the reference population (the defining incremental property; see Figure~\ref{fig:architecture}). The default is $k=20$. If $e(q)$ and $e(r)$ are normalized query and reference vectors, the blocking score is
 \[
  s_{\mathrm{FAISS}}(q,r) = e(q)^T e(r),
 \]

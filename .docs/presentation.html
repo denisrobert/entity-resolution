@@ -393,6 +393,7 @@ Store     : add / update / delete / save / load (no re-embed on load)
 <h1 id="where-the-details-live">Where the details live</h1>
 <p>Whitepaper: <code>docs/entity_resolution_whitepaper.pdf</code> (source: <code>.tex</code>).</p>
 <ul>
+<li><strong>§2 System Objective &amp; Data Model</strong> — the data model and a <strong>central architecture diagram</strong> (Fig. 1) showing the offline build, the per-query embed→block→score→decide path, and the trained weights feeding the matcher.</li>
 <li><strong>§3 Two-Stage</strong> — blocking/linkage contract and costs; <strong>Address volatility &amp; temporal decay</strong> (§3.5) consolidates why address evidence changes, the continuous retrieval-time decay and the bucketed comparison-level alternative, and their measured impact.</li>
 <li><strong>§7 Evaluation</strong> — recall, thresholds, latency, ablations.</li>
 <li><strong>§8, 8.1, 8.2, 8.3</strong> — headline results and the &quot;don't retune alone&quot; evidence.</li>
