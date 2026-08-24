@@ -86,7 +86,7 @@ available copies are flagged with the local link in their row.
 | `pipeline` | whitepaper, paradox, batch | `.docs/entity_resolution_whitepaper.tex` |
 | `paradox` | whitepaper, batch | `.docs/calibration_paradox.tex` |
 | `vectordedupbatch` | whitepaper | `.docs/vector_dedup_batch.tex` |
-| `decaynote` | whitepaper | “Why the decaying address weight cannot be absorbed into m/u” (technical note, 2026) |
+| `decaynote` | whitepaper | “Why the decaying address weight cannot be absorbed into m/u” (technical note, 2026) — source file: `.docs/design_note_mu_cannot_capture_decay.md`|
 | `decaylitreview` | whitepaper | “Time decay in Fellegi–Sunter record linkage: a literature survey” (technical note, 2026) — source file: `.docs/decay-in-fs-litreview.tex` |
 
 

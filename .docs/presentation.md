@@ -2,9 +2,9 @@
 marp: true
 theme: default
 paginate: true
-title: Entity Resolution with FAISS + Splink
+title: Two-Stage Incremental Entity Resolution (FAISS + Splink)
 author: Denis Robert
-footer: Entity Resolution with FAISS + Splink
+footer: Two-Stage Incremental Entity Resolution — FAISS + Splink
 size: 16:9
 ---
 
@@ -49,8 +49,9 @@ Part 2 Engineering leadership (architecture & design), Part 3 Line engineers
 (orientation; these teammates go hands-on with the code after the talk).
 -->
 
-# Entity Resolution with FAISS + Splink
-## One system, three conversations
+# Two-Stage Incremental Entity Resolution
+## FAISS blocking + Splink matching — online, per-query
+### One system, three conversations
 
 Denis Robert
 
@@ -87,12 +88,14 @@ Wrong answers are expensive: linking two *different* people is usually far worse
 
 # The solution: two stages
 
-> **Fast retrieval + explainable matching.**
+> **Fast retrieval + explainable matching — incremental (online, per-query).**
 
 ```
 Query ──► [embed] ──► [FAISS top-k]
       ──► [trained scorer] ──► Match / No match
 ```
+
+> This is an **incremental** resolver: it matches one incoming record against a fixed reference on demand (API / streaming insert). It is **not** a batch ER engine — it scores top-`k` candidates per query rather than materialising and clustering all pairwise comparisons at once.
 
 - **Blocking** (FAISS): cheaply finds the few most likely matches.
 - **Linkage** (trained scorer): weighs the evidence per field and returns a probability, not just yes/no. Splink trains the `m/u`; a lightweight scorer serves them per query.
@@ -101,8 +104,9 @@ Query ──► [embed] ──► [FAISS top-k]
 
 # What it delivers
 
+- **An incremental (online) matcher**: resolve one query record against a fixed reference in real time — the per-request path for an API or streaming insert. Not a batch-deduplication tool.
 - **99.1% F1** on the synthetic test corpus (40,013 labelled queries: identical + six clerical perturbations + close + unrelated).
-- **~18 ms/query amortized** *batched* throughput; the honest **online** per-query path is **~45 ms median** (embedding + FAISS + a lightweight trained scorer — no per-query Splink construction).
+- **~32 ms/query amortized** *batched* throughput; the honest **online** per-query path is **~45 ms median** (embedding + FAISS + a lightweight trained scorer — no per-query Splink construction).
 - **Persisted and reusable**: the index reloads without re-embedding the population.
 - **Defensible numbers**: every result reproduces by re-running the code.
 
@@ -147,7 +151,7 @@ Around **7–14 M records** (or when you need replicated, multi-region durabilit
 # The honest caveats
 
 - Results are measured on **synthetic data**; production needs a **labelled sample of true duplicates** to calibrate and validate.
-- **Calibrate `m/u` with labels before production** — supervised calibration improves precision (→100% here); do it with a **pinned prior** so the EM route's free prior can't shift scores (the whitepaper's calibration-pitfall).
+- **Calibrate `m/u` with labels and tune the prior** — supervised calibration improves precision on the de-duplicated 50k reference (→100%); keep the prior anchored, since the calibration gain is deck-dependent (on duplicate-rich data the untrained defaults can win).
 - Volume must clear our capacity thresholds before any external-infra spend.
 
 ---
@@ -157,7 +161,7 @@ Around **7–14 M records** (or when you need replicated, multi-region durabilit
 - Sponsor a short **proof-on-real-data** phase: a representative, labelled sample of the population we must link (with access/privacy).
 - We then commit to an F1 on *that* data, not the synthetic one.
 
-**Value in one line:** near-perfect, explainable identity resolution with batched throughput ~18 ms/query and **online per-query latency ~45 ms** — the per-query Splink rebuild is gone, replaced by a lightweight trained scorer (whitepaper §3.3).
+**Value in one line:** incremental, online identity resolution — match one query record against a fixed reference at ~45 ms per query — with near-perfect, explainable P/R/F1; the per-query Splink rebuild is gone, replaced by a lightweight trained scorer (whitepaper §3.3). For one-off batch linkage of two large populations, use a dedicated batch linker instead.
 
 ---
 
@@ -185,11 +189,11 @@ Query ──► MiniLM embed ──► FAISS top-k ──► lightweight scorer 
 
 **Blocking recall is the ceiling; the scorer is where F1 is won or lost.**
 
-- On the confusion-matrix query set (40k queries): top-20 blocking recall **99.61%** → end-to-end recall **98.29%** — the linkage stage rejects only 4 of the retrieved positives; blocking is the binding constraint.
-- Per-kind through-pipeline recall is now recorded (initial-first-name 90.5%, close 97.6%, identity-typo 99.7%, everything else ≥99.9%): the harder name-level noise is where the residual errors live.
+- On the confusion-matrix query set (40k queries): top-20 blocking recall **99.61%** → end-to-end recall **98.29%**. The binding stage depends on error kind: of 600 false negatives, 465 were retrieved-then-rejected by the matcher (mostly **initialled-first-name** positives: 99.7% blocked but only 90.5% linked), while only 135 were blocking misses (close-variant positives are blocker-capped at 97.7%).
+- Per-kind through-pipeline recall is now recorded (initial-first-name 90.5%, close 97.6%, identity-typo 99.8%, everything else ≥99.9%): the harder name-level noise is where the residual errors live.
 - (Section 7, same perturbed deck, strategy comparison: default blocking recall 99.61%; compact raises it to 99.76% and F1 99.104% → 99.175%.)
 
-> Design implication: improving the embedding/blocking engine is **not** the lever today; linkage configuration is.
+> Design implication: for close-variant noise, improving blocking recall is the lever; for initialled-first-name noise, it is the matcher / a stronger embedder at rank 1.
 
 ---
 
@@ -197,10 +201,10 @@ Query ──► MiniLM embed ──► FAISS top-k ──► lightweight scorer 
 
 | Lever | Effect | Verdict |
 |---|---|---|
-| **Threshold τ** | 0.85→0.95: F1 barely moves (99.104→99.116%); recall scarce | Small—retrieval is the lever now |
+| **Threshold τ** | 0.85→0.95: F1 barely moves (99.104→99.116%); recall scarce | Small—retrieval/matcher is the lever, per error kind |
 | **Serialization** | single seed: R@20 99.76%, F1 99.175% compact vs 99.61%/99.104% default; five-seed companion confirms the ordering | Yes—small, reproducible |
-| **Blocking size k** | 20→100: +recall, ~2.4× scorer time | Diminishing returns |
-| **Weaken address** | never beat full-strength | No (this data) |
+| **Blocking size k** | 20→100: +recall, scorer time only ~1.10× (23.9→26.2 s) | Diminishing returns |
+| **Weaken address** | no effect: F1 99.64% at every strength (reduced-scale 1,200-record sweep) | No (this data) |
 | **Retrain m/u** | §8.1: supervised **improves** (98.79 vs 98.05, precision→99.99%); §8.2 100k (perturbed deck): untrained 97.66 > supervised 97.43 > EM 94.86 | Precision-vs-recall: depends on the deck |
 
 ---
@@ -219,20 +223,20 @@ Decision-theoretic setting: `τ* = C_FP / (C_FP + C_FN)` — presumes a calibrat
 
 ---
 
-# Calibration: stable and worth doing
+# Calibration: deck-dependent, worth doing with real labels
 
-Retraining the match model is **worth doing with real labels** — and stays coherent when the prior is handled properly.
+Retraining the match model helps on some decks and hurts on others — the prior and the cost model decide.
 
-1. **Supervised calibration improves results** (§8.1): fitting `m/u` on labelled match/non-match pairs lifts F1 to **98.79% vs 98.05% untrained**, precision to **99.99%** (recall 96.59→97.61%) — under the lightweight scorer's weight tables on the perturbed deck.
-2. **Calibration is precision/recall-sensitive on duplicate-rich data** (§8.2 100k, perturbed deck): untrained F1 97.66% > supervised 97.43% > EM 94.86%7% — calibrated schemes hit precision 100% but trade recall; the right variant depends on the deployment cost model.
+1. **Supervised calibration improves results on the de-duplicated 50k reference** (§8.1): fitting `m/u` on labelled pairs lifts F1 to **98.79% vs 98.05% untrained**, precision to **99.99%** (recall 96.59→97.61%).
+2. **On duplicate-rich data the untrained defaults win** (§8.2 100k, perturbed deck): untrained F1 97.66% > supervised 97.43% > EM 94.86% — calibrated schemes hit precision 100% but trade recall; the right variant depends on the deployment cost model (precision- vs recall-critical).
 
-> Supervised calibration uses genuine match/non-match evidence; EM fits `m/u` from the (resemblance-biased) candidate structure. Both stay stable when the prior is kept coherent.
+> Supervised calibration uses genuine match evidence and helps on the near-duplicate-free reference; EM refits error terms to value-equality collisions and is the weakest on the duplicate-bearing benchmark.
 
 > **Rule:** the default config is a coherent bundle (weights + prior + `τ`). Change any part and re-validate **all three** on held-out data.
 
 Keep the prior anchored (default or blocking-adjusted estimate), fit `m/u` with the prior pinned, then **tune `τ` jointly**, with a coherence guard. Full algorithm: **Appendix — Tuning the Match Prior**.
 
-See paper §8.1.
+See paper §8.1–§8.2.
 
 ---
 
@@ -251,7 +255,7 @@ See paper §8.1.
 
 **Roadmap**
 1. Invest in **linkage calibration** (labelled pairs + joint τ/prior tuning).
-2. Do **not** spend on blocking-engine research at this scale. (Future: canopy/embedding-blocked `m/u` training — §Further Research — but only where blocking recall is the binding constraint.)
+2. Spend on **retrieval/embedding only where rank-1 / blocking recall is the binding constraint** (e.g. the initialled-first-name positives and close-variant ceiling here); canopy/embedding-blocked `m/u` training is a §Further Research option, not needed at this scale.
 3. Add a **CI gate** locking F1 on a held-out labelled set.
 4. **Gate go/no-go on internal corporate customer data** — the NC-voter run is only a public-data sanity check (pre-deduplicated; no DOB/email), so the production decision uses the org's own labelled data.
 
@@ -281,8 +285,8 @@ Store     : add / update / delete / save / load (no re-embed on load)
 
 - Confusion matrix (5k refs / 40k queries, perturbed deck): **F1 99.10%**, recall 98.29%, precision 99.94% (strict per-row definition).
 - Same-set blocking recall: **99.61%** @k=20 (Section 7, same deck, default strategy; compact 99.76%).
-- **~18 ms/query amortized batched** (embed + block + scorer); **cold per-query online path median ~45 ms** on the 50k index (embedding ~27 ms + FAISS ~29 ms + scorer ~15 ms).
-- NC-voter (real schema, synthetic mutations): **F1 92–94%**; blocking is the binding constraint at the default `k=20` (linkage becomes binding at `k=100`).
+- **~32 ms/query amortized batched** (embed + block + scorer); **cold per-query online path median ~45 ms** on the 50k index. Stage timings are measured **independently** (embedding ~27 ms, FAISS ~29 ms, scorer ~15 ms — overlapping, so they do not sum to the ~45 ms end-to-end median).
+- NC-voter (real schema, synthetic mutations): **F1 92–94%**; ~88% top-20 blocking recall on the real schema leaves the retrieval stage capping recall (the scorer adds essentially no false positives as `k` grows).
 
 > Baseline engineering numbers — config, hardware, and data shape all move them.
 
@@ -351,9 +355,9 @@ Whitepaper: `docs/entity_resolution_whitepaper.pdf` (source: `.tex`).
 # Checklist before you leave
 
 1. Run `scripts/experiment_confusion_matrix.py --count 5000` and read the JSON.
-2. Reproduce the stable calibration result: `scripts/experiment_mu_tau_interaction.py --base-count 5000`.
+2. Exercise the calibration comparison: `scripts/experiment_mu_calibration.py --index-dir data --query-count 2000` (supervised improves on the 50k reference; the duplicate-bearing benchmark shows the untrained defaults can win — deck-dependent).
 3. Swap `--input-records <your file>` into a population-based experiment.
-4. Find where **blocking recall** caps your F1 — then plan linkage work.
+4. Find where **blocking vs matcher** (per error kind) caps your F1 — then plan retrieval or linkage work accordingly.
 
 That is the fastest way to make these results your own.
 
