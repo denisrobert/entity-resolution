@@ -89,5 +89,9 @@ available copies are flagged with the local link in their row.
 | `decaynote` | whitepaper | “Why the decaying address weight cannot be absorbed into m/u” (technical note, 2026) — source file: `.docs/design_note_mu_cannot_capture_decay.md`|
 | `decaylitreview` | whitepaper | “Time decay in Fellegi–Sunter record linkage: a literature survey” (technical note, 2026) — source file: `.docs/decay-in-fs-litreview.tex` |
 
+| `statcan2021pop` | whitepaper | Statistics Canada, “Census Profile, 2021 Census of Population” — source for the provincial population proportions **and** the national male share (0.493) | https://www12.statcan.gc.ca/census-recensement/2021/dp-pd/prof/index.cfm?Lang=E ✅ (verified 2026-08-24) |
+| `canadapostfsa` | whitepaper | Canada Post, “Addressing guidelines: important information” (postal-code format / forward sortation area) | https://www.canadapost-postescanada.ca/cpc/en/support/articles/addressing-guidelines/important-information.page ✅ (verified 2026-08-24) |
+| `wpcanadapost` | whitepaper | Wikipedia, “Postal codes in Canada” (FSA prefix → province/territory mapping) | https://en.wikipedia.org/wiki/Postal_codes_in_Canada ✅ (verified 2026-08-24) |
+
 
 

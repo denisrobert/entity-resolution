@@ -103,7 +103,7 @@ Figure~\ref{fig:architecture} gives the central view of the pipeline that the re
 \label{fig:architecture}
 \end{figure}
 
-\paragraph{Synthetic-data generator.} The population is produced by the project\textquoteright s \texttt{generate\_data.py} with a fixed seed (42). Given names are gender-correlated: each record is drawn male with probability 0.498 (Statistics Canada 2021 Census share) and the given name is sampled from the male or female Faker name pool accordingly. The province or territory is sampled weighted by its 2021 Census resident population, so Ontario (~38\%), Quebec (~23\%), British Columbia (~14\%), and Alberta (~12\%) dominate as in the real national distribution. Addresses are Faker Canadian addresses whose postal-code forward-sortation-area prefix letter is drawn from the Canada Post mapping for that province (e.g.\ K--P for Ontario, G/H/J for Quebec, V for British Columbia), so the code and the province in a record always agree. Emails are Faker \texttt{ascii\_safe\_email()} addresses (varied local parts and example domains) rather than a mechanical name-based pattern, and ~30\% of addresses and emails are independently omitted. Last names are drawn from Faker\textquoteright s en\_CA surname pool; a non-English given-name distribution is left as future work.
+\paragraph{Synthetic-data generator.} The population is produced by the project\textquoteright s \texttt{generate\_data.py} with a fixed seed (42). Given names are gender-correlated: each record is drawn male with probability 0.493, and the given name is sampled from the male or female Faker name pool accordingly, matching the national male share and provincial proportions reported by Statistics Canada's 2021 Census~\cite{statcan2021pop}. The province or territory is sampled weighted by its 2021 Census resident population~\cite{statcan2021pop}, so Ontario (~38\%), Quebec (~23\%), British Columbia (~14\%), and Alberta (~12\%) dominate as in the real national distribution. Addresses are Faker Canadian addresses whose postal-code forward-sortation-area prefix letter is drawn from the Canada Post mapping for that province~\cite{canadapostfsa,wpcanadapost} (e.g.\ K--P for Ontario, G/H/J for Quebec, V for British Columbia), so the code and the province in a record always agree. Emails are Faker \texttt{ascii\_safe\_email()} addresses (varied local parts and example domains) rather than a mechanical name-based pattern, and ~30\% of addresses and emails are independently omitted. Last names are drawn from Faker\textquoteright s en\_CA surname pool; a non-English given-name distribution is left as future work.
 
 Address and email are independently removed with a configurable default probability of 0.30. Consequently, first name, last name, and date of birth are the most consistently available identity attributes, while address and email are useful but incomplete evidence. Addresses are also treated as less stable because people move and formatting conventions change.
 
@@ -897,6 +897,25 @@ Robin Linacre.
 Denis Robert.
 \newblock Batch deduplication and insertion-time prevention with a shared vector canopy index.
 \newblock Technical report, Independent Researcher, 2026.
+
+\bibitem{statcan2021pop}
+Statistics Canada.
+\newblock Census Profile, 2021 Census of Population (population counts for Canada, provinces and territories).
+\newblock \url{https://www12.statcan.gc.ca/census-recensement/2021/dp-pd/prof/index.cfm?Lang=E}.
+\newblock Accessed 2026-08-24.
+
+\bibitem{canadapostfsa}
+Canada Post.
+\newblock Addressing guidelines: important information (postal-code format; the first three characters form the forward sortation area).
+\newblock \url{https://www.canadapost-postescanada.ca/cpc/en/support/articles/addressing-guidelines/important-information.page}.
+\newblock Accessed 2026-08-24.
+
+\bibitem{wpcanadapost}
+Wikipedia.
+\newblock Postal codes in Canada (forward sortation areas; the first letter of the FSA corresponds to a postal district and, outside Quebec and Ontario, to a province or territory).
+\newblock \url{https://en.wikipedia.org/wiki/Postal_codes_in_Canada}.
+\newblock Accessed 2026-08-24.
+
 \end{thebibliography}
 
 \end{document}
