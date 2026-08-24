@@ -12,18 +12,20 @@
     "model": "sentence-transformers/all-MiniLM-L6-v2",
     "k": 20,
     "tau": 0.85,
+    "phase_mode": "aggregate-only of existing per-seed worker files",
     "note": "Repeated-seed aggregation of experiment_section7_eval.py. Mean +/- 1 SD and empirical 5%/95% percentiles across seeds. DuckDB parallel inference adds small run-to-run count noise."
   },
   "per_seed": [
     {
       "seed": 42,
+      "count": 1500,
       "default": {
-        "r20": 99.81,
-        "f1": 99.233
+        "r20": 99.8,
+        "f1": 99.228
       },
       "identity_first": {
-        "r20": 99.819,
-        "f1": 99.238
+        "r20": 99.8,
+        "f1": 99.228
       },
       "compact": {
         "r20": 99.914,
@@ -32,123 +34,127 @@
     },
     {
       "seed": 43,
+      "count": 1500,
       "default": {
-        "r20": 99.648,
-        "f1": 99.162
+        "r20": 99.667,
+        "f1": 99.171
       },
       "identity_first": {
         "r20": 99.667,
         "f1": 99.171
       },
       "compact": {
-        "r20": 99.838,
-        "f1": 99.249
+        "r20": 99.829,
+        "f1": 99.239
       }
     },
     {
       "seed": 44,
+      "count": 1500,
       "default": {
-        "r20": 99.81,
-        "f1": 99.235
+        "r20": 99.782,
+        "f1": 99.221
       },
       "identity_first": {
-        "r20": 99.81,
-        "f1": 99.235
+        "r20": 99.772,
+        "f1": 99.216
       },
       "compact": {
-        "r20": 99.905,
-        "f1": 99.279
+        "r20": 99.915,
+        "f1": 99.288
       }
     },
     {
       "seed": 45,
+      "count": 1500,
       "default": {
-        "r20": 99.762,
-        "f1": 99.239
+        "r20": 99.781,
+        "f1": 99.244
       },
       "identity_first": {
-        "r20": 99.781,
-        "f1": 99.248
+        "r20": 99.8,
+        "f1": 99.253
       },
       "compact": {
-        "r20": 99.867,
+        "r20": 99.857,
         "f1": 99.277
       }
     },
     {
       "seed": 46,
+      "count": 1500,
       "default": {
-        "r20": 99.8,
-        "f1": 99.172
+        "r20": 99.78,
+        "f1": 99.162
       },
       "identity_first": {
         "r20": 99.8,
-        "f1": 99.177
+        "f1": 99.172
       },
       "compact": {
-        "r20": 99.952,
-        "f1": 99.235
+        "r20": 99.924,
+        "f1": 99.221
       }
     }
   ],
   "aggregated": {
     "default": {
       "r20": {
-        "mean": 99.766,
-        "sd": 0.069,
-        "min": 99.648,
-        "max": 99.81,
-        "p2.5": 99.648,
-        "p97.5": 99.81
+        "mean": 99.762,
+        "sd": 0.054,
+        "min": 99.667,
+        "max": 99.8,
+        "p2.5": 99.667,
+        "p97.5": 99.8
       },
       "f1": {
-        "mean": 99.208,
-        "sd": 0.038,
+        "mean": 99.205,
+        "sd": 0.036,
         "min": 99.162,
-        "max": 99.239,
+        "max": 99.244,
         "p2.5": 99.162,
-        "p97.5": 99.239
+        "p97.5": 99.244
       }
     },
     "identity_first": {
       "r20": {
-        "mean": 99.776,
-        "sd": 0.062,
+        "mean": 99.768,
+        "sd": 0.058,
         "min": 99.667,
-        "max": 99.819,
+        "max": 99.8,
         "p2.5": 99.667,
-        "p97.5": 99.819
+        "p97.5": 99.8
       },
       "f1": {
-        "mean": 99.214,
-        "sd": 0.037,
+        "mean": 99.208,
+        "sd": 0.036,
         "min": 99.171,
-        "max": 99.248,
+        "max": 99.253,
         "p2.5": 99.171,
-        "p97.5": 99.248
+        "p97.5": 99.253
       }
     },
     "compact": {
       "r20": {
-        "mean": 99.895,
-        "sd": 0.044,
-        "min": 99.838,
-        "max": 99.952,
-        "p2.5": 99.838,
-        "p97.5": 99.952
+        "mean": 99.888,
+        "sd": 0.042,
+        "min": 99.829,
+        "max": 99.924,
+        "p2.5": 99.829,
+        "p97.5": 99.924
       },
       "f1": {
-        "mean": 99.265,
-        "sd": 0.022,
-        "min": 99.235,
-        "max": 99.286,
-        "p2.5": 99.235,
-        "p97.5": 99.286
+        "mean": 99.262,
+        "sd": 0.03,
+        "min": 99.221,
+        "max": 99.288,
+        "p2.5": 99.221,
+        "p97.5": 99.288
       }
     }
   },
   "compact_minus_default": {
-    "r20_diff_mean": 0.129,
+    "r20_diff_mean": 0.126,
     "f1_diff_mean": 0.057,
     "note": "positive means compact > default on this population"
   },

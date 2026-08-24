@@ -177,6 +177,10 @@ def main() -> None:
     parser.add_argument("--worker-seed", type=int, default=None,
                         help="Run a single seed as a worker and exit (memory-lean phase); "
                              "the orchestrator spawns one worker per seed.")
+    parser.add_argument("--aggregate-only", action="store_true",
+                        help="Skip worker spawning: aggregate the existing per-seed worker "
+                             "files already present in --seed-dir into --output (useful to "
+                             "resume after an interrupted orchestrator run).")
     parser.add_argument("--keep-seed-files", action="store_true",
                         help="Keep the per-seed worker files instead of deleting them after aggregation.")
     parser.add_argument("--seed-dir", default=None,
@@ -187,10 +191,48 @@ def main() -> None:
         worker_main(args)
         return
 
-    # ---- Orchestrator: one subprocess per seed, then aggregate. ----
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     seed_dir = Path(args.seed_dir) if args.seed_dir else output_path.parent
+
+    if args.aggregate_only:
+        seed_files = sorted(seed_dir.glob("_repeated_seed_*.json"))
+        if not seed_files:
+            print(f"no per-seed worker files found in {seed_dir}")
+            sys.exit(1)
+        agg = aggregate(seed_files)
+        seed_nums = [d["seed"] for d in agg["per_seed"]]
+        results = {
+            "parameters": {
+                "count": args.count,
+                "seeds": seed_nums,
+                "missing_rate": args.missing_rate,
+                "model": args.model,
+                "k": 20,
+                "tau": 0.85,
+                "phase_mode": "aggregate-only of existing per-seed worker files",
+                "note": (
+                    "Repeated-seed aggregation of experiment_section7_eval.py. "
+                    "Mean +/- 1 SD and empirical 5%/95% percentiles across seeds. "
+                    "DuckDB parallel inference adds small run-to-run count noise."
+                ),
+            },
+            **agg,
+            "environment": environment_block(),
+        }
+        output_path.write_text(json.dumps(results, indent=2), encoding="utf-8")
+        print(json.dumps(results["aggregated"], indent=2))
+        print(json.dumps(results["compact_minus_default"], indent=2))
+        print(f"Saved to {output_path}")
+        if not args.keep_seed_files:
+            for path in seed_files:
+                try:
+                    path.unlink()
+                except OSError:
+                    pass
+        return
+
+    # ---- Orchestrator: one subprocess per seed, then aggregate. ----
     seed_dir.mkdir(parents=True, exist_ok=True)
     seed_files: list[Path] = []
     failures: list[int] = []
