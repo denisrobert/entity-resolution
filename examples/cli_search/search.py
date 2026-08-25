@@ -19,6 +19,23 @@ The ``--index-dir`` defaults to the repository's persisted ``data/`` folder.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Expose the repo root, this script's directory, and the shared whitepaper
+# experiment dir so entity_resolution, experiments.common, and the sibling
+# experiment imports (e.g. experiment_duplicate_benchmark) resolve regardless
+# of how this script is invoked.
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _SCRIPT_DIR
+while not (_REPO_ROOT / "pyproject.toml").is_file() and _REPO_ROOT != _REPO_ROOT.parent:
+    _REPO_ROOT = _REPO_ROOT.parent
+for _IMPORT_DIR in (_SCRIPT_DIR, _REPO_ROOT / "experiments" / "whitepaper",
+                    _REPO_ROOT / "experiments", _REPO_ROOT):
+    _IMPORT_DIR_S = str(_IMPORT_DIR)
+    if _IMPORT_DIR_S not in sys.path:
+        sys.path.insert(0, _IMPORT_DIR_S)
+
 import argparse
 import json
 import sys
@@ -28,16 +45,13 @@ from typing import Any
 # Make the project root (entity_pipeline) and scripts/ (generate_data.Person)
 # importable regardless of how this script is invoked.
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(_PROJECT_ROOT))
-sys.path.insert(0, str(_PROJECT_ROOT / "scripts"))
-
-from entity_pipeline import (  # noqa: E402
+from entity_resolution.entity_pipeline import (  # noqa: E402
     Blocker,
     Linker,
     MemoryVectorDatabase,
     default_comparisons,
 )
-from generate_data import Person  # noqa: E402
+from entity_resolution.generate_data import Person  # noqa: E402
 
 
 def _field(record: Any, key: str) -> Any:

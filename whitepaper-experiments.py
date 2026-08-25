@@ -44,7 +44,7 @@ from pathlib import Path
 from typing import Callable, Optional, Sequence
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-SCRIPTS = PROJECT_ROOT / "scripts"
+SCRIPTS = PROJECT_ROOT / "experiments"
 RESULT_DIR = PROJECT_ROOT / "results" / "erwhitepaper"
 NCCV_DIR = PROJECT_ROOT / "datasets" / "ncvoter"
 
@@ -80,6 +80,9 @@ class Experiment:
     # results/erwhitepaper. Data prerequisites (e.g. the persisted FAISS index)
     # are not "results" and may live elsewhere (data/).
     is_result: bool = True
+    # When set (a dotted module under the src package), run as
+    # ``python -m entity_resolution.<module>`` instead of ``python <script>``.
+    module: Optional[str] = None
 
 
 # About the smoke overrides: they exercise the same code paths with count sizes
@@ -89,7 +92,8 @@ EXPERIMENTS: list[Experiment] = [
     Experiment(
         name="generate_index",
         description="Build the persisted 50,000-record FAISS index (precedent for the data-dependent experiments)",
-        script="scripts/generate_data.py",
+        script="src/entity_resolution/generate_data.py",
+        module="generate_data",
         args=["--count", "50000", "--missing-rate", "0.3", "--output-dir", "data"],
         outputs=("data/people.faiss", "data/people.json"),
         smoke_args=["--count", "2000", "--missing-rate", "0.3", "--output-dir", "_smoke_data"],
@@ -98,7 +102,7 @@ EXPERIMENTS: list[Experiment] = [
     Experiment(
         name="confusion_matrix",
         description="Headline confusion matrix: 5,000 reference rows x 3 queries = 15,000 queries at tau=0.85, k=20",
-        script="scripts/experiment_confusion_matrix.py",
+        script="experiments/whitepaper/experiment_confusion_matrix.py",
         args=["--count", "5000", "--seed", "42",
               "--output", "results/erwhitepaper/confusion_matrix_results.json"],
         outputs=("results/erwhitepaper/confusion_matrix_results.json",),
@@ -108,7 +112,7 @@ EXPERIMENTS: list[Experiment] = [
     Experiment(
         name="mu_calibration",
         description="Supervised m/u calibration on the persisted 50k index (entity-disjoint, 6,000 queries)",
-        script="scripts/experiment_mu_calibration.py",
+        script="experiments/whitepaper/experiment_mu_calibration.py",
         args=["--index-dir", "data", "--query-count", "2000", "--train-method", "supervised",
               "--output", "results/erwhitepaper/mu_calibration_results.json"],
         outputs=("results/erwhitepaper/mu_calibration_results.json",),
@@ -119,7 +123,7 @@ EXPERIMENTS: list[Experiment] = [
     Experiment(
         name="duplicate_benchmark",
         description="100k-record duplicate-bearing benchmark (3% twins, 3,000 queries, three m/u schemes)",
-        script="scripts/experiment_duplicate_benchmark.py",
+        script="experiments/whitepaper/experiment_duplicate_benchmark.py",
         args=["--base-count", "100000", "--match-rate", "0.03",
               "--output", "results/erwhitepaper/training_results.json"],
         outputs=("results/erwhitepaper/training_results.json",),
@@ -129,7 +133,7 @@ EXPERIMENTS: list[Experiment] = [
     Experiment(
         name="f1_sweep",
         description="Decision-threshold x address-weight sweep on the 5,000/c15,000-query confusion population",
-        script="scripts/experiment_f1_sweep.py",
+        script="experiments/whitepaper/experiment_f1_sweep.py",
         args=["--count", "5000", "--seed", "42",
               "--output", "results/erwhitepaper/f1_sweep_results.json"],
         outputs=("results/erwhitepaper/f1_sweep_results.json",),
@@ -139,7 +143,7 @@ EXPERIMENTS: list[Experiment] = [
     Experiment(
         name="mu_tau_interaction",
         description="Calibration-robustness (m/u variants x tau) on the duplicate-bearing population",
-        script="scripts/experiment_mu_tau_interaction.py",
+        script="experiments/whitepaper/experiment_mu_tau_interaction.py",
         args=["--base-count", "5000", "--match-rate", "0.03",
               "--output", "results/erwhitepaper/mu_tau_interaction.json"],
         outputs=("results/erwhitepaper/mu_tau_interaction.json",),
@@ -149,7 +153,7 @@ EXPERIMENTS: list[Experiment] = [
     Experiment(
         name="mu_prior_tau_surface",
         description="Joint prior x threshold F1 surface for untrained vs EM m/u",
-        script="scripts/experiment_mu_prior_tau_surface.py",
+        script="experiments/whitepaper/experiment_mu_prior_tau_surface.py",
         args=["--base-count", "5000", "--match-rate", "0.03",
               "--output", "results/erwhitepaper/mu_prior_tau_surface.json"],
         outputs=("results/erwhitepaper/mu_prior_tau_surface.json",),
@@ -159,7 +163,7 @@ EXPERIMENTS: list[Experiment] = [
     Experiment(
         name="online_latency",
         description="Cold online resolver per-query latency on the persisted 50k index (30 queries, breakdown)",
-        script="scripts/experiment_online_latency.py",
+        script="experiments/whitepaper/experiment_online_latency.py",
         args=["--index-dir", "data", "--query-count", "30", "--breakdown",
               "--output", "results/erwhitepaper/online_resolver_latency.json"],
         outputs=("results/erwhitepaper/online_resolver_latency.json",),
@@ -170,7 +174,7 @@ EXPERIMENTS: list[Experiment] = [
     Experiment(
         name="section7_eval",
         description="Measured Section 7 benchmark: row-serialization ablations (default/identity_first/compact) over 5,000 records",
-        script="scripts/experiment_section7_eval.py",
+        script="experiments/whitepaper/experiment_section7_eval.py",
         args=["--count", "5000", "--seed", "42",
               "--output", "results/erwhitepaper/section7_results.json",
               "--csv-output", "results/erwhitepaper/section7_metrics.csv"],
@@ -183,7 +187,7 @@ EXPERIMENTS: list[Experiment] = [
     Experiment(
         name="section7_repeated",
         description="Repeated-seed aggregation of the serialization result (seeds 42..46)",
-        script="scripts/experiment_section7_repeated.py",
+        script="experiments/whitepaper/experiment_section7_repeated.py",
         args=["--count", "1500", "--seeds", "42", "43", "44", "45", "46",
               "--output", "results/erwhitepaper/section7_repeated_results.json"],
         outputs=("results/erwhitepaper/section7_repeated_results.json",),
@@ -193,7 +197,7 @@ EXPERIMENTS: list[Experiment] = [
     Experiment(
         name="temporal_gap",
         description="Temporal-decay stress test: 6,000-record index, 180 duplicate pairs, gap cohorts and views incl. gap_weighted",
-        script="scripts/experiment_temporal_gap.py",
+        script="experiments/whitepaper/experiment_temporal_gap.py",
         args=["--base-count", "6000", "--match-rate", "0.03", "--linkage",
               "--output", "results/erwhitepaper/temporal_gap_results.json"],
         outputs=("results/erwhitepaper/temporal_gap_results.json",),
@@ -205,7 +209,7 @@ EXPERIMENTS: list[Experiment] = [
     Experiment(
         name="ncvoter_resolution_k20",
         description="NC-voter mutated-duplicate resolution at k=20",
-        script="scripts/ncvoter/experiment_resolution.py",
+        script="experiments/whitepaper/ncvoter/experiment_resolution.py",
         args=["--sample", "datasets/ncvoter/sample_5000.csv", "--in-index", "3000",
               "--pos-queries", "1500", "--neg-queries", "1500", "--k", "20",
               "--output", "results/erwhitepaper/ncvoter/results_resolution.json"],
@@ -218,7 +222,7 @@ EXPERIMENTS: list[Experiment] = [
     Experiment(
         name="ncvoter_resolution_k50",
         description="NC-voter resolution at k=50",
-        script="scripts/ncvoter/experiment_resolution.py",
+        script="experiments/whitepaper/ncvoter/experiment_resolution.py",
         args=["--sample", "datasets/ncvoter/sample_5000.csv", "--in-index", "3000",
               "--pos-queries", "1500", "--neg-queries", "1500", "--k", "50",
               "--output", "results/erwhitepaper/ncvoter/results_resolution_k50.json"],
@@ -231,7 +235,7 @@ EXPERIMENTS: list[Experiment] = [
     Experiment(
         name="ncvoter_resolution_k100",
         description="NC-voter resolution at k=100",
-        script="scripts/ncvoter/experiment_resolution.py",
+        script="experiments/whitepaper/ncvoter/experiment_resolution.py",
         args=["--sample", "datasets/ncvoter/sample_5000.csv", "--in-index", "3000",
               "--pos-queries", "1500", "--neg-queries", "1500", "--k", "100",
               "--output", "results/erwhitepaper/ncvoter/results_resolution_k100.json"],
@@ -244,7 +248,7 @@ EXPERIMENTS: list[Experiment] = [
     Experiment(
         name="ncvoter_blocking_recall",
         description="NC-voter blocking recall across k=5..100 on 1,000 mutated queries",
-        script="scripts/ncvoter/experiment_blocking_recall.py",
+        script="experiments/whitepaper/ncvoter/experiment_blocking_recall.py",
         args=["--sample", "datasets/ncvoter/sample_5000.csv", "--query-count", "1000",
               "--mutation-seed", "7",
               "--output", "results/erwhitepaper/ncvoter/results_blocking_recall.json"],
@@ -257,7 +261,7 @@ EXPERIMENTS: list[Experiment] = [
     Experiment(
         name="ncvoter_f1_sweep",
         description="NC-voter threshold/address sweep (full-strength vs weakened 0.8)",
-        script="scripts/ncvoter/experiment_f1_sweep.py",
+        script="experiments/whitepaper/ncvoter/experiment_f1_sweep.py",
         args=["--sample", "datasets/ncvoter/sample_5000.csv", "--in-index", "3000",
               "--pos-queries", "1500", "--neg-queries", "1500",
               "--output", "results/erwhitepaper/ncvoter/results_f1_sweep.json"],
@@ -270,7 +274,7 @@ EXPERIMENTS: list[Experiment] = [
 Experiment(
         name="recall_perturbed",
         description="Recall of the persisted 50k index under the 6 PersonPerturbator perturbations (500 queries/kind, R@1 and R@20)",
-        script="scripts/experiment_recall_perturbed.py",
+        script="experiments/whitepaper/experiment_recall_perturbed.py",
         args=["--index-dir", "data", "--per-kind", "500", "--k", "20",
               "--output", "results/erwhitepaper/recall_perturbed_results.json"],
         outputs=("results/erwhitepaper/recall_perturbed_results.json",),
@@ -281,7 +285,7 @@ Experiment(
     Experiment(
         name="recall_perturbed_models",
         description="Multi-model perturbed recall on the 50k base (MiniLM/mdbr/stella/GIST, 500 queries/kind, pinned revisions, OpenVINO GPU)",
-        script="scripts/experiment_recall_perturbed_models.py",
+        script="experiments/whitepaper/experiment_recall_perturbed_models.py",
         args=["--device", "openvino:GPU", "--per-kind", "500", "--k", "20",
               "--output", "results/erwhitepaper/recall_perturbed_models_results.json"],
         outputs=("results/erwhitepaper/recall_perturbed_models_results.json",),
@@ -396,7 +400,10 @@ def resolve_selection(args: argparse.Namespace) -> list[Experiment]:
 
 def command_for(e: Experiment, args: argparse.Namespace) -> list[str]:
     py = args.python or sys.executable
-    cmd = [py, str(PROJECT_ROOT / e.script)]
+    if e.module:
+        cmd = [py, "-m", f"entity_resolution.{e.module}"]
+    else:
+        cmd = [py, str(PROJECT_ROOT / e.script)]
     cmd.extend(list(e.smoke_args) if args.smoke else list(e.args))
     return cmd
 

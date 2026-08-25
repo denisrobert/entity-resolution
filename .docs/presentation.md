@@ -300,14 +300,14 @@ Run from repo root; scripts have `--help` and deterministic seeds (default 42).
 
 | Paper section | Script |
 |---|---|
-| §7 evaluation | `scripts/experiment_section7_eval.py` |
-| §8 confusion matrix | `scripts/experiment_confusion_matrix.py` |
-| §8.1 m/u calibration | `scripts/experiment_mu_calibration.py` |
-| §8.2 duplicate benchmark | `scripts/experiment_duplicate_benchmark.py` |
-| §8.3 F1 sweep | `scripts/experiment_f1_sweep.py` |
-| calibration robustness | `scripts/experiment_mu_tau_interaction.py` |
-| joint τ×prior surface | `scripts/experiment_mu_prior_tau_surface.py` |
-| NC-voter replication | `scripts/ncvoter/*` + `extract_ncvoter.py` |
+| §7 evaluation | `experiments/whitepaper/experiment_section7_eval.py` |
+| §8 confusion matrix | `experiments/whitepaper/experiment_confusion_matrix.py` |
+| §8.1 m/u calibration | `experiments/whitepaper/experiment_mu_calibration.py` |
+| §8.2 duplicate benchmark | `experiments/whitepaper/experiment_duplicate_benchmark.py` |
+| §8.3 F1 sweep | `experiments/whitepaper/experiment_f1_sweep.py` |
+| calibration robustness | `experiments/whitepaper/experiment_mu_tau_interaction.py` |
+| joint τ×prior surface | `experiments/whitepaper/experiment_mu_prior_tau_surface.py` |
+| NC-voter replication | `experiments/whitepaper/ncvoter/*` + `extract_ncvoter.py` |
 
 For **your** data: population-based scripts accept `--input-records FILE`.
 
@@ -329,7 +329,7 @@ For **your** data: population-based scripts accept `--input-records FILE`.
 
 - **Blocking recall is a hard ceiling.** If recall is low, raise `k` or serialization, not the embedding model.
 - **Address weakening didn't help** here — test, don't assume.
-- **Real data needs a mutation/duplicate model** to score (`scripts/ncvoter/ncvoter_util.py`).
+- **Real data needs a mutation/duplicate model** to score (`experiments/whitepaper/ncvoter/ncvoter_util.py`).
 - NC voter has **no full DOB and no email** — those comparisons are weak there.
 
 ---
@@ -355,8 +355,8 @@ Whitepaper: `docs/entity_resolution_whitepaper.pdf` (source: `.tex`).
 
 # Checklist before you leave
 
-1. Run `scripts/experiment_confusion_matrix.py --count 5000` and read the JSON.
-2. Exercise the calibration comparison: `scripts/experiment_mu_calibration.py --index-dir data --query-count 2000` (supervised improves on the 50k reference; the duplicate-bearing benchmark shows the untrained defaults can win — deck-dependent).
+1. Run `experiments/whitepaper/experiment_confusion_matrix.py --count 5000` and read the JSON.
+2. Exercise the calibration comparison: `experiments/whitepaper/experiment_mu_calibration.py --index-dir data --query-count 2000` (supervised improves on the 50k reference; the duplicate-bearing benchmark shows the untrained defaults can win — deck-dependent).
 3. Swap `--input-records <your file>` into a population-based experiment.
 4. Find where **blocking vs matcher** (per error kind) caps your F1 — then plan retrieval or linkage work accordingly.
 

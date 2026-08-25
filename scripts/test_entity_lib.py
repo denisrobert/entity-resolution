@@ -4,15 +4,29 @@ Run with:  python scripts/test_entity_lib.py
 """
 
 import sys
+from pathlib import Path
+
+# Expose the repo root, this script's directory, and the shared whitepaper
+# experiment dir so entity_resolution, experiments.common, and the sibling
+# experiment imports (e.g. experiment_duplicate_benchmark) resolve regardless
+# of how this script is invoked.
+_SCRIPT_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _SCRIPT_DIR
+while not (_REPO_ROOT / "pyproject.toml").is_file() and _REPO_ROOT != _REPO_ROOT.parent:
+    _REPO_ROOT = _REPO_ROOT.parent
+for _IMPORT_DIR in (_SCRIPT_DIR, _REPO_ROOT / "experiments" / "whitepaper",
+                    _REPO_ROOT / "experiments", _REPO_ROOT):
+    _IMPORT_DIR_S = str(_IMPORT_DIR)
+    if _IMPORT_DIR_S not in sys.path:
+        sys.path.insert(0, _IMPORT_DIR_S)
+
+import sys
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from entity_resolver import resolve_threshold  # noqa: E402
-from generate_data import Person  # noqa: E402
-from person_perturbation import (  # noqa: E402
+from entity_resolution.entity_resolver import resolve_threshold  # noqa: E402
+from entity_resolution.generate_data import Person  # noqa: E402
+from entity_resolution.person_perturbation import (  # noqa: E402
     PersonPerturbator,
     Perturbation,
 )

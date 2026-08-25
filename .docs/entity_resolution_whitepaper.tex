@@ -257,7 +257,7 @@ A note on the linkage side of the decay, which is now treated in Section~\ref{se
 \textbf{The basic workflow.} The pipeline is operated with two explicit commands, an offline build and an online query:
 {\footnotesize
 \begin{verbatim}
-python scripts/generate_data.py --count 50000 --missing-rate 0.3 --output-dir data
+python src/entity_resolution/generate_data.py --count 50000 --missing-rate 0.3 --output-dir data
 python scripts/search_cli.py --index-dir data --input-json query.json --threshold 0.85
 \end{verbatim}
 }

@@ -335,35 +335,35 @@ Store     : add / update / delete / save / load (no re-embed on load)
 <tbody>
 <tr>
 <td>§7 evaluation</td>
-<td><code>scripts/experiment_section7_eval.py</code></td>
+<td><code>experiments/whitepaper/experiment_section7_eval.py</code></td>
 </tr>
 <tr>
 <td>§8 confusion matrix</td>
-<td><code>scripts/experiment_confusion_matrix.py</code></td>
+<td><code>experiments/whitepaper/experiment_confusion_matrix.py</code></td>
 </tr>
 <tr>
 <td>§8.1 m/u calibration</td>
-<td><code>scripts/experiment_mu_calibration.py</code></td>
+<td><code>experiments/whitepaper/experiment_mu_calibration.py</code></td>
 </tr>
 <tr>
 <td>§8.2 duplicate benchmark</td>
-<td><code>scripts/experiment_duplicate_benchmark.py</code></td>
+<td><code>experiments/whitepaper/experiment_duplicate_benchmark.py</code></td>
 </tr>
 <tr>
 <td>§8.3 F1 sweep</td>
-<td><code>scripts/experiment_f1_sweep.py</code></td>
+<td><code>experiments/whitepaper/experiment_f1_sweep.py</code></td>
 </tr>
 <tr>
 <td>calibration robustness</td>
-<td><code>scripts/experiment_mu_tau_interaction.py</code></td>
+<td><code>experiments/whitepaper/experiment_mu_tau_interaction.py</code></td>
 </tr>
 <tr>
 <td>joint τ×prior surface</td>
-<td><code>scripts/experiment_mu_prior_tau_surface.py</code></td>
+<td><code>experiments/whitepaper/experiment_mu_prior_tau_surface.py</code></td>
 </tr>
 <tr>
 <td>NC-voter replication</td>
-<td><code>scripts/ncvoter/*</code> + <code>extract_ncvoter.py</code></td>
+<td><code>experiments/whitepaper/ncvoter/*</code> + <code>extract_ncvoter.py</code></td>
 </tr>
 </tbody>
 </table>
@@ -384,7 +384,7 @@ Store     : add / update / delete / save / load (no re-embed on load)
 <ul>
 <li><strong>Blocking recall is a hard ceiling.</strong> If recall is low, raise <code>k</code> or serialization, not the embedding model.</li>
 <li><strong>Address weakening didn't help</strong> here — test, don't assume.</li>
-<li><strong>Real data needs a mutation/duplicate model</strong> to score (<code>scripts/ncvoter/ncvoter_util.py</code>).</li>
+<li><strong>Real data needs a mutation/duplicate model</strong> to score (<code>experiments/whitepaper/ncvoter/ncvoter_util.py</code>).</li>
 <li>NC voter has <strong>no full DOB and no email</strong> — those comparisons are weak there.</li>
 </ul>
 <footer>Two-Stage Incremental Entity Resolution — FAISS + Splink</footer>
@@ -407,8 +407,8 @@ Store     : add / update / delete / save / load (no re-embed on load)
 </foreignObject></svg><svg data-marpit-svg="" viewBox="0 0 1280 720"><foreignObject width="1280" height="720"><section id="26" data-paginate="true" data-footer="Two-Stage Incremental Entity Resolution — FAISS + Splink" data-theme="default" lang="en-US" data-marpit-pagination="26" style="--paginate:true;--footer:Two-Stage Incremental Entity Resolution — FAISS + Splink;--theme:default;" data-marpit-pagination-total="27" data-size="16:9">
 <h1 id="checklist-before-you-leave">Checklist before you leave</h1>
 <ol>
-<li>Run <code>scripts/experiment_confusion_matrix.py --count 5000</code> and read the JSON.</li>
-<li>Exercise the calibration comparison: <code>scripts/experiment_mu_calibration.py --index-dir data --query-count 2000</code> (supervised improves on the 50k reference; the duplicate-bearing benchmark shows the untrained defaults can win — deck-dependent).</li>
+<li>Run <code>experiments/whitepaper/experiment_confusion_matrix.py --count 5000</code> and read the JSON.</li>
+<li>Exercise the calibration comparison: <code>experiments/whitepaper/experiment_mu_calibration.py --index-dir data --query-count 2000</code> (supervised improves on the 50k reference; the duplicate-bearing benchmark shows the untrained defaults can win — deck-dependent).</li>
 <li>Swap <code>--input-records &lt;your file&gt;</code> into a population-based experiment.</li>
 <li>Find where <strong>blocking vs matcher</strong> (per error kind) caps your F1 — then plan retrieval or linkage work accordingly.</li>
 </ol>

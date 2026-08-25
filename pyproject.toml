@@ -96,10 +96,11 @@ openvino = [
 ]
 
 [tool.setuptools]
-# This repository is a scripts-and-helper-modules project (run with the repo
-# root on PYTHONPATH), not a distributable library: expose only the root helper
-# modules and install no package data.
-py-modules = ["model_pins", "scorer", "entity_pipeline"]
+# Core pipeline modules live in a real ``src`` package
+# (``entity_resolution``); the experiment scripts under ``experiments/`` are
+# run as scripts with the repo root on ``sys.path`` and are not installed.
+package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
-include = []
+where = ["src"]
+include = ["entity_resolution*"]

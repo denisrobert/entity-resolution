@@ -49,7 +49,7 @@ interpreters' minor version (3.13) are pinned exactly in `pyproject.toml`
 
 ```bash
 # Generate people, create embeddings, and persist the FAISS index plus metadata
-python scripts/generate_data.py --count 50000 --missing-rate 0.3 --output-dir data
+python src/entity_resolution/generate_data.py --count 50000 --missing-rate 0.3 --output-dir data
 
 # Resolve a person using the persisted index
 python scripts/search_cli.py \
@@ -66,14 +66,14 @@ python scripts/search_cli.py \
 python scripts/search_cli.py --index-dir data --input-json query.json
 
 # Run the 5,000-row confusion-matrix experiment
-python scripts/experiment_confusion_matrix.py --count 5000 --output confusion_matrix_results.json
+python experiments/whitepaper/experiment_confusion_matrix.py --count 5000 --output confusion_matrix_results.json
 
 # Run the full Section 7 evaluation plan
-python scripts/experiment_section7_eval.py --count 5000 --ablation-count 500 \
+python experiments/whitepaper/experiment_section7_eval.py --count 5000 --ablation-count 500 \
   --output section7_results.json --csv-output section7_metrics.csv
 
 # Compare m/u calibration (supervised vs EM vs untrained) on the persisted 50k index
-python scripts/experiment_mu_calibration.py --index-dir data --query-count 2000 \
+python experiments/whitepaper/experiment_mu_calibration.py --index-dir data --query-count 2000 \
   --output mu_calibration_results.json
 ```
 
@@ -142,15 +142,17 @@ recall and 99.77% F1. Results are stored in `section7_results.json` and
 
 ### Python API
 
-The project-root module `entity_pipeline` provides the primary pipeline API. The
-legacy resolver stack (`generate_data`, `vector_store`, `entity_resolver`) is
-maintained under `scripts/`.
+Core pipeline code lives in the installed `entity_resolution` package
+(`src/entity_resolution/`); the legacy resolver stack (`generate_data`,
+`vector_store`, `entity_resolver`, `person_perturbation`) is part of the same
+package. Installed editable with `pip install -e .`.
 
 ```python
-# Legacy resolver API (modules live under scripts/; run with scripts/ on sys.path)
-from generate_data import Person, generate_people
-from entity_resolver import create_resolver
-from vector_store import FaissPersonStore, build_person_store
+# Core package API (import entity_resolution or its submodules)
+from entity_resolution.entity_pipeline import Blocker, Linker, default_comparisons
+from entity_resolution.generate_data import Person, generate_people
+from entity_resolution.entity_resolver import create_resolver
+from entity_resolution.vector_store import FaissPersonStore, build_person_store
 
 # Generate data and build the persisted index once
 people = generate_people(50000, missing_rate=0.3)
@@ -178,12 +180,12 @@ if result:
     print(f"Matched: {result['matched_person'].first_name} {result['matched_person'].last_name}")
 ```
 
-The abstract `Blocker`/`Linker` classes in `entity_pipeline.py` (the root module)
+The abstract `Blocker`/`Linker` classes in `entity_resolution.entity_pipeline`
 expose the two stages separately and support training the Splink `m/u` parameters
 on the vector store:
 
 ```python
-from entity_pipeline import Blocker, Linker, default_comparisons
+from entity_resolution.entity_pipeline import Blocker, Linker, default_comparisons
 
 blocker = Blocker.build(people, k=20)          # index the reference population
 linker = Linker(default_comparisons(), tau=0.85)
@@ -201,7 +203,7 @@ An in-memory store can be persisted to and restored from disk, and exposes
 `update`/`delete` (which rebuild the index) alongside `add`:
 
 ```python
-from entity_pipeline import MemoryVectorDatabase, HuggingFaceEmbeddingModel, FlatIndexingStrategy
+from entity_resolution.entity_pipeline import MemoryVectorDatabase, HuggingFaceEmbeddingModel, FlatIndexingStrategy
 
 db = MemoryVectorDatabase(HuggingFaceEmbeddingModel(), FlatIndexingStrategy())
 db.add(people)
@@ -220,32 +222,45 @@ need persistence.
 
 ```
 entity-resolution/
-├── __init__.py           # Package exports (entity_pipeline API)
-├── requirements.txt      # Dependencies
-├── entity_pipeline.py    # Abstract Blocker/Linker pipeline + in-memory store
-├── scripts/              # Command-line / whitepaper evaluation scripts
-│   ├── common.py         # Shared helpers + dataset loader (reuse on other data)
-│   ├── generate_data.py  # Synthetic Canadian person generation
-│   ├── vector_store.py   # Legacy FAISS vector store (LangChain interface)
-│   ├── entity_resolver.py # Legacy Splink-based resolver
-│   ├── search_cli.py     # Load index and resolve one input person
-│   ├── extract_ncvoter.py # Pre-process the NC voter export into a person CSV
-│   ├── experiment_confusion_matrix.py  # Section 8 confusion-matrix experiment
-│   ├── experiment_section7_eval.py     # Section 7 benchmark suite
-│   ├── experiment_mu_calibration.py    # Section 8.1: supervised/EM vs untrained m/u
-│   ├── experiment_duplicate_benchmark.py  # Section 8.2: 100k duplicate-bearing benchmark
-│   ├── experiment_f1_sweep.py          # Section 8.3: threshold/address-weight F1 sweep
-│   ├── experiment_mu_tau_interaction.py   # Calibration-paradox decomposition
-│   ├── experiment_mu_prior_tau_surface.py # Joint (tau, prior) F1 surface
-│   ├── experiment_smoothing_sweep.py      # Calibration-paradox smoothing (Table 4)
-│   ├── experiment_paradox_figures.py      # Calibration-paradox mechanism figures/metrics
-│   ├── ncvoter/          # Real-data NC-voter experiments (mutation model)
-│   │   ├── ncvoter_util.py              # person mapping + mutation model
-│   │   ├── prepare_sample.py            # subsample the records CSV
-│   │   ├── experiment_blocking_recall.py
-│   │   ├── experiment_resolution.py
-│   │   └── experiment_f1_sweep.py
-│   └── *_results.json    # Saved experiment outputs
+├── pyproject.toml         # Build metadata + deps (pip install -e .)
+├── src/
+│   └── entity_resolution/ # Installed core package
+│       ├── __init__.py         # Package exports (entity_pipeline API, resolver stack)
+│       ├── entity_pipeline.py  # Abstract Blocker/Linker pipeline + in-memory store
+│       ├── scorer.py           # Splink-trained lightweight scorer / WeightTable
+│       ├── model_pins.py       # Pinned embedding model id/revision
+│       ├── generate_data.py    # Synthetic Canadian person generation
+│       ├── vector_store.py     # FAISS vector store (LangChain interface)
+│       ├── entity_resolver.py  # Splink-based resolver
+│       ├── person_perturbation.py  # Clerical-error perturbation model
+│       ├── continuous_linker.py    # Belin–Rubin EM continuous linker
+│       └── metrics.py          # Additional evaluation metrics
+├── experiments/            # Whitepaper/companion experiment scripts
+│   ├── common/             # Shared helpers + dataset loader (experiments.common)
+│   ├── whitepaper/         # Experiments feeding entity_resolution_whitepaper.tex
+│   │   ├── experiment_confusion_matrix.py  # §8 confusion-matrix experiment
+│   │   ├── experiment_section7_eval.py     # §7 benchmark suite
+│   │   ├── experiment_mu_calibration.py    # §8.1 supervised/EM vs untrained m/u
+│   │   ├── experiment_duplicate_benchmark.py  # §8.2 100k duplicate-bearing benchmark
+│   │   ├── experiment_f1_sweep.py          # §8.3 threshold/address-weight F1 sweep
+│   │   ├── experiment_mu_tau_interaction.py   # calibration-paradox decomposition
+│   │   ├── experiment_mu_prior_tau_surface.py # joint (tau, prior) F1 surface
+│   │   ├── experiment_smoothing_sweep.py      # calibration-paradox smoothing (Table 4)
+│   │   ├── experiment_recall_perturbed.py     # blocking recall under perturbations
+│   │   ├── experiment_online_latency.py       # cold online resolver latency
+│   │   ├── ...
+│   │   └── ncvoter/       # Real-data NC-voter experiments (mutation model)
+│   │       ├── ncvoter_util.py              # person mapping + mutation model
+│   │       ├── prepare_sample.py            # subsample the records CSV
+│   │       ├── experiment_blocking_recall.py
+│   │       ├── experiment_resolution.py
+│   │       └── experiment_f1_sweep.py
+│   ├── batch/             # Duplicate-bearing batch metrics (vector_dedup_batch.tex)
+│   └── paradox/           # Calibration-paradox figures (calibration_paradox.tex)
+├── scripts/               # Tooling that stays at the legacy location
+│   ├── search_cli.py      # Load index and resolve one input person
+│   ├── test_entity_lib.py # Unit tests for the core library
+│   └── verify_claims.py   # Cross-check paper numbers vs result artifacts
 ├── data/                 # Persisted FAISS index and person metadata (synthetic)
 ├── datasets/ncvoter/     # NC voter export + derived CSVs (not committed)
 ├── examples/             # Runnable example projects (search a saved index)
@@ -317,16 +332,16 @@ export first (see below).
 
 | Paper section | Script | Command |
 |---|---|---|
-| §7 benchmark suite | `scripts/experiment_section7_eval.py` | `python scripts/experiment_section7_eval.py --count 5000 --ablation-count 500 --output results/erwhitepaper/section7_results.json --csv-output results/erwhitepaper/section7_metrics.csv` |
-| Blocking recall under clerical perturbations | `scripts/experiment_recall_perturbed.py` | `python scripts/experiment_recall_perturbed.py --index-dir data --per-kind 500 --k 20 --output results/erwhitepaper/recall_perturbed_results.json` |
-| §8 confusion matrix | `scripts/experiment_confusion_matrix.py` | `python scripts/experiment_confusion_matrix.py --count 5000 --output results/erwhitepaper/confusion_matrix_results.json` (add `--address-strength 0.8` for the weakened-address run) |
-| §8.1 m/u (supervised/EM vs untrained) | `scripts/experiment_mu_calibration.py` | `python scripts/experiment_mu_calibration.py --index-dir data --query-count 2000 --output results/erwhitepaper/mu_calibration_results.json` |
-| §8.2 duplicate-bearing benchmark | `scripts/experiment_duplicate_benchmark.py` | `python scripts/experiment_duplicate_benchmark.py --base-count 100000 --match-rate 0.03 --output results/erwhitepaper/training_results.json` |
-| §8.3 threshold/address-weight sweep | `scripts/experiment_f1_sweep.py` | `python scripts/experiment_f1_sweep.py --count 5000 --address-strengths 0.6 0.7 0.8 0.9 0.95 1.0 --output results/erwhitepaper/f1_sweep_results.json` |
-| Calibration-paradox decomposition | `scripts/experiment_mu_tau_interaction.py` | `python scripts/experiment_mu_tau_interaction.py --base-count 5000 --match-rate 0.03 --output results/calibration/mu_tau_interaction.json` |
-| Joint (τ, prior) F1 surface | `scripts/experiment_mu_prior_tau_surface.py` | `python scripts/experiment_mu_prior_tau_surface.py --base-count 5000 --output results/calibration/mu_prior_tau_surface.json` |
-| Calibration-paradox smoothing (Table 4) | `scripts/experiment_smoothing_sweep.py` | `python scripts/experiment_smoothing_sweep.py --index-dir data --query-count 2000 --output results/calibration/smoothing_sweep.json` |
-| Calibration-paradox mechanism figures/metrics | `scripts/experiment_paradox_figures.py` | `python scripts/experiment_paradox_figures.py --dataset ncvoter --out-dir results/calibration` and `... --dataset synthetic --out-dir results/calibration` |
+| §7 benchmark suite | `experiments/whitepaper/experiment_section7_eval.py` | `python experiments/whitepaper/experiment_section7_eval.py --count 5000 --ablation-count 500 --output results/erwhitepaper/section7_results.json --csv-output results/erwhitepaper/section7_metrics.csv` |
+| Blocking recall under clerical perturbations | `experiments/whitepaper/experiment_recall_perturbed.py` | `python experiments/whitepaper/experiment_recall_perturbed.py --index-dir data --per-kind 500 --k 20 --output results/erwhitepaper/recall_perturbed_results.json` |
+| §8 confusion matrix | `experiments/whitepaper/experiment_confusion_matrix.py` | `python experiments/whitepaper/experiment_confusion_matrix.py --count 5000 --output results/erwhitepaper/confusion_matrix_results.json` (add `--address-strength 0.8` for the weakened-address run) |
+| §8.1 m/u (supervised/EM vs untrained) | `experiments/whitepaper/experiment_mu_calibration.py` | `python experiments/whitepaper/experiment_mu_calibration.py --index-dir data --query-count 2000 --output results/erwhitepaper/mu_calibration_results.json` |
+| §8.2 duplicate-bearing benchmark | `experiments/whitepaper/experiment_duplicate_benchmark.py` | `python experiments/whitepaper/experiment_duplicate_benchmark.py --base-count 100000 --match-rate 0.03 --output results/erwhitepaper/training_results.json` |
+| §8.3 threshold/address-weight sweep | `experiments/whitepaper/experiment_f1_sweep.py` | `python experiments/whitepaper/experiment_f1_sweep.py --count 5000 --address-strengths 0.6 0.7 0.8 0.9 0.95 1.0 --output results/erwhitepaper/f1_sweep_results.json` |
+| Calibration-paradox decomposition | `experiments/whitepaper/experiment_mu_tau_interaction.py` | `python experiments/whitepaper/experiment_mu_tau_interaction.py --base-count 5000 --match-rate 0.03 --output results/calibration/mu_tau_interaction.json` |
+| Joint (τ, prior) F1 surface | `experiments/whitepaper/experiment_mu_prior_tau_surface.py` | `python experiments/whitepaper/experiment_mu_prior_tau_surface.py --base-count 5000 --output results/calibration/mu_prior_tau_surface.json` |
+| Calibration-paradox smoothing (Table 4) | `experiments/whitepaper/experiment_smoothing_sweep.py` | `python experiments/whitepaper/experiment_smoothing_sweep.py --index-dir data --query-count 2000 --output results/calibration/smoothing_sweep.json` |
+| Calibration-paradox mechanism figures/metrics | `experiments/paradox/experiment_paradox_figures.py` | `python experiments/paradox/experiment_paradox_figures.py --dataset ncvoter --out-dir results/calibration` and `... --dataset synthetic --out-dir results/calibration` |
 
 The entity-resolutions-whitepaper results are persisted under `results/erwhitepaper/`
 (and `results/erwhitepaper/ncvoter/` for the NC-voter runs); every table/figure in
@@ -340,7 +355,7 @@ table/figure in `.docs/calibration_paradox.tex` cites the artifact that produced
 `--index-dir data`. If that artifact is absent, regenerate it first:
 
 ```bash
-python scripts/generate_data.py --count 50000 --missing-rate 0.3 --output-dir data
+python src/entity_resolution/generate_data.py --count 50000 --missing-rate 0.3 --output-dir data
 ```
 
 ### NC Voter replication (paper Section 9) — data source and pre-processing
@@ -360,7 +375,7 @@ Pre-process it into a standard person CSV (extract the relevant columns, keep
 birth year, omit the absent email, and drop rows with no first/last name):
 
 ```bash
-python scripts/extract_ncvoter.py \
+python experiments/whitepaper/ncvoter/extract_ncvoter.py \
   --input datasets/ncvoter/ncvoter_Statewide.txt \
   --output datasets/ncvoter/ncvoter_records.csv
 ```
@@ -369,7 +384,7 @@ Then subsample a workable subset (the full file has ~9.2M records; the paper
 uses a 5,000-record uniform sample):
 
 ```bash
-python scripts/ncvoter/prepare_sample.py \
+python experiments/whitepaper/ncvoter/prepare_sample.py \
   --input datasets/ncvoter/ncvoter_records.csv \
   --output datasets/ncvoter/sample_5000.csv --count 5000 --seed 42
 ```
@@ -384,18 +399,18 @@ changes/omissions (55%/20%), and birth-year shifts (~10%). Mutation rates and
 
 ```bash
 # Blocking recall: does a mutated duplicate recover its clean base at k=5..100?
-python scripts/ncvoter/experiment_blocking_recall.py \
+python experiments/whitepaper/ncvoter/experiment_blocking_recall.py \
   --sample datasets/ncvoter/sample_5000.csv --query-count 1000 --k 5 10 20 50 100 \
   --output results/erwhitepaper/ncvoter/results_blocking_recall.json
 
 # Confusion matrix + F1 (re-run with --k 50 / --k 100 for the k-scaling analysis)
-python scripts/ncvoter/experiment_resolution.py \
+python experiments/whitepaper/ncvoter/experiment_resolution.py \
   --sample datasets/ncvoter/sample_5000.csv \
   --in-index 3000 --pos-queries 1500 --neg-queries 1500 --k 20 --threshold 0.85 \
   --output results/erwhitepaper/ncvoter/results_resolution.json
 
 # Threshold/address-weight F1 sweep
-python scripts/ncvoter/experiment_f1_sweep.py \
+python experiments/whitepaper/ncvoter/experiment_f1_sweep.py \
   --sample datasets/ncvoter/sample_5000.csv \
   --in-index 3000 --pos-queries 1500 --neg-queries 1500 \
   --thresholds 0.85 0.9 0.95 --address-strengths 0.8 1.0 \
@@ -434,7 +449,7 @@ The Splink model is configured with the following priority order:
 ## Artifacts and Caveats
 
 The resolver produces match probabilities, FAISS cosine similarity scores,
-matched person records, and candidate rankings. `scripts/generate_data.py`
+matched person records, and candidate rankings. `src/entity_resolution/generate_data.py`
 persists `data/people.faiss` and `data/people.json`.
 
 The included data is synthetic and intended for evaluation. Splink currently
