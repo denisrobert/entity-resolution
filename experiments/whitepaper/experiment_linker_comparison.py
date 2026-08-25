@@ -8,7 +8,7 @@ are measured.
 
 Usage::
 
-    python scripts/experiment_linker_comparison.py --count 3000 \\
+    python experiments/whitepaper/experiment_linker_comparison.py --count 3000 \\
         --output results/linker_comparison.json
 
 Flags:

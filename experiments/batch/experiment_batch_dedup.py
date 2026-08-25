@@ -25,13 +25,13 @@ Pipeline
 
 Example::
 
-    python scripts/experiment_batch_dedup.py --base-count 20000 --match-rate 0.03 \\
+    python experiments/batch/experiment_batch_dedup.py --base-count 20000 --match-rate 0.03 \\
         --kmeans-clusters 512 --overlap-m 3 --threshold 0.85 \\
         --output batch_dedup_results.json
 
 Quick smoke test::
 
-    python scripts/experiment_batch_dedup.py --base-count 3000 --match-rate 0.03 \\
+    python experiments/batch/experiment_batch_dedup.py --base-count 3000 --match-rate 0.03 \\
         --kmeans-clusters 128 --overlap-m 2 --k 10
 """
 

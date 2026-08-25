@@ -21,7 +21,7 @@ decay from the hard ``two_tier`` bucket on real data.
 
 Reproduction::
 
-    python scripts/experiment_ncvoter_staggered.py \\
+    python experiments/whitepaper/ncvoter/experiment_ncvoter_staggered.py \\
         --snapshots datasets/ncvoter_snapshots/wake_2012.csv \\
             datasets/ncvoter_snapshots/wake_2014.csv \\   # ... any set of years
             datasets/ncvoter_snapshots/wake_2026.csv \\

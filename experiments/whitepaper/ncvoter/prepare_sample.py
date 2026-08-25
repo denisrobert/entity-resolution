@@ -7,7 +7,7 @@ columns. The sampled CSV is then consumed by the ncvoter experiment scripts.
 
 Usage::
 
-    python scripts/ncvoter/prepare_sample.py \\
+    python experiments/whitepaper/ncvoter/prepare_sample.py \\
         --input datasets/ncvoter/ncvoter_records.csv \\
         --output datasets/ncvoter/sample_5000.csv --count 5000 --seed 42
 """

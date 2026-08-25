@@ -19,7 +19,7 @@ Variants:
 
 Usage::
 
-    python scripts/experiment_mu_tau_interaction.py --base-count 5000 --match-rate 0.03 \\
+    python experiments/whitepaper/experiment_mu_tau_interaction.py --base-count 5000 --match-rate 0.03 \\
         --output mu_tau_interaction.json
 """
 

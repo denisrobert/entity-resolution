@@ -23,14 +23,14 @@ index (``data/``) built with the pinned default model.
 
 Usage::
 
-    python scripts/experiment_recall_perturbed.py \
+    python experiments/whitepaper/experiment_recall_perturbed.py \
         --index-dir data --per-kind 500 --k 20 \
         --output results/erwhitepaper/recall_perturbed_results.json
 
     # the same experiment with a different embedding model (index rebuilt first)
-    python scripts/generate_data.py --model sentence-transformers/all-MiniLM-L6-v2 \
+    python src/entity_resolution/generate_data.py --model sentence-transformers/all-MiniLM-L6-v2 \
         --output-dir data_alt
-    python scripts/experiment_recall_perturbed.py --index-dir data_alt
+    python experiments/whitepaper/experiment_recall_perturbed.py --index-dir data_alt
 """
 
 from __future__ import annotations

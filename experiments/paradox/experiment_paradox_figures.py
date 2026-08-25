@@ -18,7 +18,7 @@ Figures are saved to the output directory as PNG: ``paradox_mech1.png`` /
 
 Usage::
 
-    python scripts/experiment_paradox_figures.py \\
+    python experiments/paradox/experiment_paradox_figures.py \\
         --sample datasets/ncvoter/sample_5000.csv --out-dir .docs/figures
 """
 

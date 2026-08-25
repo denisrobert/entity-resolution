@@ -10,7 +10,7 @@ comparable F1 only near low prior AND high tau, which is why a fixed
 
 Usage::
 
-    python scripts/experiment_mu_prior_tau_surface.py --base-count 5000 \\
+    python experiments/whitepaper/experiment_mu_prior_tau_surface.py --base-count 5000 \\
         --priors 1e-5 1e-4 1e-3 5e-3 1e-2 --taus 0.5 0.85 0.9 0.95 0.98 \\
         --output mu_prior_tau_surface.json
 """

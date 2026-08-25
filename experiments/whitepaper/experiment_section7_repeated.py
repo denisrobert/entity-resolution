@@ -19,12 +19,12 @@ Example:
 
 .. code-block:: powershell
 
-    python scripts/experiment_section7_repeated.py --count 1500 \\
+    python experiments/whitepaper/experiment_section7_repeated.py --count 1500 \\
         --seeds 42 43 44 45 46 \\
         --output results/erwhitepaper/section7_repeated_results.json
 
     # worker mode (used internally by the orchestrator; can also be driven manually)
-    python scripts/experiment_section7_repeated.py --worker-seed 42 \\
+    python experiments/whitepaper/experiment_section7_repeated.py --worker-seed 42 \\
         --count 1500 --output _repeated_seed_42.json
 
 The single-seed ``section7_results.json`` remains the canonical artifact; this

@@ -24,7 +24,7 @@ recall at small k can be weighed against latency.
 
 Example::
 
-    python scripts/experiment_small_k_recall.py --base-count 20000 --match-rate 0.03 \\
+    python experiments/whitepaper/experiment_small_k_recall.py --base-count 20000 --match-rate 0.03 \\
         --k "1 5 10 20" --views full identity contact multi_union \\
         --model sentence-transformers/all-MiniLM-L6-v2 \\
         --output small_k_recall_results.json

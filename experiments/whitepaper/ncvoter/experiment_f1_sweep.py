@@ -7,7 +7,7 @@ operating point.
 
 Usage::
 
-    python scripts/ncvoter/experiment_f1_sweep.py \\
+    python experiments/whitepaper/ncvoter/experiment_f1_sweep.py \\
         --sample datasets/ncvoter/sample_5000.csv \\
         --in-index 3000 --pos-queries 1500 --neg-queries 1500 \\
         --thresholds 0.85 0.9 0.95 \\

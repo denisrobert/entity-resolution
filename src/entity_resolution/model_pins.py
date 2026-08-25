@@ -13,7 +13,7 @@ Reproducibility pins:
 
 The revision is enforced by the embedding construction sites in
 ``entity_pipeline.HuggingFaceEmbeddingModel`` and
-``scripts/vector_store.FaissPersonStore`` (and the direct
+``src/entity_resolution/vector_store.FaissPersonStore`` (and the direct
 ``HuggingFaceEmbeddings`` use in the Section 7 evaluator).
 """
 

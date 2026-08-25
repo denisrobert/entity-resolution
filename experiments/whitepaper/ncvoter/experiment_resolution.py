@@ -14,7 +14,7 @@ evaluates real record linkage with noise on a real-world schema.
 
 Usage::
 
-    python scripts/ncvoter/experiment_resolution.py \\
+    python experiments/whitepaper/ncvoter/experiment_resolution.py \\
         --sample datasets/ncvoter/sample_5000.csv \\
         --in-index 3000 --pos-queries 1500 --neg-queries 1500 \\
         --k 20 --threshold 0.85 --output ncvoter_resolution.json

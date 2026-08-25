@@ -27,7 +27,7 @@ resolution. This script separates two effects:
 
 Example::
 
-    python scripts/experiment_field_ordering.py --base-count 3000 \\
+    python experiments/batch/experiment_field_ordering.py --base-count 3000 \\
         --kmeans-clusters 128 --overlap-m 2 --permutations 24 \\
         --output field_ordering_results.json
 """

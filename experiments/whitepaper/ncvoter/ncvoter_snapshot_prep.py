@@ -19,15 +19,15 @@ so this script provides two reproducible, memory-safe steps:
 Reproduction::
 
     # 1. extract one county from the 2012 and 2022 snapshots (optionally --limit)
-    python scripts/ncvoter_snapshot_prep.py extract \\
+    python experiments/whitepaper/ncvoter/ncvoter_snapshot_prep.py extract \\
         --source datasets/ncvoter_historical/VR_Snapshot_20120101.zip \\
         --county WAKE --output datasets/ncvoter_snapshots/wake_2012.csv
-    python scripts/ncvoter_snapshot_prep.py extract \\
+    python experiments/whitepaper/ncvoter/ncvoter_snapshot_prep.py extract \\
         --source datasets/ncvoter_historical/VR_Snapshot_20220101.zip \\
         --county WAKE --output datasets/ncvoter_snapshots/wake_2022.csv
 
     # 2. join the two snapshots into temporal duplicate/stable pairs
-    python scripts/ncvoter_snapshot_prep.py join \\
+    python experiments/whitepaper/ncvoter/ncvoter_snapshot_prep.py join \\
         --older datasets/ncvoter_snapshots/wake_2012.csv \\
         --newer datasets/ncvoter_snapshots/wake_2022.csv
 

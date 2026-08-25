@@ -15,7 +15,7 @@ is stable across snapshots), and then scores the same blocking methods as
 
 Reproduction::
 
-    python scripts/experiment_ncvoter_real.py \\
+    python experiments/whitepaper/ncvoter/experiment_ncvoter_real.py \\
         --older datasets/ncvoter_snapshots/wake_2012.csv \\
         --newer datasets/ncvoter_snapshots/wake_2026.csv \\
         --sample 20000 --seed 0 --output datasets/ncvoter_snapshots/real_results.json

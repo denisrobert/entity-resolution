@@ -23,7 +23,7 @@ real-world schema. The evaluation pairings are:
    sample):
 
    ```bash
-   python scripts/ncvoter/prepare_sample.py \
+   python experiments/whitepaper/ncvoter/prepare_sample.py \
      --input datasets/ncvoter/ncvoter_records.csv \
      --output datasets/ncvoter/sample_5000.csv --count 5000 --seed 42
    ```
@@ -31,14 +31,14 @@ real-world schema. The evaluation pairings are:
 2. **Blocking recall** (does a mutated duplicate recover its clean base `@k`?)
 
    ```bash
-   python scripts/ncvoter/experiment_blocking_recall.py \
+   python experiments/whitepaper/ncvoter/experiment_blocking_recall.py \
      --sample datasets/ncvoter/sample_5000.csv --query-count 1000 --k 5 10 20
    ```
 
 3. **Confusion matrix + F1** (mutated-positive vs mutated-negative):
 
    ```bash
-   python scripts/ncvoter/experiment_resolution.py \
+   python experiments/whitepaper/ncvoter/experiment_resolution.py \
      --sample datasets/ncvoter/sample_5000.csv \
      --in-index 3000 --pos-queries 1500 --neg-queries 1500 --k 20 --threshold 0.85
    ```
@@ -46,7 +46,7 @@ real-world schema. The evaluation pairings are:
 4. **Threshold / address-weight F1 sweep** (same mutated setup):
 
    ```bash
-   python scripts/ncvoter/experiment_f1_sweep.py \
+   python experiments/whitepaper/ncvoter/experiment_f1_sweep.py \
      --sample datasets/ncvoter/sample_5000.csv \
      --in-index 3000 --pos-queries 1500 --neg-queries 1500 \
      --thresholds 0.85 0.9 0.95 --address-strengths 0.8 1.0
@@ -61,5 +61,5 @@ real-world schema. The evaluation pairings are:
 - Mutation rates and the mutation seed are configurable (defaults in
   `ncvoter_util.DEFAULT_MUTATION_RATES`; `--mutation-seed` on each script).
 - Results are written as JSON next to wherever each script is run.
-- These scripts live in `scripts/ncvoter/` so they do not perturb the synthetic
+- These scripts live in `experiments/whitepaper/ncvoter/` so they do not perturb the synthetic
   whitepaper experiments in `scripts/`.

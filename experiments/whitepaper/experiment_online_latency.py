@@ -20,7 +20,7 @@ Example:
 
 .. code-block:: powershell
 
-    python scripts/experiment_online_latency.py --index-dir data --query-count 25 \
+    python experiments/whitepaper/experiment_online_latency.py --index-dir data --query-count 25 \
         --breakdown --output results/erwhitepaper/online_resolver_latency.json
 """
 

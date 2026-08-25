@@ -18,7 +18,7 @@ from a resolved settings dict):
 
 This matches the expression Splink's ``predict`` lowers to SQL, so value->level
 mapping is identical by construction and the scorer can be validated against
-``Linker.inference.predict`` on shared pairs (see scripts/experiment_lightweight_scorer.py).
+``Linker.inference.predict`` on shared pairs (see experiments/whitepaper/experiment_lightweight_scorer.py).
 """
 
 from __future__ import annotations

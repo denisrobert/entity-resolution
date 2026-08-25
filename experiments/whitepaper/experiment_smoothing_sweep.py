@@ -9,7 +9,7 @@ Result: results/calibration/smoothing_sweep.json
 
 Usual run::
 
-    python scripts/experiment_smoothing_sweep.py --index-dir data --query-count 2000 \\
+    python experiments/whitepaper/experiment_smoothing_sweep.py --index-dir data --query-count 2000 \\
         --output results/calibration/smoothing_sweep.json
 """
 

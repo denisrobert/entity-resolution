@@ -8,7 +8,7 @@ of the whitepaper's top-k blocking recall.
 
 Usage::
 
-    python scripts/ncvoter/experiment_blocking_recall.py \\
+    python experiments/whitepaper/ncvoter/experiment_blocking_recall.py \\
         --sample datasets/ncvoter/sample_5000.csv --query-count 1000 \\
         --k 5 10 20 --output ncvoter_blocking_recall.json
 """

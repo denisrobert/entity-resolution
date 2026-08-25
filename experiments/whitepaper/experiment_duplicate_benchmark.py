@@ -17,13 +17,13 @@ reported as a confusion matrix plus metrics, with F1 highlighted.
 
 Example::
 
-    python scripts/experiment_duplicate_benchmark.py --base-count 100000 --match-rate 0.03 \\
+    python experiments/whitepaper/experiment_duplicate_benchmark.py --base-count 100000 --match-rate 0.03 \\
         --k 20 --threshold 0.85 \\
         --output training_results.json
 
 Quick smoke test with a small base::
 
-    python scripts/experiment_duplicate_benchmark.py --base-count 3000 --match-rate 0.03 --k 10
+    python experiments/whitepaper/experiment_duplicate_benchmark.py --base-count 3000 --match-rate 0.03 --k 10
 """
 
 from __future__ import annotations

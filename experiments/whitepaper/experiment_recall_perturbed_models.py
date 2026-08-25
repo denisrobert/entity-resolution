@@ -23,12 +23,12 @@ so the numbers are reproducible.
 
 Usage::
 
-    python scripts/experiment_recall_perturbed_models.py \\
+    python experiments/whitepaper/experiment_recall_perturbed_models.py \\
         --per-kind 500 --k 20 \\
         --output results/erwhitepaper/recall_perturbed_models_results.json
 
     # run only a subset / different sizes
-    python scripts/experiment_recall_perturbed_models.py \\
+    python experiments/whitepaper/experiment_recall_perturbed_models.py \\
         --models mini,mdbr --per-kind 200 --k 20
 """
 

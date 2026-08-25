@@ -9,7 +9,7 @@ maximum probability and scored as a confusion matrix + F1. The sweep reports the
 
 Usage::
 
-    python scripts/experiment_f1_sweep.py --count 5000 \\
+    python experiments/whitepaper/experiment_f1_sweep.py --count 5000 \\
         --address-strengths 0.6 0.8 1.0 1.2 \\
         --thresholds 0.85 0.87 0.9 0.92 0.95 \\
         --output f1_sweep_results.json

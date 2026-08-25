@@ -35,9 +35,9 @@ Method
 
 Usage::
 
-    python scripts/experiment_lightweight_scorer.py --count 1500 \
+    python experiments/whitepaper/experiment_lightweight_scorer.py --count 1500 \
         --output results/lightweight_scorer_results.json
-    python scripts/experiment_lightweight_scorer.py --index-dir data \
+    python experiments/whitepaper/experiment_lightweight_scorer.py --index-dir data \
         --query-count 200 --output results/lightweight_scorer_results.json
 """
 

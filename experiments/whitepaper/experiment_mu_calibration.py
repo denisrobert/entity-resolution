@@ -16,7 +16,7 @@ Usual run (full 50k reference index, sample of queries for feasibility):
 
 .. code-block:: powershell
 
-    python scripts/experiment_mu_calibration.py --index-dir data --query-count 2000 \\
+    python experiments/whitepaper/experiment_mu_calibration.py --index-dir data --query-count 2000 \\
         --output mu_calibration_results.json
 """
 

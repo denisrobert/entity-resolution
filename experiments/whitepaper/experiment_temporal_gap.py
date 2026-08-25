@@ -38,9 +38,9 @@ F1 on balanced match/non-match queries, so the decay's effect on *link quality*
 
 Example::
 
-    python scripts/experiment_temporal_gap.py --base-count 15000 --gap all \\
+    python experiments/whitepaper/experiment_temporal_gap.py --base-count 15000 --gap all \\
         --k "1 5 10 20" --output temporal_gap_results.json
-    python scripts/experiment_temporal_gap.py --base-count 8000 --gap all \\
+    python experiments/whitepaper/experiment_temporal_gap.py --base-count 8000 --gap all \\
         --k 10 --linkage --output temporal_gap_results.json
 """
 
@@ -447,7 +447,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "linkage": args.linkage,
             "linkage_threshold": args.threshold,
             "experiment": (
-                "python scripts/experiment_temporal_gap.py --base-count "
+                "python experiments/whitepaper/experiment_temporal_gap.py --base-count "
                 f"{args.base_count} --match-rate {args.match_rate} "
                 f"--gap {args.gap} --k {' '.join(map(str, args.k))} "
                 f"--views {' '.join(args.views)} --seed {args.seed}"
